@@ -595,87 +595,80 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
           
           // Calculate container-relative positions for labels
           const containerWidth = stageSize.width - 40; // Available width for labels
-          const containerCenterX = containerWidth / 2; // Center of label container
           
-          const columnLabels = [];
-          const usedPositions = new Set(); // Track used positions to prevent overlap
+          const columnLabels: JSX.Element[] = [];
           
-          // Generate labels for all columns in the grid
-          for (let col = minCol; col <= maxCol; col++) {
-            // Calculate grid position EXACTLY as CSV reader does: (col - 1) * gridSpacing
-            const gridX = (col - 1) * gridSpacing;
+          // NEW APPROACH: Generate labels based on actual pin positions
+          // instead of iterating through grid ranges to avoid 90/270 degree overlap
+          const validPins = pins.filter(pin => pin.gridPosition);
+          const processedPositions = new Set();
+          
+          validPins.forEach(pin => {
+            if (!pin.gridPosition) return;
             
-            // Apply exact same transformations as transformPosition function
-            let transformedX = gridX;
-            let transformedY = 0;
+            // Transform pin position to screen coordinates
+            const pinTransformed = transformPosition(pin);
             
-            // Apply rotation (same as transformPosition)
-            if (rotation !== 0) {
-              const rad = (rotation * Math.PI) / 180;
-              const cos = Math.cos(rad);
-              const sin = Math.sin(rad);
-              const newX = transformedX * cos - transformedY * sin;
-              const newY = transformedX * sin + transformedY * cos;
-              transformedX = newX;
-              transformedY = newY;
+            // Check if this pin contributes to column labels (within reasonable Y range for header)
+            const headerY = 15; // Center of header area
+            const yTolerance = 200; // Allow labels that might be visible in header
+            
+            // Round position to avoid duplicate labels for nearby pins
+            const roundedX = Math.round(pinTransformed.x / 25) * 25;
+            const positionKey = `col-${roundedX}`;
+            
+            if (Math.abs(pinTransformed.y - headerY) < yTolerance && !processedPositions.has(positionKey)) {
+              processedPositions.add(positionKey);
+              
+              // Use appropriate grid coordinate based on rotation for the label
+              let displayText: string;
+              switch (rotation) {
+                case 0:
+                case 180:
+                  // Normal orientation: column labels show column numbers
+                  displayText = pin.gridPosition.col.toString();
+                  break;
+                case 90:
+                case 270:
+                  // 90/270 degree rotation: column labels show row letters
+                  displayText = pin.gridPosition.row;
+                  break;
+                default:
+                  displayText = pin.gridPosition.col.toString();
+              }
+              const labelLeft = Math.round(pinTransformed.x - 10);
+              
+              // Check if position is within container
+              const isVisible = labelLeft >= -50 && labelLeft <= containerWidth + 50;
+              
+              if (isVisible) {
+                console.log(`🏷️ Column label for pin ${pin.pinNumber}: pos=${labelLeft}, text="${displayText}"`);
+                
+                columnLabels.push(
+                  <div
+                    key={positionKey}
+                    style={{
+                      position: 'absolute',
+                      left: labelLeft,
+                      top: 0,
+                      width: 20,
+                      height: 30,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 12,
+                      fontWeight: 'bold',
+                      color: '#e0e0e0',
+                      textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
+                      pointerEvents: 'none'
+                    }}
+                  >
+                    {displayText}
+                  </div>
+                );
+              }
             }
-            
-            // Apply mirroring for bottom view (same as transformPosition)
-            if (!isTopView) {
-              transformedX = -transformedX;
-            }
-            
-            // Apply viewport scaling and offset (same as transformPosition)
-            const screenX = transformedX * viewport.scale + viewport.x + containerCenterX;
-            
-            // Column label text - show what the USER would see at this position
-            // Find a representative pin at this column to determine the correct label
-            const samplePin = pins.find(p => p.gridPosition?.col === col);
-            let displayText = col.toString(); // fallback
-            
-            if (samplePin && samplePin.pinNumber) {
-              // Extract column part from actual pin number at this position
-              const columnPart = samplePin.pinNumber.replace(/^[A-Z]+/, '');
-              displayText = columnPart;
-              console.log(`🏷️ Col ${col}: found pin ${samplePin.pinNumber} → display "${displayText}"`);
-            } else {
-              console.log(`🏷️ Col ${col}: no sample pin found, using fallback "${displayText}"`);
-            }
-            
-            // Check if position is within container and not overlapping
-            const labelLeft = Math.round(screenX - 10);
-            const isVisible = labelLeft >= 0 && labelLeft <= containerWidth - 20;
-            
-            // 重複防止のためのキー生成
-            const gridSize = 25;
-            const positionKey = Math.round(labelLeft / gridSize) * gridSize;
-            
-            if (isVisible && !usedPositions.has(positionKey)) {
-              usedPositions.add(positionKey);
-              columnLabels.push(
-                <div
-                  key={`col-${col}-${positionKey}`}
-                  style={{
-                    position: 'absolute',
-                    left: labelLeft,
-                    top: 0,
-                    width: 20,
-                    height: 30,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 12,
-                    fontWeight: 'bold',
-                    color: '#e0e0e0',
-                    textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
-                    pointerEvents: 'none'
-                  }}
-                >
-                  {displayText}
-                </div>
-              );
-            }
-          }
+          });
           
           return columnLabels;
         })()}
@@ -704,88 +697,80 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
           
           // Calculate container-relative positions for labels
           const containerHeight = stageSize.height - 30; // Available height for labels
-          const containerCenterY = containerHeight / 2; // Center of label container
           
-          const rowLabels = [];
-          const usedPositions = new Set(); // Track used positions to prevent overlap
+          const rowLabels: JSX.Element[] = [];
           
-          // Generate labels for all rows in the grid
-          for (let rowIndex = minRow; rowIndex <= maxRow; rowIndex++) {
-            // Calculate grid position EXACTLY as CSV reader does: rowOffset * gridSpacing
-            const gridY = rowIndex * gridSpacing;
+          // NEW APPROACH: Generate labels based on actual pin positions
+          // instead of iterating through grid ranges to avoid 90/270 degree overlap
+          const validPins = pins.filter(pin => pin.gridPosition);
+          const processedPositions = new Set();
+          
+          validPins.forEach(pin => {
+            if (!pin.gridPosition) return;
             
-            // Apply exact same transformations as transformPosition function
-            let transformedX = 0;
-            let transformedY = gridY;
+            // Transform pin position to screen coordinates
+            const pinTransformed = transformPosition(pin);
             
-            // Apply rotation (same as transformPosition)
-            if (rotation !== 0) {
-              const rad = (rotation * Math.PI) / 180;
-              const cos = Math.cos(rad);
-              const sin = Math.sin(rad);
-              const newX = transformedX * cos - transformedY * sin;
-              const newY = transformedX * sin + transformedY * cos;
-              transformedX = newX;
-              transformedY = newY;
+            // Check if this pin contributes to row labels (within reasonable X range for sidebar)
+            const sidebarX = 20; // Center of sidebar area
+            const xTolerance = 200; // Allow labels that might be visible in sidebar
+            
+            // Round position to avoid duplicate labels for nearby pins
+            const roundedY = Math.round(pinTransformed.y / 25) * 25;
+            const positionKey = `row-${roundedY}`;
+            
+            if (Math.abs(pinTransformed.x - sidebarX) < xTolerance && !processedPositions.has(positionKey)) {
+              processedPositions.add(positionKey);
+              
+              // Use appropriate grid coordinate based on rotation for the label
+              let displayText: string;
+              switch (rotation) {
+                case 0:
+                case 180:
+                  // Normal orientation: row labels show row letters
+                  displayText = pin.gridPosition.row;
+                  break;
+                case 90:
+                case 270:
+                  // 90/270 degree rotation: row labels show column numbers
+                  displayText = pin.gridPosition.col.toString();
+                  break;
+                default:
+                  displayText = pin.gridPosition.row;
+              }
+              const labelTop = Math.round(pinTransformed.y - 10);
+              
+              // Check if position is within container
+              const isVisible = labelTop >= -50 && labelTop <= containerHeight + 50;
+              
+              if (isVisible) {
+                console.log(`🏷️ Row label for pin ${pin.pinNumber}: pos=${labelTop}, text="${displayText}"`);
+                
+                rowLabels.push(
+                  <div
+                    key={positionKey}
+                    style={{
+                      position: 'absolute',
+                      left: 0,
+                      top: labelTop,
+                      width: 40,
+                      height: 20,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 12,
+                      fontWeight: 'bold',
+                      color: '#e0e0e0',
+                      textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
+                      pointerEvents: 'none'
+                    }}
+                  >
+                    {displayText}
+                  </div>
+                );
+              }
             }
-            
-            // Apply mirroring for bottom view (same as transformPosition)
-            if (!isTopView) {
-              transformedX = -transformedX;
-            }
-            
-            // Apply viewport scaling and offset (same as transformPosition)
-            const screenY = transformedY * viewport.scale + viewport.y + containerCenterY;
-            
-            // Row label text - show what the USER would see at this position
-            // Find a representative pin at this row to determine the correct label
-            const rowChar = String.fromCharCode(65 + rowIndex); // Convert rowIndex to A, B, C...
-            const samplePin = pins.find(p => p.gridPosition?.row === rowChar);
-            let displayText = rowChar; // fallback
-            
-            if (samplePin && samplePin.pinNumber) {
-              // Extract row part from actual pin number at this position
-              const rowPart = samplePin.pinNumber.replace(/[0-9]+$/, '');
-              displayText = rowPart;
-              console.log(`🏷️ Row ${rowIndex}(${rowChar}): found pin ${samplePin.pinNumber} → display "${displayText}"`);
-            } else {
-              console.log(`🏷️ Row ${rowIndex}(${rowChar}): no sample pin found, using fallback "${displayText}"`);
-            }
-            
-            // Check if position is within container and not overlapping
-            const labelTop = Math.round(screenY - 10);
-            const isVisible = labelTop >= 0 && labelTop <= containerHeight - 20;
-            
-            // 重複防止のためのキー生成
-            const gridSize = 25;
-            const positionKey = Math.round(labelTop / gridSize) * gridSize;
-            
-            if (isVisible && !usedPositions.has(positionKey)) {
-              usedPositions.add(positionKey);
-              rowLabels.push(
-                <div
-                  key={`row-${rowIndex}-${positionKey}`}
-                  style={{
-                    position: 'absolute',
-                    left: 0,
-                    top: labelTop,
-                    width: 40,
-                    height: 20,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 12,
-                    fontWeight: 'bold',
-                    color: '#e0e0e0',
-                    textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
-                    pointerEvents: 'none'
-                  }}
-                >
-                  {displayText}
-                </div>
-              );
-            }
-          }
+          });
           
           return rowLabels;
         })()}

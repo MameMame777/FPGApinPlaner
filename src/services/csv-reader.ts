@@ -273,8 +273,8 @@ export class CSVReader {
         col: parseInt(match[2], 10),
       };
       
-      // Debug specific pins
-      if (pinNumber === 'J3' || pinNumber === 'J4') {
+      // Debug specific pins to understand the parsing issue
+      if (pinNumber === 'J3' || pinNumber === 'J4' || pinNumber === 'A1' || pinNumber === 'B1' || pinNumber === 'D2') {
         console.log(`🔍 parseGridPosition(${pinNumber}):`, gridPos);
       }
       
