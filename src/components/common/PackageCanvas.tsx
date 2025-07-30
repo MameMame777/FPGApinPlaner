@@ -236,8 +236,59 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
       })));
       
       // Debug specific pins that might be problematic
-      const a1 = pins.find(p => p.pinNumber === 'A1');
-      if (a1) console.log('🔍 A1 Debug:', { pinNumber: a1.pinNumber, pinName: a1.pinName, signalName: a1.signalName, gridPosition: a1.gridPosition, position: a1.position, transformed: transformPosition(a1) });
+      const debugPins = ['A1', 'B1', 'A2', 'C3'];
+      debugPins.forEach(pinNum => {
+        const pin = pins.find(p => p.pinNumber === pinNum);
+        if (pin) {
+          console.log(`🔍 ${pinNum} Pin Debug - Rotation:`, rotation, 'isTopView:', isTopView);
+          console.log(`  - Original position:`, pin.position);
+          console.log(`  - Grid position:`, pin.gridPosition);
+          
+          // 手動で座標変換を追跡
+          let { x, y } = pin.position;
+          console.log(`  - Step 1 (original):`, { x, y });
+          
+          // CSVリーダーでの計算を確認
+          if (pin.gridPosition && (packageDims as any).gridSpacing) {
+            const expectedCol = pin.gridPosition.col;
+            const expectedRow = pin.gridPosition.row.charCodeAt(0) - 'A'.charCodeAt(0);
+            const expectedX = (expectedCol - 1) * (packageDims as any).gridSpacing;
+            const expectedY = expectedRow * (packageDims as any).gridSpacing;
+            console.log(`  - Expected from grid (${pin.gridPosition.row}${pin.gridPosition.col}):`, { x: expectedX, y: expectedY });
+            console.log(`  - Match with actual:`, { x: x === expectedX, y: y === expectedY });
+          }
+          
+          // 回転適用
+          if (rotation !== 0) {
+            const rad = (rotation * Math.PI) / 180;
+            const cos = Math.cos(rad);
+            const sin = Math.sin(rad);
+            const newX = x * cos - y * sin;
+            const newY = x * sin + y * cos;
+            x = newX;
+            y = newY;
+            console.log(`  - Step 2 (after rotation):`, { x, y });
+          }
+          
+          // ミラーリング適用
+          if (!isTopView) {
+            x = -x;
+            console.log(`  - Step 3 (after mirroring):`, { x, y });
+          }
+          
+          // 最終的な画面座標
+          const canvasWidth = stageSize.width - 40;
+          const canvasHeight = stageSize.height - 30;
+          const finalX = x * viewport.scale + viewport.x + canvasWidth / 2;
+          const finalY = y * viewport.scale + viewport.y + canvasHeight / 2;
+          console.log(`  - Step 4 (final screen position):`, { x: finalX, y: finalY });
+          
+          // transformPosition関数での結果と比較
+          const transformed = transformPosition(pin);
+          console.log(`  - transformPosition result:`, transformed);
+          console.log(`  - Match:`, { x: Math.abs(finalX - transformed.x) < 0.1, y: Math.abs(finalY - transformed.y) < 0.1 });
+        }
+      });
       
       // Check pins with signal names
       const assignedPins = pins.filter(p => p.signalName && p.signalName.trim() !== '');
@@ -261,7 +312,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
         })));
       }
     }
-  }, [pins, packageDims]);
+  }, [pins, packageDims, rotation, isTopView, viewport, stageSize]);
 
   // Transform coordinates based on view settings with stable scaling
   const transformPosition = (pin: Pin) => {
@@ -285,37 +336,6 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
     }
     
     // Apply viewport scaling and offset (account for label margins)
-    const canvasWidth = stageSize.width - 40; // Account for left margin
-    const canvasHeight = stageSize.height - 30; // Account for top margin
-    const transformedX = x * viewport.scale + viewport.x + canvasWidth / 2;
-    const transformedY = y * viewport.scale + viewport.y + canvasHeight / 2;
-    
-    return { x: transformedX, y: transformedY };
-  };
-
-  // Unified coordinate transformation for grid coordinates (used by grid labels)
-  // This MUST use the exact same transformation logic as transformPosition
-  const transformGridCoord = (gridX: number, gridY: number) => {
-    let x = gridX;
-    let y = gridY;
-    
-    // Apply rotation first (at original scale) - SAME AS transformPosition
-    if (rotation !== 0) {
-      const rad = (rotation * Math.PI) / 180;
-      const cos = Math.cos(rad);
-      const sin = Math.sin(rad);
-      const newX = x * cos - y * sin;
-      const newY = x * sin + y * cos;
-      x = newX;
-      y = newY;
-    }
-    
-    // Apply mirroring for bottom view - SAME AS transformPosition
-    if (!isTopView) {
-      x = -x;
-    }
-    
-    // Apply viewport scaling and offset - SAME AS transformPosition
     const canvasWidth = stageSize.width - 40; // Account for left margin
     const canvasHeight = stageSize.height - 30; // Account for top margin
     const transformedX = x * viewport.scale + viewport.x + canvasWidth / 2;
@@ -571,65 +591,74 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
           const { gridSpacing, minCol, maxCol } = packageDims as any;
           if (!gridSpacing) return null;
           
-          // Calculate visible column range
-          const getVisibleColumnRange = () => {
-            const viewportLeft = -viewport.x - (stageSize.width - 40) / 2;
-            const viewportRight = -viewport.x + (stageSize.width - 40) / 2;
-            const scale = viewport.scale;
-            const visibleMinCol = Math.max(minCol, Math.floor((viewportLeft / scale) / gridSpacing) + 1);
-            const visibleMaxCol = Math.min(maxCol, Math.ceil((viewportRight / scale) / gridSpacing) + 1);
-            return { visibleMinCol, visibleMaxCol };
-          };
+          console.log('🏷️ Column labels generation:', { minCol, maxCol, gridSpacing, viewport });
           
-          const { visibleMinCol, visibleMaxCol } = getVisibleColumnRange();
+          // Calculate container-relative positions for labels
+          const containerWidth = stageSize.width - 40; // Available width for labels
+          const containerCenterX = containerWidth / 2; // Center of label container
+          
           const columnLabels = [];
+          const usedPositions = new Set(); // Track used positions to prevent overlap
           
-          for (let col = visibleMinCol; col <= visibleMaxCol; col++) {
+          // Generate labels for all columns in the grid
+          for (let col = minCol; col <= maxCol; col++) {
+            // Calculate grid position EXACTLY as CSV reader does: (col - 1) * gridSpacing
             const gridX = (col - 1) * gridSpacing;
             
-            // Use transformGridCoord for consistent coordinate transformation
-            const gridPosition = transformGridCoord(gridX, 0); // Base line for columns
-            const screenX = gridPosition.x;
-            const screenY = gridPosition.y;
+            // Apply exact same transformations as transformPosition function
+            let transformedX = gridX;
+            let transformedY = 0;
             
-            // Column label text and positioning
-            let displayText = col.toString();
-            let finalScreenX = screenX;
-            let finalScreenY = screenY; // Use calculated screenY instead of hardcoded 0
-            
-            // Adjust label text and position based on rotation
-            if (rotation === 90 || rotation === 270) {
-              // For rotations, column numbers become row letters
-              if (rotation === 90) {
-                displayText = String.fromCharCode(65 + ((col - minCol) % 26));
-              } else if (rotation === 270) {
-                displayText = String.fromCharCode(65 + ((maxCol - col) % 26));
-              }
-              
-              // For 90°/270°, labels should move to left side (row label area)
-              // But this conflicts with row labels, so we keep them on top with adjusted position
-              finalScreenX = screenX;
-              finalScreenY = Math.max(0, Math.min(30, screenY + 15)); // Clamp to top area
-            } else {
-              // 0°/180°: normal horizontal labels
-              if (!isTopView) {
-                // Flip: reverse column order for bottom view
-                displayText = (maxCol + minCol - col).toString();
-                console.log('🔄 Column flip debug:', `col=${col} → displayText=${displayText}, maxCol=${maxCol}, minCol=${minCol}`);
-              }
+            // Apply rotation (same as transformPosition)
+            if (rotation !== 0) {
+              const rad = (rotation * Math.PI) / 180;
+              const cos = Math.cos(rad);
+              const sin = Math.sin(rad);
+              const newX = transformedX * cos - transformedY * sin;
+              const newY = transformedX * sin + transformedY * cos;
+              transformedX = newX;
+              transformedY = newY;
             }
             
-            // Check visibility - always use horizontal position for column labels
-            const isVisible = finalScreenX >= 0 && finalScreenX <= stageSize.width - 40;
+            // Apply mirroring for bottom view (same as transformPosition)
+            if (!isTopView) {
+              transformedX = -transformedX;
+            }
             
-            if (isVisible) {
+            // Apply viewport scaling and offset (same as transformPosition)
+            const screenX = transformedX * viewport.scale + viewport.x + containerCenterX;
+            
+            // Column label text - show what the USER would see at this position
+            // Find a representative pin at this column to determine the correct label
+            const samplePin = pins.find(p => p.gridPosition?.col === col);
+            let displayText = col.toString(); // fallback
+            
+            if (samplePin && samplePin.pinNumber) {
+              // Extract column part from actual pin number at this position
+              const columnPart = samplePin.pinNumber.replace(/^[A-Z]+/, '');
+              displayText = columnPart;
+              console.log(`🏷️ Col ${col}: found pin ${samplePin.pinNumber} → display "${displayText}"`);
+            } else {
+              console.log(`🏷️ Col ${col}: no sample pin found, using fallback "${displayText}"`);
+            }
+            
+            // Check if position is within container and not overlapping
+            const labelLeft = Math.round(screenX - 10);
+            const isVisible = labelLeft >= 0 && labelLeft <= containerWidth - 20;
+            
+            // 重複防止のためのキー生成
+            const gridSize = 25;
+            const positionKey = Math.round(labelLeft / gridSize) * gridSize;
+            
+            if (isVisible && !usedPositions.has(positionKey)) {
+              usedPositions.add(positionKey);
               columnLabels.push(
                 <div
-                  key={`col-${col}`}
+                  key={`col-${col}-${positionKey}`}
                   style={{
                     position: 'absolute',
-                    left: finalScreenX - 10,
-                    top: finalScreenY,
+                    left: labelLeft,
+                    top: 0,
                     width: 20,
                     height: 30,
                     display: 'flex',
@@ -638,7 +667,8 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                     fontSize: 12,
                     fontWeight: 'bold',
                     color: '#e0e0e0',
-                    textShadow: '1px 1px 2px rgba(0,0,0,0.8)'
+                    textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
+                    pointerEvents: 'none'
                   }}
                 >
                   {displayText}
@@ -670,56 +700,75 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
           const { gridSpacing, minRow, maxRow } = packageDims as any;
           if (!gridSpacing) return null;
           
-          // Calculate visible row range
-          const getVisibleRowRange = () => {
-            const viewportTop = -viewport.y - (stageSize.height - 30) / 2;
-            const viewportBottom = -viewport.y + (stageSize.height - 30) / 2;
-            const scale = viewport.scale;
-            const visibleMinRow = Math.max(minRow, Math.floor((viewportTop / scale) / gridSpacing));
-            const visibleMaxRow = Math.min(maxRow, Math.ceil((viewportBottom / scale) / gridSpacing));
-            return { visibleMinRow, visibleMaxRow };
-          };
+          console.log('🏷️ Row labels generation:', { minRow, maxRow, gridSpacing, viewport });
           
-          const { visibleMinRow, visibleMaxRow } = getVisibleRowRange();
+          // Calculate container-relative positions for labels
+          const containerHeight = stageSize.height - 30; // Available height for labels
+          const containerCenterY = containerHeight / 2; // Center of label container
+          
           const rowLabels = [];
+          const usedPositions = new Set(); // Track used positions to prevent overlap
           
-          for (let rowIndex = visibleMinRow; rowIndex <= visibleMaxRow; rowIndex++) {
+          // Generate labels for all rows in the grid
+          for (let rowIndex = minRow; rowIndex <= maxRow; rowIndex++) {
+            // Calculate grid position EXACTLY as CSV reader does: rowOffset * gridSpacing
             const gridY = rowIndex * gridSpacing;
             
-            // Use transformGridCoord for consistent coordinate transformation
-            const gridPosition = transformGridCoord(0, gridY); // Base line for rows
-            const screenX = gridPosition.x;
-            const screenY = gridPosition.y;
+            // Apply exact same transformations as transformPosition function
+            let transformedX = 0;
+            let transformedY = gridY;
             
-            // Row label text and positioning
-            const labelText = String.fromCharCode(65 + (rowIndex % 26));
-            let displayText = labelText;
-            let finalScreenX = screenX;
-            let finalScreenY = screenY;
-            
-            console.log('📍 Row label debug:', 'rowIndex:', rowIndex, 'labelText:', labelText, 'rotation:', rotation);
-            
-            // Adjust label text based on rotation (but keep position in left area)
-            if (rotation === 90 || rotation === 270) {
-              // For rotations, row letters become column numbers but stay on left
-              displayText = (rowIndex + 1).toString();
-              // Keep labels in left area, just change the text
-              finalScreenX = 0;
-              finalScreenY = screenY;
+            // Apply rotation (same as transformPosition)
+            if (rotation !== 0) {
+              const rad = (rotation * Math.PI) / 180;
+              const cos = Math.cos(rad);
+              const sin = Math.sin(rad);
+              const newX = transformedX * cos - transformedY * sin;
+              const newY = transformedX * sin + transformedY * cos;
+              transformedX = newX;
+              transformedY = newY;
             }
-            // For 0°/180°: keep original row labels (A, B, C, D... - no flip)
             
-            // Check visibility - always use vertical position for row labels
-            const isVisible = finalScreenY >= 0 && finalScreenY <= stageSize.height - 30;
+            // Apply mirroring for bottom view (same as transformPosition)
+            if (!isTopView) {
+              transformedX = -transformedX;
+            }
             
-            if (isVisible) {
+            // Apply viewport scaling and offset (same as transformPosition)
+            const screenY = transformedY * viewport.scale + viewport.y + containerCenterY;
+            
+            // Row label text - show what the USER would see at this position
+            // Find a representative pin at this row to determine the correct label
+            const rowChar = String.fromCharCode(65 + rowIndex); // Convert rowIndex to A, B, C...
+            const samplePin = pins.find(p => p.gridPosition?.row === rowChar);
+            let displayText = rowChar; // fallback
+            
+            if (samplePin && samplePin.pinNumber) {
+              // Extract row part from actual pin number at this position
+              const rowPart = samplePin.pinNumber.replace(/[0-9]+$/, '');
+              displayText = rowPart;
+              console.log(`🏷️ Row ${rowIndex}(${rowChar}): found pin ${samplePin.pinNumber} → display "${displayText}"`);
+            } else {
+              console.log(`🏷️ Row ${rowIndex}(${rowChar}): no sample pin found, using fallback "${displayText}"`);
+            }
+            
+            // Check if position is within container and not overlapping
+            const labelTop = Math.round(screenY - 10);
+            const isVisible = labelTop >= 0 && labelTop <= containerHeight - 20;
+            
+            // 重複防止のためのキー生成
+            const gridSize = 25;
+            const positionKey = Math.round(labelTop / gridSize) * gridSize;
+            
+            if (isVisible && !usedPositions.has(positionKey)) {
+              usedPositions.add(positionKey);
               rowLabels.push(
                 <div
-                  key={`row-${rowIndex}`}
+                  key={`row-${rowIndex}-${positionKey}`}
                   style={{
                     position: 'absolute',
-                    left: finalScreenX,
-                    top: finalScreenY - 10,
+                    left: 0,
+                    top: labelTop,
                     width: 40,
                     height: 20,
                     display: 'flex',
@@ -728,7 +777,8 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                     fontSize: 12,
                     fontWeight: 'bold',
                     color: '#e0e0e0',
-                    textShadow: '1px 1px 2px rgba(0,0,0,0.8)'
+                    textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
+                    pointerEvents: 'none'
                   }}
                 >
                   {displayText}
