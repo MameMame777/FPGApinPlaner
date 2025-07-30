@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { Stage, Layer, Rect, Text, Group, Line, Circle } from 'react-konva';
 import { KonvaEventObject } from 'konva/lib/Node';
 import { Pin, Package } from '@/types';
+import { DifferentialPairUtils } from '@/utils/differential-pair-utils';
 
 interface PackageCanvasProps {
   package: Package | null;
@@ -13,6 +14,7 @@ interface PackageCanvasProps {
   rotation: number;
   isTopView: boolean;
   onZoomChange?: (zoom: number) => void;
+  resetTrigger?: number; // Counter to force reset even when zoom is already 100%
 }
 
 const PackageCanvas: React.FC<PackageCanvasProps> = ({
@@ -24,7 +26,8 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
   zoom,
   rotation,
   isTopView,
-  onZoomChange
+  onZoomChange,
+  resetTrigger = 0
 }) => {
   const stageRef = useRef<any>(null);
   const [stageSize, setStageSize] = useState({ width: 800, height: 600 });
@@ -63,6 +66,26 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
     window.addEventListener('resize', updateSize);
     return () => window.removeEventListener('resize', updateSize);
   }, []);
+
+  // Set initial viewport position when package is loaded
+  useEffect(() => {
+    if (pkg && pins.length > 0 && stageSize.width > 0 && stageSize.height > 0) {
+      console.log('📍 Setting initial viewport position to screen center');
+      
+      // Set initial position to center of drawing area (screen center)
+      // This is independent of package dimensions and ensures consistent behavior
+      const initialPosition = {
+        x: 0, // Screen center as origin
+        y: 0, // Screen center as origin
+        scale: 1
+      };
+      
+      console.log('📐 Initial position set to screen center (0, 0)');
+      console.log('📐 Stage size:', stageSize.width, 'x', stageSize.height);
+      
+      setViewport(initialPosition);
+    }
+  }, [pkg, pins.length]);
 
   // Bank-based color logic for tiles
   const getBankColor = (pin: Pin) => {
@@ -107,6 +130,32 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
     };
     
     return typeColors[pin.pinType as keyof typeof typeColors] || '#FFF';
+  };
+
+  // Get differential pair highlight color
+  const getDifferentialHighlightColor = (pin: Pin, allPins: Pin[], selectedPins: Set<string>) => {
+    if (!DifferentialPairUtils.isDifferentialPin(pin)) {
+      return null; // 差動ピンでない場合はハイライトしない
+    }
+
+    const pairPin = DifferentialPairUtils.findPairPin(pin, allPins);
+    if (!pairPin) {
+      return null; // ペアピンが見つからない場合
+    }
+
+    const isThisPinSelected = selectedPins.has(pin.id);
+    const isPairPinSelected = selectedPins.has(pairPin.id);
+
+    // 選択されたピンまたはそのペアが選択されている場合のみハイライト
+    if (isThisPinSelected || isPairPinSelected) {
+      const pinType = DifferentialPairUtils.getDifferentialPairType(pin.pinName) || 
+                     (pin.signalName ? DifferentialPairUtils.getDifferentialPairType(pin.signalName) : null);
+      
+      // Positive: 赤、Negative: 黄色
+      return pinType === 'positive' ? '#FF0000' : '#FFFF00';
+    }
+
+    return null;
   };
 
   // Group pins by bank for boundary highlighting
@@ -235,9 +284,42 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
       x = -x;
     }
     
-    // Apply viewport scaling and offset
-    const transformedX = x * viewport.scale + viewport.x + stageSize.width / 2;
-    const transformedY = y * viewport.scale + viewport.y + stageSize.height / 2;
+    // Apply viewport scaling and offset (account for label margins)
+    const canvasWidth = stageSize.width - 40; // Account for left margin
+    const canvasHeight = stageSize.height - 30; // Account for top margin
+    const transformedX = x * viewport.scale + viewport.x + canvasWidth / 2;
+    const transformedY = y * viewport.scale + viewport.y + canvasHeight / 2;
+    
+    return { x: transformedX, y: transformedY };
+  };
+
+  // Unified coordinate transformation for grid coordinates (used by grid labels)
+  // This MUST use the exact same transformation logic as transformPosition
+  const transformGridCoord = (gridX: number, gridY: number) => {
+    let x = gridX;
+    let y = gridY;
+    
+    // Apply rotation first (at original scale) - SAME AS transformPosition
+    if (rotation !== 0) {
+      const rad = (rotation * Math.PI) / 180;
+      const cos = Math.cos(rad);
+      const sin = Math.sin(rad);
+      const newX = x * cos - y * sin;
+      const newY = x * sin + y * cos;
+      x = newX;
+      y = newY;
+    }
+    
+    // Apply mirroring for bottom view - SAME AS transformPosition
+    if (!isTopView) {
+      x = -x;
+    }
+    
+    // Apply viewport scaling and offset - SAME AS transformPosition
+    const canvasWidth = stageSize.width - 40; // Account for left margin
+    const canvasHeight = stageSize.height - 30; // Account for top margin
+    const transformedX = x * viewport.scale + viewport.x + canvasWidth / 2;
+    const transformedY = y * viewport.scale + viewport.y + canvasHeight / 2;
     
     return { x: transformedX, y: transformedY };
   };
@@ -350,26 +432,43 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
     setMouseDownTime(0);
   };
 
-  // Reset viewport when zoom is reset to 1.0
+  // Reset viewport to screen center (100% zoom + screen center position)
+  const resetViewport = () => {
+    console.log('🔄 Manual reset - returning to screen center');
+    
+    // Always return to screen center (0, 0) regardless of current state
+    const centeredPosition = {
+      x: 0,
+      y: 0,
+      scale: 1
+    };
+    
+    console.log('📐 Resetting to screen center (0, 0)');
+    
+    setViewport(centeredPosition);
+    onZoomChange?.(1);
+  };
+
+  // Reset viewport when zoom is reset to 1.0 OR when resetTrigger changes
   useEffect(() => {
-    if (zoom === 1.0) {
+    console.log('🔄 Zoom prop changed to:', zoom, 'resetTrigger:', resetTrigger);
+    if (Math.abs(zoom - 1.0) < 0.001) {
+      console.log('📍 Zoom is 1.0, returning to screen center');
+      
+      // Always return to screen center (0, 0) for consistent behavior
       setViewport({
         x: 0,
         y: 0,
         scale: 1
       });
+    } else {
+      // Always sync viewport scale with zoom prop
+      setViewport(prev => ({
+        ...prev,
+        scale: zoom
+      }));
     }
-  }, [zoom]);
-
-  // Reset viewport to 100%
-  const resetViewport = () => {
-    setViewport({
-      x: 0,
-      y: 0,
-      scale: 1
-    });
-    onZoomChange?.(1);
-  };
+  }, [zoom, resetTrigger]);
 
   // Handle keyboard shortcuts
   useEffect(() => {
@@ -453,11 +552,202 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
   }
 
   return (
-    <div style={{ width: '100%', height: '100%', backgroundColor: '#1a1a1a' }}>
+    <div style={{ width: '100%', height: '100%', backgroundColor: '#1a1a1a', position: 'relative' }}>
+      {/* Grid Labels - Top (Columns) */}
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        left: 40,
+        right: 0,
+        height: 30,
+        backgroundColor: '#2a2a2a',
+        borderBottom: '1px solid #444',
+        display: 'flex',
+        alignItems: 'center',
+        zIndex: 10,
+        overflow: 'hidden'
+      }}>
+        {viewport.scale > 0.1 && (() => {
+          const { gridSpacing, minCol, maxCol } = packageDims as any;
+          if (!gridSpacing) return null;
+          
+          // Calculate visible column range
+          const getVisibleColumnRange = () => {
+            const viewportLeft = -viewport.x - (stageSize.width - 40) / 2;
+            const viewportRight = -viewport.x + (stageSize.width - 40) / 2;
+            const scale = viewport.scale;
+            const visibleMinCol = Math.max(minCol, Math.floor((viewportLeft / scale) / gridSpacing) + 1);
+            const visibleMaxCol = Math.min(maxCol, Math.ceil((viewportRight / scale) / gridSpacing) + 1);
+            return { visibleMinCol, visibleMaxCol };
+          };
+          
+          const { visibleMinCol, visibleMaxCol } = getVisibleColumnRange();
+          const columnLabels = [];
+          
+          for (let col = visibleMinCol; col <= visibleMaxCol; col++) {
+            const gridX = (col - 1) * gridSpacing;
+            
+            // Use transformGridCoord for consistent coordinate transformation
+            const gridPosition = transformGridCoord(gridX, 0); // Base line for columns
+            const screenX = gridPosition.x;
+            const screenY = gridPosition.y;
+            
+            // Column label text and positioning
+            let displayText = col.toString();
+            let finalScreenX = screenX;
+            let finalScreenY = screenY; // Use calculated screenY instead of hardcoded 0
+            
+            // Adjust label text and position based on rotation
+            if (rotation === 90 || rotation === 270) {
+              // For rotations, column numbers become row letters
+              if (rotation === 90) {
+                displayText = String.fromCharCode(65 + ((col - minCol) % 26));
+              } else if (rotation === 270) {
+                displayText = String.fromCharCode(65 + ((maxCol - col) % 26));
+              }
+              
+              // For 90°/270°, labels should move to left side (row label area)
+              // But this conflicts with row labels, so we keep them on top with adjusted position
+              finalScreenX = screenX;
+              finalScreenY = Math.max(0, Math.min(30, screenY + 15)); // Clamp to top area
+            } else {
+              // 0°/180°: normal horizontal labels
+              if (!isTopView) {
+                // Flip: reverse column order for bottom view
+                displayText = (maxCol + minCol - col).toString();
+                console.log('🔄 Column flip debug:', `col=${col} → displayText=${displayText}, maxCol=${maxCol}, minCol=${minCol}`);
+              }
+            }
+            
+            // Check visibility - always use horizontal position for column labels
+            const isVisible = finalScreenX >= 0 && finalScreenX <= stageSize.width - 40;
+            
+            if (isVisible) {
+              columnLabels.push(
+                <div
+                  key={`col-${col}`}
+                  style={{
+                    position: 'absolute',
+                    left: finalScreenX - 10,
+                    top: finalScreenY,
+                    width: 20,
+                    height: 30,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 12,
+                    fontWeight: 'bold',
+                    color: '#e0e0e0',
+                    textShadow: '1px 1px 2px rgba(0,0,0,0.8)'
+                  }}
+                >
+                  {displayText}
+                </div>
+              );
+            }
+          }
+          
+          return columnLabels;
+        })()}
+      </div>
+      
+      {/* Grid Labels - Left (Rows) */}
+      <div style={{
+        position: 'absolute',
+        top: 30,
+        left: 0,
+        width: 40,
+        bottom: 0,
+        backgroundColor: '#2a2a2a',
+        borderRight: '1px solid #444',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        zIndex: 10,
+        overflow: 'hidden'
+      }}>
+        {viewport.scale > 0.1 && (() => {
+          const { gridSpacing, minRow, maxRow } = packageDims as any;
+          if (!gridSpacing) return null;
+          
+          // Calculate visible row range
+          const getVisibleRowRange = () => {
+            const viewportTop = -viewport.y - (stageSize.height - 30) / 2;
+            const viewportBottom = -viewport.y + (stageSize.height - 30) / 2;
+            const scale = viewport.scale;
+            const visibleMinRow = Math.max(minRow, Math.floor((viewportTop / scale) / gridSpacing));
+            const visibleMaxRow = Math.min(maxRow, Math.ceil((viewportBottom / scale) / gridSpacing));
+            return { visibleMinRow, visibleMaxRow };
+          };
+          
+          const { visibleMinRow, visibleMaxRow } = getVisibleRowRange();
+          const rowLabels = [];
+          
+          for (let rowIndex = visibleMinRow; rowIndex <= visibleMaxRow; rowIndex++) {
+            const gridY = rowIndex * gridSpacing;
+            
+            // Use transformGridCoord for consistent coordinate transformation
+            const gridPosition = transformGridCoord(0, gridY); // Base line for rows
+            const screenX = gridPosition.x;
+            const screenY = gridPosition.y;
+            
+            // Row label text and positioning
+            const labelText = String.fromCharCode(65 + (rowIndex % 26));
+            let displayText = labelText;
+            let finalScreenX = screenX;
+            let finalScreenY = screenY;
+            
+            console.log('📍 Row label debug:', 'rowIndex:', rowIndex, 'labelText:', labelText, 'rotation:', rotation);
+            
+            // Adjust label text based on rotation (but keep position in left area)
+            if (rotation === 90 || rotation === 270) {
+              // For rotations, row letters become column numbers but stay on left
+              displayText = (rowIndex + 1).toString();
+              // Keep labels in left area, just change the text
+              finalScreenX = 0;
+              finalScreenY = screenY;
+            }
+            // For 0°/180°: keep original row labels (A, B, C, D... - no flip)
+            
+            // Check visibility - always use vertical position for row labels
+            const isVisible = finalScreenY >= 0 && finalScreenY <= stageSize.height - 30;
+            
+            if (isVisible) {
+              rowLabels.push(
+                <div
+                  key={`row-${rowIndex}`}
+                  style={{
+                    position: 'absolute',
+                    left: finalScreenX,
+                    top: finalScreenY - 10,
+                    width: 40,
+                    height: 20,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 12,
+                    fontWeight: 'bold',
+                    color: '#e0e0e0',
+                    textShadow: '1px 1px 2px rgba(0,0,0,0.8)'
+                  }}
+                >
+                  {displayText}
+                </div>
+              );
+            }
+          }
+          
+          return rowLabels;
+        })()}
+      </div>
+      
+      {/* Main Canvas */}
       <Stage
         ref={stageRef}
-        width={stageSize.width}
-        height={stageSize.height}
+        width={stageSize.width - 40} // Account for left margin
+        height={stageSize.height - 30} // Account for top margin
+        x={40} // Offset for left label area
+        y={30} // Offset for top label area
         onClick={handleStageClick}
         onWheel={handleWheel}
         onMouseDown={handleMouseDown}
@@ -694,148 +984,6 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
             );
           })()}
 
-          {/* Grid Coordinate Labels */}
-          {viewport.scale > 0.3 && (() => {
-            // Use package dimensions with grid information
-            const { gridSpacing, minRow, maxRow, minCol, maxCol } = packageDims as any;
-            
-            if (!gridSpacing) return null;
-            
-            // Helper function to transform grid coordinates (same as transformPosition)
-            const transformGridCoord = (gridX: number, gridY: number) => {
-              let x = gridX;
-              let y = gridY;
-              
-              // Apply rotation first (at original scale)
-              if (rotation !== 0) {
-                const rad = (rotation * Math.PI) / 180;
-                const cos = Math.cos(rad);
-                const sin = Math.sin(rad);
-                const newX = x * cos - y * sin;
-                const newY = x * sin + y * cos;
-                x = newX;
-                y = newY;
-              }
-              
-              // Apply mirroring for bottom view
-              if (!isTopView) {
-                x = -x;
-              }
-              
-              // Apply viewport scaling and offset
-              const transformedX = x * viewport.scale + viewport.x + stageSize.width / 2;
-              const transformedY = y * viewport.scale + viewport.y + stageSize.height / 2;
-              
-              return { x: transformedX, y: transformedY };
-            };
-            
-            const labels = [];
-            
-            // Column labels (1, 2, 3, ...) - bottom of package
-            for (let col = minCol; col <= maxCol; col++) {
-              // Use the same coordinate calculation as pins
-              const gridX = (col - 1) * gridSpacing;
-              const gridY = (maxRow + 1) * gridSpacing;
-              const pos = transformGridCoord(gridX, gridY);
-              
-              let labelText = col.toString();
-              if (!isTopView) {
-                labelText = (maxCol + minCol - col).toString();
-              }
-              
-              labels.push(
-                <Text
-                  key={`col-bottom-${col}`}
-                  x={pos.x - 5}
-                  y={pos.y + 10}
-                  text={labelText}
-                  fontSize={Math.max(10, Math.min(14, viewport.scale * 12))}
-                  fill="#999"
-                  align="center"
-                />
-              );
-            }
-            
-            // Column labels (1, 2, 3, ...) - top of package (same as bottom)
-            for (let col = minCol; col <= maxCol; col++) {
-              // Use the same coordinate calculation as pins
-              const gridX = (col - 1) * gridSpacing;
-              const gridY = (minRow - 1) * gridSpacing;
-              const pos = transformGridCoord(gridX, gridY);
-              
-              let labelText = col.toString();
-              if (!isTopView) {
-                labelText = (maxCol + minCol - col).toString();
-              }
-              
-              labels.push(
-                <Text
-                  key={`col-top-${col}`}
-                  x={pos.x - 5}
-                  y={pos.y - 20}
-                  text={labelText}
-                  fontSize={Math.max(10, Math.min(14, viewport.scale * 12))}
-                  fill="#999"
-                  align="center"
-                />
-              );
-            }
-            
-            // Row labels (A, B, C, ...) - left side of package
-            for (let rowIndex = minRow; rowIndex <= maxRow; rowIndex++) {
-              // Use the same coordinate calculation as pins
-              const gridX = (minCol - 2) * gridSpacing;
-              const gridY = rowIndex * gridSpacing;
-              const pos = transformGridCoord(gridX, gridY);
-              
-              let labelIndex = rowIndex;
-              if (!isTopView) {
-                labelIndex = maxRow + minRow - rowIndex;
-              }
-              const labelText = String.fromCharCode(65 + (labelIndex % 26));
-              
-              labels.push(
-                <Text
-                  key={`row-left-${rowIndex}`}
-                  x={pos.x}
-                  y={pos.y - 5}
-                  text={labelText}
-                  fontSize={Math.max(10, Math.min(14, viewport.scale * 12))}
-                  fill="#999"
-                  align="center"
-                />
-              );
-            }
-            
-            // Row labels (A, B, C, ...) - right side of package (same as left)
-            for (let rowIndex = minRow; rowIndex <= maxRow; rowIndex++) {
-              // Use the same coordinate calculation as pins
-              const gridX = (maxCol + 1) * gridSpacing;
-              const gridY = rowIndex * gridSpacing;
-              const pos = transformGridCoord(gridX, gridY);
-              
-              let labelIndex = rowIndex;
-              if (!isTopView) {
-                labelIndex = maxRow + minRow - rowIndex;
-              }
-              const labelText = String.fromCharCode(65 + (labelIndex % 26));
-              
-              labels.push(
-                <Text
-                  key={`row-right-${rowIndex}`}
-                  x={pos.x + 10}
-                  y={pos.y - 5}
-                  text={labelText}
-                  fontSize={Math.max(10, Math.min(14, viewport.scale * 12))}
-                  fill="#999"
-                  align="center"
-                />
-              );
-            }
-            
-            return <Group>{labels}</Group>;
-          })()}
-
           {/* Pin rendering */}
           {(() => {
             // Use viewport-based sizing for stable scaling
@@ -849,6 +997,9 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
               const circleColor = getPinTypeColor(pin);
               const fontSize = Math.max(6, Math.min(16, viewport.scale * 10));
               const smallFontSize = Math.max(5, Math.min(12, viewport.scale * 8));
+              
+              // 差動ペアのハイライト色を取得
+              const differentialHighlightColor = getDifferentialHighlightColor(pin, pins, selectedPins);
               
               // Show detailed info when zoom is sufficient or pin is selected
               const showDetails = viewport.scale > 0.4 || isSelected;
@@ -870,6 +1021,21 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                     style={{ cursor: 'pointer' }}
                   />
                   
+                  {/* Differential pair tile highlight */}
+                  {differentialHighlightColor && (
+                    <Rect
+                      x={pos.x - tileSize / 2 - 2}
+                      y={pos.y - tileSize / 2 - 2}
+                      width={tileSize + 4}
+                      height={tileSize + 4}
+                      fill="transparent"
+                      stroke={differentialHighlightColor}
+                      strokeWidth={2}
+                      cornerRadius={6}
+                      listening={false}
+                    />
+                  )}
+                  
                   {/* Inner circle with pin type color */}
                   <Circle
                     x={pos.x}
@@ -880,6 +1046,20 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                     strokeWidth={1}
                     listening={false} // Disable mouse events on circle to allow tile selection
                   />
+                  
+                  {/* Differential pair highlight ring */}
+                  {differentialHighlightColor && (
+                    <Circle
+                      x={pos.x}
+                      y={pos.y}
+                      radius={Math.max(8, tileSize * 0.35)}
+                      fill="transparent"
+                      stroke={differentialHighlightColor}
+                      strokeWidth={3}
+                      listening={false}
+                      dash={[5, 5]} // 点線でより目立つように
+                    />
+                  )}
                   
                   {/* Pin number - always visible in center with background */}
                   <Rect
@@ -965,6 +1145,56 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                 </Group>
               );
             });
+          })()}
+          
+          {/* Differential pair connection lines */}
+          {(() => {
+            const connectionLines: JSX.Element[] = [];
+            const processedPairs = new Set();
+            
+            pins.forEach(pin => {
+              if (processedPairs.has(pin.id)) return;
+              
+              // Check if this pin is part of a differential pair
+              if (DifferentialPairUtils.isDifferentialPin(pin)) {
+                const pairPin = DifferentialPairUtils.findPairPin(pin, pins);
+                
+                if (pairPin && !processedPairs.has(pairPin.id)) {
+                  // Mark both pins as processed to avoid duplicate lines
+                  processedPairs.add(pin.id);
+                  processedPairs.add(pairPin.id);
+                  
+                  const pos1 = transformPosition(pin);
+                  const pos2 = transformPosition(pairPin);
+                  
+                  // Get colors for the differential pair
+                  const color1 = getDifferentialHighlightColor(pin, pins, selectedPins);
+                  const color2 = getDifferentialHighlightColor(pairPin, pins, selectedPins);
+                  
+                  // Use the first color found, or default to a neutral color
+                  const lineColor = color1 || color2 || '#FF6600';
+                  
+                  // Only draw connection lines if both pins are visible and not too close
+                  const distance = Math.sqrt(Math.pow(pos2.x - pos1.x, 2) + Math.pow(pos2.y - pos1.y, 2));
+                  
+                  if (distance > 50) { // Only show lines if pins are reasonably far apart
+                    connectionLines.push(
+                      <Line
+                        key={`diff-pair-${pin.id}-${pairPin.id}`}
+                        points={[pos1.x, pos1.y, pos2.x, pos2.y]}
+                        stroke={lineColor}
+                        strokeWidth={2}
+                        opacity={0.6}
+                        dash={[8, 4]}
+                        listening={false}
+                      />
+                    );
+                  }
+                }
+              }
+            });
+            
+            return connectionLines;
           })()}
           
           {/* Bank group boundaries - drawn below selection highlights */}

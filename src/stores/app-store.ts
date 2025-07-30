@@ -84,6 +84,7 @@ const initialViewConfig: ViewConfig = {
   showPinNumbers: true,
   showSignalNames: true,
   showPinTypes: false,
+  resetTrigger: 0,
 };
 
 const initialFilters: FilterState = {
@@ -269,6 +270,7 @@ export const useAppStore = create<AppState & AppActions>()(
     resetZoom: () =>
       set((state) => {
         state.viewConfig.zoom = 1.0;
+        state.viewConfig.resetTrigger += 1; // Force reset even if zoom was already 100%
       }),
 
     updateViewConfig: (config) =>

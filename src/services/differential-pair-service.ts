@@ -187,35 +187,15 @@ export class DifferentialPairService {
    * バンク互換性チェック
    */
   private static checkBankCompatibility(pin1: Pin, pin2: Pin): { compatible: boolean; reason?: string } {
-    // 同じバンクの場合
-    if (pin1.bank === pin2.bank) {
-      return { compatible: true };
+    // 差動ペアは必ず同じバンク内でなければならない
+    if (pin1.bank !== pin2.bank) {
+      return { 
+        compatible: false, 
+        reason: `Differential pairs must be in the same bank. Pin1: Bank ${pin1.bank}, Pin2: Bank ${pin2.bank}` 
+      };
     }
 
-    // 異なるバンクの場合、特定の組み合わせをチェック
-    const bank1 = parseInt(pin1.bank || '0');
-    const bank2 = parseInt(pin2.bank || '0');
-
-    // 隣接バンクは通常互換性がある
-    if (Math.abs(bank1 - bank2) === 1) {
-      return { compatible: true };
-    }
-
-    // 特定のバンク組み合わせ（デバイス依存）
-    const compatibleBanks = [
-      [14, 15], [16, 17], [32, 33], [34, 35]
-    ];
-
-    for (const [b1, b2] of compatibleBanks) {
-      if ((bank1 === b1 && bank2 === b2) || (bank1 === b2 && bank2 === b1)) {
-        return { compatible: true };
-      }
-    }
-
-    return { 
-      compatible: false, 
-      reason: `Banks ${pin1.bank} and ${pin2.bank} are not compatible for differential pairs` 
-    };
+    return { compatible: true };
   }
 
   /**
@@ -320,22 +300,34 @@ export class DifferentialPairService {
     if (signalName.endsWith('_p')) {
       const baseName = signalName.slice(0, -2);
       const negativeName = baseName + '_n';
-      matches.push(...allPins.filter(p => p.signalName.toLowerCase() === negativeName));
+      matches.push(...allPins.filter(p => 
+        p.signalName.toLowerCase() === negativeName &&
+        p.bank === pin.bank // 同じバンク内のみ
+      ));
     } else if (signalName.endsWith('_n')) {
       const baseName = signalName.slice(0, -2);
       const positiveName = baseName + '_p';
-      matches.push(...allPins.filter(p => p.signalName.toLowerCase() === positiveName));
+      matches.push(...allPins.filter(p => 
+        p.signalName.toLowerCase() === positiveName &&
+        p.bank === pin.bank // 同じバンク内のみ
+      ));
     }
 
     // パターン2: +/- suffix
     if (signalName.endsWith('+')) {
       const baseName = signalName.slice(0, -1);
       const negativeName = baseName + '-';
-      matches.push(...allPins.filter(p => p.signalName.toLowerCase() === negativeName));
+      matches.push(...allPins.filter(p => 
+        p.signalName.toLowerCase() === negativeName &&
+        p.bank === pin.bank // 同じバンク内のみ
+      ));
     } else if (signalName.endsWith('-')) {
       const baseName = signalName.slice(0, -1);
       const positiveName = baseName + '+';
-      matches.push(...allPins.filter(p => p.signalName.toLowerCase() === positiveName));
+      matches.push(...allPins.filter(p => 
+        p.signalName.toLowerCase() === positiveName &&
+        p.bank === pin.bank // 同じバンク内のみ
+      ));
     }
 
     // パターン3: 数字による区別 (CLK0/CLK1)
@@ -347,7 +339,10 @@ export class DifferentialPairService {
       // 偶数->奇数、奇数->偶数 のペアを探す
       const pairNumber = number % 2 === 0 ? number + 1 : number - 1;
       const pairName = baseName + pairNumber;
-      matches.push(...allPins.filter(p => p.signalName.toLowerCase() === pairName));
+      matches.push(...allPins.filter(p => 
+        p.signalName.toLowerCase() === pairName &&
+        p.bank === pin.bank // 同じバンク内のみ
+      ));
     }
 
     return matches;

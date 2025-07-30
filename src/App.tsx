@@ -8,6 +8,7 @@ import { SettingsPanel } from '@/components/common/SettingsPanel';
 import { DifferentialPairManager } from '@/components/common/DifferentialPairManager';
 import PackageCanvas from '@/components/common/PackageCanvas';
 import { loadSampleData } from '@/utils/sample-data';
+import { DifferentialPairUtils } from '@/utils/differential-pair-utils';
 
 interface AppProps {}
 
@@ -189,7 +190,24 @@ const App: React.FC<AppProps> = () => {
       if (aIsLastViewerSelected && !bIsLastViewerSelected) return -1;
       if (!aIsLastViewerSelected && bIsLastViewerSelected) return 1;
       
-      // Second priority: Regular sorting
+      // Second priority: If there's a last viewer-selected pin and it's a differential pair,
+      // put its pair pin as second priority
+      if (lastViewerSelectedPin && !aIsLastViewerSelected && !bIsLastViewerSelected) {
+        const lastSelectedPin = filteredPins.find(p => p.id === lastViewerSelectedPin);
+        if (lastSelectedPin && DifferentialPairUtils.isDifferentialPin(lastSelectedPin)) {
+          const pairPin = DifferentialPairUtils.findPairPin(lastSelectedPin, filteredPins);
+          if (pairPin) {
+            console.log(`差動ペア検出: ${lastSelectedPin.pinName} -> ${pairPin.pinName}`);
+            const aIsPairPin = a.id === pairPin.id;
+            const bIsPairPin = b.id === pairPin.id;
+            
+            if (aIsPairPin && !bIsPairPin) return -1;
+            if (!aIsPairPin && bIsPairPin) return 1;
+          }
+        }
+      }
+      
+      // Third priority: Regular sorting
       let valueA: string;
       let valueB: string;
 
@@ -511,15 +529,28 @@ const App: React.FC<AppProps> = () => {
                   <span>Showing {filteredPins.length} of {pins.length}</span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  {sortedPinsForList.map(pin => (
-                    <PinItem
-                      key={pin.id}
-                      pin={pin}
-                      isSelected={selectedPins.has(pin.id)}
-                      onSelect={handleListPinSelect}
-                      onAssignSignal={assignSignal}
-                    />
-                  ))}
+                  {sortedPinsForList.map((pin, index) => {
+                    // 差動ペアの対応ピンかどうかを判定
+                    let isPairPin = false;
+                    if (lastViewerSelectedPin && index > 0) {
+                      const lastSelectedPin = filteredPins.find(p => p.id === lastViewerSelectedPin);
+                      if (lastSelectedPin && DifferentialPairUtils.isDifferentialPin(lastSelectedPin)) {
+                        const pairPin = DifferentialPairUtils.findPairPin(lastSelectedPin, filteredPins);
+                        isPairPin = pairPin?.id === pin.id;
+                      }
+                    }
+
+                    return (
+                      <PinItem
+                        key={pin.id}
+                        pin={pin}
+                        isSelected={selectedPins.has(pin.id)}
+                        onSelect={handleListPinSelect}
+                        onAssignSignal={assignSignal}
+                        isPairPin={isPairPin}
+                      />
+                    );
+                  })}
                 </div>
               </>
             )}
@@ -636,6 +667,7 @@ const App: React.FC<AppProps> = () => {
               rotation={viewConfig.rotation}
               isTopView={viewConfig.isTopView}
               onZoomChange={setZoom}
+              resetTrigger={viewConfig.resetTrigger}
             />
           </div>
         </main>

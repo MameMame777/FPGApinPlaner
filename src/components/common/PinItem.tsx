@@ -1,11 +1,13 @@
 import React from 'react';
 import { Pin } from '@/types';
+import { DifferentialPairUtils } from '@/utils/differential-pair-utils';
 
 interface PinItemProps {
   pin: Pin;
   isSelected: boolean;
   onSelect: (pinId: string) => void;
   onAssignSignal: (pinId: string, signalName: string) => void;
+  isPairPin?: boolean; // 差動ペアの対応ピンかどうか
 }
 
 export const PinItem: React.FC<PinItemProps> = ({
@@ -13,6 +15,7 @@ export const PinItem: React.FC<PinItemProps> = ({
   isSelected,
   onSelect,
   onAssignSignal,
+  isPairPin = false,
 }) => {
   const handleSignalChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     onAssignSignal(pin.id, event.target.value);
@@ -34,6 +37,11 @@ export const PinItem: React.FC<PinItemProps> = ({
     return colors[type as keyof typeof colors] || '#666666';
   };
 
+  // 差動ペアのタイプを取得 (pinNameを優先)
+  const differentialType = DifferentialPairUtils.getDifferentialPairType(pin.pinName) || 
+                           (pin.signalName ? DifferentialPairUtils.getDifferentialPairType(pin.signalName) : null);
+  const isDifferential = DifferentialPairUtils.isDifferentialPin(pin);
+
   return (
     <div
       className={`pin-item ${isSelected ? 'selected' : ''}`}
@@ -43,12 +51,47 @@ export const PinItem: React.FC<PinItemProps> = ({
         alignItems: 'center',
         padding: '8px 12px',
         margin: '2px 0',
-        backgroundColor: isSelected ? '#444' : '#2a2a2a',
+        backgroundColor: isSelected ? '#444' : (isPairPin ? '#2d3748' : '#2a2a2a'), // ペアピンは少し異なる背景色
         borderRadius: '4px',
         cursor: 'pointer',
-        border: `2px solid ${isSelected ? '#4A90E2' : 'transparent'}`,
+        border: `2px solid ${isSelected ? '#4A90E2' : (isPairPin ? '#9333ea' : 'transparent')}`,
+        position: 'relative',
       }}
     >
+      {/* Differential Pair Indicator */}
+      {isDifferential && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '4px',
+            right: '4px',
+            fontSize: '10px',
+            color: differentialType === 'positive' ? '#22c55e' : '#ef4444',
+            fontWeight: 'bold',
+          }}
+          title={`Differential ${differentialType === 'positive' ? 'Positive' : 'Negative'} Pin`}
+        >
+          {differentialType === 'positive' ? '⚡+' : '⚡-'}
+        </div>
+      )}
+
+      {/* Pair Pin Indicator */}
+      {isPairPin && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '4px',
+            left: '4px',
+            fontSize: '10px',
+            color: '#9333ea',
+            fontWeight: 'bold',
+          }}
+          title="Differential Pair Pin"
+        >
+          ⟷
+        </div>
+      )}
+
       {/* Pin Type Indicator */}
       <div
         style={{
