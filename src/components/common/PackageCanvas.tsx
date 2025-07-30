@@ -222,97 +222,12 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
 
   const packageDims = getPackageDimensions();
 
-  // Debug logging
+  // Package initialization logging
   useEffect(() => {
     if (pins.length > 0) {
-      console.log('🎯 Package dimensions:', packageDims);
-      console.log('🎯 First few pins:', pins.slice(0, 5).map(p => ({
-        pinNumber: p.pinNumber,
-        pinName: p.pinName,
-        signalName: p.signalName,
-        gridPosition: p.gridPosition,
-        position: p.position,
-        transformed: transformPosition(p)
-      })));
-      
-      // Debug specific pins that might be problematic
-      const debugPins = ['A1', 'B1', 'A2', 'C3'];
-      debugPins.forEach(pinNum => {
-        const pin = pins.find(p => p.pinNumber === pinNum);
-        if (pin) {
-          console.log(`🔍 ${pinNum} Pin Debug - Rotation:`, rotation, 'isTopView:', isTopView);
-          console.log(`  - Original position:`, pin.position);
-          console.log(`  - Grid position:`, pin.gridPosition);
-          
-          // 手動で座標変換を追跡
-          let { x, y } = pin.position;
-          console.log(`  - Step 1 (original):`, { x, y });
-          
-          // CSVリーダーでの計算を確認
-          if (pin.gridPosition && (packageDims as any).gridSpacing) {
-            const expectedCol = pin.gridPosition.col;
-            const expectedRow = pin.gridPosition.row.charCodeAt(0) - 'A'.charCodeAt(0);
-            const expectedX = (expectedCol - 1) * (packageDims as any).gridSpacing;
-            const expectedY = expectedRow * (packageDims as any).gridSpacing;
-            console.log(`  - Expected from grid (${pin.gridPosition.row}${pin.gridPosition.col}):`, { x: expectedX, y: expectedY });
-            console.log(`  - Match with actual:`, { x: x === expectedX, y: y === expectedY });
-          }
-          
-          // 回転適用
-          if (rotation !== 0) {
-            const rad = (rotation * Math.PI) / 180;
-            const cos = Math.cos(rad);
-            const sin = Math.sin(rad);
-            const newX = x * cos - y * sin;
-            const newY = x * sin + y * cos;
-            x = newX;
-            y = newY;
-            console.log(`  - Step 2 (after rotation):`, { x, y });
-          }
-          
-          // ミラーリング適用
-          if (!isTopView) {
-            x = -x;
-            console.log(`  - Step 3 (after mirroring):`, { x, y });
-          }
-          
-          // 最終的な画面座標
-          const canvasWidth = stageSize.width - 40;
-          const canvasHeight = stageSize.height - 30;
-          const finalX = x * viewport.scale + viewport.x + canvasWidth / 2;
-          const finalY = y * viewport.scale + viewport.y + canvasHeight / 2;
-          console.log(`  - Step 4 (final screen position):`, { x: finalX, y: finalY });
-          
-          // transformPosition関数での結果と比較
-          const transformed = transformPosition(pin);
-          console.log(`  - transformPosition result:`, transformed);
-          console.log(`  - Match:`, { x: Math.abs(finalX - transformed.x) < 0.1, y: Math.abs(finalY - transformed.y) < 0.1 });
-        }
-      });
-      
-      // Check pins with signal names
-      const assignedPins = pins.filter(p => p.signalName && p.signalName.trim() !== '');
-      console.log('📌 Pins with signal names:', assignedPins.length, assignedPins.slice(0, 3).map(p => ({
-        pinNumber: p.pinNumber,
-        signalName: p.signalName
-      })));
-      
-      // Show pins with unusual data
-      const suspiciousPins = pins.filter(p => 
-        p.pinNumber.toLowerCase().includes('total') || 
-        p.pinNumber.toLowerCase().includes('number') ||
-        p.pinName?.toLowerCase().includes('total') ||
-        p.pinName?.toLowerCase().includes('number')
-      );
-      if (suspiciousPins.length > 0) {
-        console.log('� Suspicious pins found:', suspiciousPins.map(p => ({
-          pinNumber: p.pinNumber,
-          pinName: p.pinName,
-          gridPosition: p.gridPosition
-        })));
-      }
+      console.log('Package loaded:', pins.length, 'pins');
     }
-  }, [pins, packageDims, rotation, isTopView, viewport, stageSize]);
+  }, [pins.length]);
 
   // Transform coordinates based on view settings with stable scaling
   const transformPosition = (pin: Pin) => {
@@ -588,18 +503,15 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
         overflow: 'hidden'
       }}>
         {viewport.scale > 0.1 && (() => {
-          const { gridSpacing, minCol, maxCol } = packageDims as any;
+          const { gridSpacing } = packageDims as any;
           if (!gridSpacing) return null;
-          
-          console.log('🏷️ Column labels generation:', { minCol, maxCol, gridSpacing, viewport });
           
           // Calculate container-relative positions for labels
           const containerWidth = stageSize.width - 40; // Available width for labels
           
           const columnLabels: JSX.Element[] = [];
           
-          // NEW APPROACH: Generate labels based on actual pin positions
-          // instead of iterating through grid ranges to avoid 90/270 degree overlap
+          // Generate labels based on actual pin positions to avoid overlap issues
           const validPins = pins.filter(pin => pin.gridPosition);
           const processedPositions = new Set();
           
@@ -642,8 +554,6 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
               const isVisible = labelLeft >= -50 && labelLeft <= containerWidth + 50;
               
               if (isVisible) {
-                console.log(`🏷️ Column label for pin ${pin.pinNumber}: pos=${labelLeft}, text="${displayText}"`);
-                
                 columnLabels.push(
                   <div
                     key={positionKey}
@@ -690,18 +600,15 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
         overflow: 'hidden'
       }}>
         {viewport.scale > 0.1 && (() => {
-          const { gridSpacing, minRow, maxRow } = packageDims as any;
+          const { gridSpacing } = packageDims as any;
           if (!gridSpacing) return null;
-          
-          console.log('🏷️ Row labels generation:', { minRow, maxRow, gridSpacing, viewport });
           
           // Calculate container-relative positions for labels
           const containerHeight = stageSize.height - 30; // Available height for labels
           
           const rowLabels: JSX.Element[] = [];
           
-          // NEW APPROACH: Generate labels based on actual pin positions
-          // instead of iterating through grid ranges to avoid 90/270 degree overlap
+          // Generate labels based on actual pin positions to avoid overlap issues
           const validPins = pins.filter(pin => pin.gridPosition);
           const processedPositions = new Set();
           
@@ -744,8 +651,6 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
               const isVisible = labelTop >= -50 && labelTop <= containerHeight + 50;
               
               if (isVisible) {
-                console.log(`🏷️ Row label for pin ${pin.pinNumber}: pos=${labelTop}, text="${displayText}"`);
-                
                 rowLabels.push(
                   <div
                     key={positionKey}
