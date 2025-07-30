@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CSV Loading Test</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background-color: #1e1e1e; 
+            color: white; 
+        }
+        .result { 
+            margin: 10px 0; 
+            padding: 10px; 
+            background-color: #333; 
+            border-radius: 4px; 
+        }
+        input[type="file"] { 
+            margin: 10px 0; 
+            padding: 8px; 
+        }
+        button { 
+            padding: 8px 16px; 
+            background-color: #4A90E2; 
+            border: none; 
+            border-radius: 4px; 
+            color: white; 
+            cursor: pointer; 
+        }
+    </style>
+</head>
+<body>
+    <h1>CSV読み込みテスト</h1>
+    <input type="file" id="csvFile" accept=".csv" />
+    <button onclick="loadCSV()">CSVを読み込む</button>
+    
+    <div id="results"></div>
+    
+    <script>
+        function loadCSV() {
+            const fileInput = document.getElementById('csvFile');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('CSVファイルを選択してください');
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const content = e.target.result;
+                parseCSV(content, file.name);
+            };
+            reader.readAsText(file);
+        }
+        
+        function parseCSV(content, filename) {
+            const lines = content.split('\n').map(line => line.trim()).filter(line => line);
+            const resultsDiv = document.getElementById('results');
+            
+            if (lines.length === 0) {
+                resultsDiv.innerHTML = '<div class="result">❌ ファイルが空です</div>';
+                return;
+            }
+            
+            const headers = lines[0].split(',');
+            const dataLines = lines.slice(1);
+            
+            let html = `
+                <div class="result">
+                    <h3>📄 ファイル: ${filename}</h3>
+                    <p><strong>行数:</strong> ${lines.length} (ヘッダー含む)</p>
+                    <p><strong>データ行数:</strong> ${dataLines.length}</p>
+                </div>
+                
+                <div class="result">
+                    <h4>📊 ヘッダー情報:</h4>
+                    <ul>
+            `;
+            
+            headers.forEach((header, index) => {
+                html += `<li>${index + 1}. ${header}</li>`;
+            });
+            
+            html += `
+                    </ul>
+                </div>
+                
+                <div class="result">
+                    <h4>🔍 最初の5行のデータ:</h4>
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background-color: #444;">
+            `;
+            
+            headers.forEach(header => {
+                html += `<th style="border: 1px solid #555; padding: 8px;">${header}</th>`;
+            });
+            
+            html += `
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            for (let i = 0; i < Math.min(5, dataLines.length); i++) {
+                const cells = dataLines[i].split(',');
+                html += '<tr>';
+                cells.forEach(cell => {
+                    html += `<td style="border: 1px solid #555; padding: 4px;">${cell}</td>`;
+                });
+                html += '</tr>';
+            }
+            
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="result">
+                    <h4>📈 統計情報:</h4>
+                    <p><strong>ピン数:</strong> ${dataLines.length}</p>
+                    <p><strong>フォーマット検出:</strong> ${detectFormat(headers)}</p>
+                </div>
+            `;
+            
+            resultsDiv.innerHTML = html;
+        }
+        
+        function detectFormat(headers) {
+            const xilinxHeaders = ['Pin', 'Pin Name', 'Memory Byte Group', 'Bank', 'VCCAUX Group', 'Super Logic Region', 'I/O Type', 'No-Connect'];
+            const genericHeaders = ['Pin', 'Signal', 'Direction', 'Voltage', 'Package_Pin', 'Row', 'Col'];
+            
+            const xilinxMatch = xilinxHeaders.every(h => headers.includes(h));
+            const genericMatch = genericHeaders.some(h => headers.includes(h));
+            
+            if (xilinxMatch) return '🟢 Xilinx形式';
+            if (genericMatch) return '🟡 汎用形式';
+            return '🔴 不明な形式';
+        }
+    </script>
+</body>
+</html>

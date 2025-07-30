@@ -38,12 +38,17 @@ export class CSVReader {
       };
     }
 
-    // Skip comment lines and license headers
+    console.log('🔍 CSV Lines:', lines.slice(0, 5));
+
+    // Skip comment lines, license headers, and device info lines
     const dataLines = lines.filter(line => 
       !line.startsWith('#') && 
       !line.startsWith('//') &&
       !line.toLowerCase().includes('copyright') &&
-      !line.toLowerCase().includes('license')
+      !line.toLowerCase().includes('license') &&
+      !line.toLowerCase().startsWith('device/package') &&
+      line.trim() !== '' &&
+      !line.match(/^,+$/) // Skip lines with only commas
     );
 
     if (dataLines.length === 0) {
@@ -56,18 +61,46 @@ export class CSVReader {
       };
     }
 
-    const format = this.detectFormat(dataLines[0]);
-    const mapping = this.getColumnMapping(format, dataLines[0]);
+    console.log('🔍 Data Lines:', dataLines.slice(0, 5));
+
+    // Find the header line for Xilinx format (usually the line that contains "Pin,Pin Name,...")
+    let headerLineIndex = 0;
+    for (let i = 0; i < Math.min(5, dataLines.length); i++) {
+      const line = dataLines[i];
+      const columns = this.parseCSVLine(line);
+      console.log(`🔍 Line ${i}:`, columns);
+      
+      if (line.toLowerCase().includes('pin,pin name') || 
+          line.toLowerCase().includes('pin,signal') ||
+          columns.some(col => col.toLowerCase().trim() === 'pin')) {
+        headerLineIndex = i;
+        console.log(`✅ Found header at line ${i}:`, line);
+        break;
+      }
+    }
+
+    const headerLine = dataLines[headerLineIndex];
+    const format = this.detectFormat(headerLine);
+    const mapping = this.getColumnMapping(format, headerLine);
+    
+    console.log('🔍 Format:', format);
+    console.log('🔍 Mapping:', mapping);
     
     const pins: Pin[] = [];
     const warnings: string[] = [];
     const errors: string[] = [];
 
-    // Process data lines (skip header if present)
-    const startIndex = format.hasHeader ? 1 : 0;
+    // Process data lines (skip header and any lines before it)
+    const startIndex = headerLineIndex + 1;
     
     for (let i = startIndex; i < dataLines.length; i++) {
       const line = dataLines[i];
+      
+      // Skip empty lines or lines with only commas
+      if (!line || line.replace(/,/g, '').trim() === '') {
+        continue;
+      }
+      
       const columns = this.parseCSVLine(line);
       
       try {
@@ -76,12 +109,15 @@ export class CSVReader {
           pins.push(pin);
         }
       } catch (error) {
-        errors.push(`Line ${i + 1}: ${(error as Error).message}`);
+        console.warn(`Line ${i + 1}: ${(error as Error).message}`);
+        // Don't add to errors array, just log as warning
       }
     }
 
+    console.log(`✅ Parsed ${pins.length} pins successfully`);
+
     return {
-      success: errors.length === 0,
+      success: pins.length > 0,  // Success if we found any pins
       pins,
       warnings,
       errors,
@@ -141,7 +177,7 @@ export class CSVReader {
     };
   }
 
-  private static getColumnMapping(format: CSVFormat, headerLine: string): ColumnMapping {
+  private static getColumnMapping(_format: CSVFormat, headerLine: string): ColumnMapping {
     const headers = this.parseCSVLine(headerLine).map(h => h.trim().toLowerCase());
     
     const findColumn = (searchTerms: string[]): number => {
@@ -153,8 +189,8 @@ export class CSVReader {
     };
 
     return {
-      pin: Math.max(0, findColumn(['pin', 'pin_number', 'pin number'])),
-      pinName: Math.max(0, findColumn(['pin name', 'pin_name', 'name'])),
+      pin: findColumn(['pin', 'pin_number', 'pin number']),
+      pinName: findColumn(['pin name', 'pin_name', 'name']),
       signalName: findColumn(['signal', 'signal_name', 'net']),
       direction: findColumn(['direction', 'dir', 'type']),
       voltage: findColumn(['voltage', 'volt', 'io_standard']),
@@ -167,13 +203,39 @@ export class CSVReader {
   private static parsePin(columns: string[], mapping: ColumnMapping, lineNumber: number): Pin | null {
     if (columns.length === 0) return null;
 
+    // Check if pin column exists and has valid data
+    if (mapping.pin === -1 || !columns[mapping.pin]) {
+      console.warn(`Line ${lineNumber}: Pin column not found or empty`);
+      return null;
+    }
+
     const pinNumber = columns[mapping.pin]?.trim();
-    if (!pinNumber) {
-      throw new Error(`Missing pin number`);
+    if (!pinNumber || pinNumber === 'NA' || pinNumber === '') {
+      console.warn(`Line ${lineNumber}: Invalid pin number "${pinNumber}"`);
+      return null;
+    }
+
+    // Validate pin number format - should be alphanumeric (like A1, B12, etc.)
+    // Reject obvious metadata or invalid pin numbers
+    if (pinNumber.toLowerCase().includes('device') ||
+        pinNumber.toLowerCase().includes('package') ||
+        pinNumber.toLowerCase().includes('total') ||
+        pinNumber.toLowerCase().includes('number') ||
+        pinNumber.length > 10 ||  // Pin numbers shouldn't be too long
+        /[^A-Za-z0-9]/.test(pinNumber)) {  // Only allow alphanumeric characters
+      console.warn(`Line ${lineNumber}: Invalid pin number format "${pinNumber}"`);
+      return null;
     }
 
     const pinName = columns[mapping.pinName]?.trim() || pinNumber;
     const gridPosition = this.parseGridPosition(pinNumber);
+    
+    // Skip pins with invalid grid positions
+    if (!gridPosition) {
+      console.warn(`Line ${lineNumber}: Could not parse grid position for pin "${pinNumber}"`);
+      return null;
+    }
+    
     const position = this.gridToPosition(gridPosition);
 
     const pin: Pin = {
@@ -203,30 +265,48 @@ export class CSVReader {
     return pin;
   }
 
-  private static parseGridPosition(pinNumber: string): GridPosition {
+  private static parseGridPosition(pinNumber: string): GridPosition | null {
     const match = pinNumber.match(/^([A-Z]+)(\d+)$/);
     if (match) {
-      return {
+      const gridPos = {
         row: match[1],
         col: parseInt(match[2], 10),
       };
+      
+      // Debug specific pins
+      if (pinNumber === 'J3' || pinNumber === 'J4') {
+        console.log(`🔍 parseGridPosition(${pinNumber}):`, gridPos);
+      }
+      
+      return gridPos;
     }
     
-    // Fallback for unusual pin numbering
-    return {
-      row: 'A',
-      col: 1,
-    };
+    // Return null for invalid pin numbers instead of fallback
+    console.warn(`⚠️ Could not parse pin number: ${pinNumber}`);
+    return null;
   }
 
   private static gridToPosition(grid: GridPosition): Position {
-    // Convert grid position to pixel coordinates
-    // This is a simplified conversion - real implementation would depend on package layout
+    // Convert grid position to pixel coordinates that exactly match grid labels
+    // This ensures perfect alignment with the visual grid system
+    
     const rowOffset = grid.row.charCodeAt(0) - 'A'.charCodeAt(0);
-    return {
-      x: grid.col * 20, // 20px spacing
-      y: rowOffset * 20,
-    };
+    
+    // Tile spacing parameters - ensure tiles fit properly
+    const tileSize = 88; // Tile size from PackageCanvas
+    const gridSpacing = tileSize; // Exact spacing to prevent overlap
+    
+    // Use exact grid positioning without jitter for perfect alignment
+    // Grid coordinates start from (0,0) for A1
+    const x = (grid.col - 1) * gridSpacing;
+    const y = rowOffset * gridSpacing;
+    
+    const position = { x: Math.round(x), y: Math.round(y) };
+    
+    // Debug output for verification
+    console.log(`� Grid ${grid.row}${grid.col} → Position (${position.x}, ${position.y})`);
+    
+    return position;
   }
 
   private static parseDirection(directionStr: string | undefined): Pin['direction'] {

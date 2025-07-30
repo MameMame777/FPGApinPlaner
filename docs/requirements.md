@@ -300,6 +300,7 @@ C1,DONE_0,NA,0,NA,NA,CONFIG,NA
   - Excel/CSV形式でのデータエクスポート
   - KiCadシンボルライブラリ生成
   - PDF形式レポート生成
+  - ピンリスト表示機能（ビューワーと同時に表示）
 
 - **技術的根拠**:
   - 成熟したライブラリ（Papa Parse、Konva.js等）

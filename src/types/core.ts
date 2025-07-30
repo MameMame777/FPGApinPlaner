@@ -38,6 +38,62 @@ export interface DifferentialPair {
   type: 'positive' | 'negative';
 }
 
+// 拡張された差動ペア管理用の型定義
+export interface DifferentialPairGroup {
+  id: string;
+  name: string;
+  positivePinId: string;
+  negativePinId: string;
+  constraints?: DifferentialConstraints;
+  verified?: boolean;
+  status: 'valid' | 'invalid' | 'warning' | 'unverified';
+  errors?: string[];
+  warnings?: string[];
+  category?: 'LVDS' | 'TMDS' | 'MIPI' | 'CUSTOM';
+  created: Date;
+  modified: Date;
+}
+
+export interface DifferentialConstraints {
+  maxSkew?: number; // ps単位
+  impedance?: number; // 単端インピーダンス (Ohm)
+  diffImpedance?: number; // 差動インピーダンス (Ohm)
+  ioStandard?: string; // LVDS, TMDS_33, など
+  driveStrength?: string;
+  slewRate?: 'SLOW' | 'FAST';
+  terminationResistor?: number; // 終端抵抗値 (Ohm)
+  couplingCoefficient?: number; // 結合係数 (0-1)
+  routingRules?: {
+    maxLength?: number; // mm単位
+    minSpacing?: number; // mm単位
+    viaCount?: number;
+    layerRestrictions?: string[];
+  };
+}
+
+export interface DifferentialValidationResult {
+  isValid: boolean;
+  errors: string[];
+  warnings: string[];
+  suggestions?: string[];
+  bankCompatibility?: boolean;
+  voltageCompatibility?: boolean;
+  physicalProximity?: {
+    distance: number;
+    acceptable: boolean;
+  };
+}
+
+export interface DifferentialPairTemplate {
+  id: string;
+  name: string;
+  constraints: DifferentialConstraints;
+  description?: string;
+  category: 'LVDS' | 'TMDS' | 'MIPI' | 'CUSTOM';
+  isBuiltIn: boolean;
+  compatibleDevices?: string[];
+}
+
 export interface Pin {
   id: string;                    // Unique identifier
   pinNumber: string;             // Physical pin number (A1, B2, etc.)
@@ -85,6 +141,9 @@ export interface ViewConfig {
   showPinTypes: boolean;
 }
 
+export type SortField = 'pinNumber' | 'pinName' | 'signalName' | 'pinType' | 'bank';
+export type SortOrder = 'asc' | 'desc';
+
 export interface FilterState {
   pinTypes: PinType[];
   banks: string[];
@@ -92,6 +151,8 @@ export interface FilterState {
   voltageFilter: string[];
   assignmentStatus: 'all' | 'assigned' | 'unassigned';
   showOnlyDifferentialPairs: boolean;
+  sortField: SortField;
+  sortOrder: SortOrder;
 }
 
 export interface FPGAProject {

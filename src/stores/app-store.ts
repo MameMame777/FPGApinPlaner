@@ -1,6 +1,10 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
-import { Pin, Package, ViewConfig, FilterState, FPGAProject } from '@/types';
+import { enableMapSet } from 'immer';
+import { Pin, Package, ViewConfig, FilterState, FPGAProject, SortField, SortOrder } from '@/types';
+
+// Enable Immer MapSet plugin
+enableMapSet();
 
 interface AppState {
   // Current project state
@@ -49,12 +53,15 @@ interface AppActions {
   setRotation: (rotation: number) => void;
   toggleView: () => void;
   setZoom: (zoom: number) => void;
+  resetZoom: () => void;
   updateViewConfig: (config: Partial<ViewConfig>) => void;
   
   // Filter management
   updateFilters: (filters: Partial<FilterState>) => void;
   clearFilters: () => void;
   applyFilters: () => void;
+  setSortField: (field: SortField) => void;
+  setSortOrder: (order: SortOrder) => void;
   
   // Differential pair management
   assignDifferentialPair: (positiveId: string, negativeId: string, baseName: string) => void;
@@ -86,6 +93,8 @@ const initialFilters: FilterState = {
   voltageFilter: [],
   assignmentStatus: 'all',
   showOnlyDifferentialPairs: false,
+  sortField: 'pinNumber',
+  sortOrder: 'asc',
 };
 
 export const useAppStore = create<AppState & AppActions>()(
@@ -139,6 +148,9 @@ export const useAppStore = create<AppState & AppActions>()(
         state.filteredPins = packageData.pins;
         state.viewConfig = initialViewConfig;
         state.filters = initialFilters;
+        
+        // Apply initial filters and sorting
+        get().applyFilters();
       }),
 
     saveProject: () =>
@@ -154,10 +166,16 @@ export const useAppStore = create<AppState & AppActions>()(
     // Package and pin management
     loadPackage: (packageData) =>
       set((state) => {
+        console.log('🏪 ストア: loadPackage開始', packageData);
         state.package = packageData;
         state.pins = packageData.pins;
         state.filteredPins = packageData.pins;
         state.selectedPins.clear();
+        console.log('🏪 ストア更新完了:', {
+          packageName: state.package?.name,
+          pinsCount: state.pins.length,
+          filteredPinsCount: state.filteredPins.length
+        });
       }),
 
     updatePin: (pinId, updates) =>
@@ -184,14 +202,17 @@ export const useAppStore = create<AppState & AppActions>()(
         });
       }),
 
-    assignSignal: (pinId, signalName) =>
+    assignSignal: (pinId, signalName) => {
       set((state) => {
         const pin = state.pins.find(p => p.id === pinId);
         if (pin) {
           pin.signalName = signalName;
           pin.isAssigned = signalName !== '';
         }
-      }),
+      });
+      // Apply filters after state update
+      get().applyFilters();
+    },
 
     clearSignal: (pinId) =>
       set((state) => {
@@ -245,6 +266,11 @@ export const useAppStore = create<AppState & AppActions>()(
         state.viewConfig.zoom = Math.max(0.1, Math.min(5.0, zoom));
       }),
 
+    resetZoom: () =>
+      set((state) => {
+        state.viewConfig.zoom = 1.0;
+      }),
+
     updateViewConfig: (config) =>
       set((state) => {
         Object.assign(state.viewConfig, config);
@@ -254,19 +280,9 @@ export const useAppStore = create<AppState & AppActions>()(
     updateFilters: (filters) =>
       set((state) => {
         Object.assign(state.filters, filters);
-        // Apply filters immediately
-        get().applyFilters();
-      }),
-
-    clearFilters: () =>
-      set((state) => {
-        state.filters = { ...initialFilters };
-        state.filteredPins = state.pins;
-      }),
-
-    applyFilters: () =>
-      set((state) => {
-        let filtered = state.pins;
+        
+        // Apply filters immediately within the same state update
+        let filtered = [...state.pins];
 
         // Filter by pin types
         if (state.filters.pinTypes.length > 0) {
@@ -311,7 +327,157 @@ export const useAppStore = create<AppState & AppActions>()(
           filtered = filtered.filter(pin => pin.differentialPair);
         }
 
+        // Apply sorting
+        filtered.sort((a, b) => {
+          let valueA: string;
+          let valueB: string;
+
+          switch (state.filters.sortField) {
+            case 'pinNumber':
+              valueA = a.pinNumber;
+              valueB = b.pinNumber;
+              break;
+            case 'pinName':
+              valueA = a.pinName;
+              valueB = b.pinName;
+              break;
+            case 'signalName':
+              valueA = a.signalName;
+              valueB = b.signalName;
+              break;
+            case 'pinType':
+              valueA = a.pinType;
+              valueB = b.pinType;
+              break;
+            case 'bank':
+              valueA = a.bank || '';
+              valueB = b.bank || '';
+              break;
+            default:
+              valueA = a.pinNumber;
+              valueB = b.pinNumber;
+          }
+
+          // Natural sort for alphanumeric values (A1, A2, A10, B1, etc.)
+          const result = valueA.localeCompare(valueB, undefined, { 
+            numeric: true, 
+            sensitivity: 'base' 
+          });
+          
+          return state.filters.sortOrder === 'asc' ? result : -result;
+        });
+
         state.filteredPins = filtered;
+      }),
+
+    clearFilters: () =>
+      set((state) => {
+        state.filters = { ...initialFilters };
+        state.filteredPins = state.pins;
+      }),
+
+    applyFilters: () =>
+      set((state) => {
+        let filtered = [...state.pins];
+
+        // Filter by pin types
+        if (state.filters.pinTypes.length > 0) {
+          filtered = filtered.filter(pin => 
+            state.filters.pinTypes.includes(pin.pinType)
+          );
+        }
+
+        // Filter by banks
+        if (state.filters.banks.length > 0) {
+          filtered = filtered.filter(pin => 
+            pin.bank && state.filters.banks.includes(pin.bank)
+          );
+        }
+
+        // Filter by search text
+        if (state.filters.searchText) {
+          const searchLower = state.filters.searchText.toLowerCase();
+          filtered = filtered.filter(pin => 
+            pin.pinNumber.toLowerCase().includes(searchLower) ||
+            pin.pinName.toLowerCase().includes(searchLower) ||
+            pin.signalName.toLowerCase().includes(searchLower)
+          );
+        }
+
+        // Filter by voltage
+        if (state.filters.voltageFilter.length > 0) {
+          filtered = filtered.filter(pin => 
+            state.filters.voltageFilter.includes(pin.voltage)
+          );
+        }
+
+        // Filter by assignment status
+        if (state.filters.assignmentStatus !== 'all') {
+          filtered = filtered.filter(pin => 
+            state.filters.assignmentStatus === 'assigned' ? pin.isAssigned : !pin.isAssigned
+          );
+        }
+
+        // Filter differential pairs only
+        if (state.filters.showOnlyDifferentialPairs) {
+          filtered = filtered.filter(pin => pin.differentialPair);
+        }
+
+        // Apply sorting
+        filtered.sort((a, b) => {
+          let valueA: string;
+          let valueB: string;
+
+          switch (state.filters.sortField) {
+            case 'pinNumber':
+              valueA = a.pinNumber;
+              valueB = b.pinNumber;
+              break;
+            case 'pinName':
+              valueA = a.pinName;
+              valueB = b.pinName;
+              break;
+            case 'signalName':
+              valueA = a.signalName || '';
+              valueB = b.signalName || '';
+              break;
+            case 'pinType':
+              valueA = a.pinType;
+              valueB = b.pinType;
+              break;
+            case 'bank':
+              valueA = a.bank || '';
+              valueB = b.bank || '';
+              break;
+            default:
+              valueA = a.pinNumber;
+              valueB = b.pinNumber;
+          }
+
+          // Natural sort for alphanumeric values (A1, A2, A10, B1, etc.)
+          const result = valueA.localeCompare(valueB, undefined, { 
+            numeric: true, 
+            sensitivity: 'base' 
+          });
+          
+          return state.filters.sortOrder === 'asc' ? result : -result;
+        });
+
+        state.filteredPins = filtered;
+      }),
+
+    setSortField: (field) =>
+      set((state) => {
+        state.filters.sortField = field;
+        // Re-apply sorting immediately
+        get().applyFilters();
+      }),
+
+    setSortOrder: (order) =>
+      set((state) => {
+        state.filters.sortOrder = order;
+        // Re-apply sorting immediately
+        get().applyFilters();
       }),
 
     // Differential pair management
