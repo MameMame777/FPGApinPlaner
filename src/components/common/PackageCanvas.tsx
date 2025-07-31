@@ -515,10 +515,6 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
           const validPins = pins.filter(pin => pin.gridPosition);
           const processedPositions = new Set();
           
-          // Debug info
-          console.log(`🏷️ Column Label Generation - Viewport: (${viewport.x.toFixed(1)}, ${viewport.y.toFixed(1)}, ${viewport.scale.toFixed(2)})`);
-          console.log(`🏷️ Valid pins: ${validPins.length}, Container width: ${containerWidth}`);
-          
           validPins.forEach(pin => {
             if (!pin.gridPosition) return;
             
@@ -526,9 +522,9 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
             const pinTransformed = transformPosition(pin);
             
             // Check if this pin contributes to column labels (within header area)
-            // Use extended range to ensure labels don't disappear during pan
+            // Use extended tolerance range to ensure labels remain visible during viewport panning
             const headerY = 15; // Center of header area
-            const extendedYTolerance = Math.max(300, stageSize.height * 0.8); // Dynamic tolerance
+            const extendedYTolerance = Math.max(300, stageSize.height * 0.8); // Dynamic tolerance based on screen size
             
             // Round position to avoid duplicate labels for nearby pins
             const roundedX = Math.round(pinTransformed.x / 25) * 25;
@@ -555,8 +551,8 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
               }
               const labelLeft = Math.round(pinTransformed.x - 10);
               
-              // Check if position is within extended container bounds
-              const extendedWidth = containerWidth + 200; // Extended bounds for smooth panning
+              // Check if position is within extended container bounds to provide smooth panning experience
+              const extendedWidth = containerWidth + 200; // Extended bounds prevent label flickering during pan
               const isVisible = labelLeft >= -100 && labelLeft <= extendedWidth;
               
               if (isVisible) {
@@ -586,7 +582,6 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
             }
           });
           
-          console.log(`🏷️ Generated ${columnLabels.length} column labels`);
           return columnLabels;
         })()}
       </div>
@@ -619,10 +614,6 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
           const validPins = pins.filter(pin => pin.gridPosition);
           const processedPositions = new Set();
           
-          // Debug info
-          console.log(`🏷️ Row Label Generation - Viewport: (${viewport.x.toFixed(1)}, ${viewport.y.toFixed(1)}, ${viewport.scale.toFixed(2)})`);
-          console.log(`🏷️ Valid pins: ${validPins.length}, Container height: ${containerHeight}`);
-          
           validPins.forEach(pin => {
             if (!pin.gridPosition) return;
             
@@ -630,9 +621,9 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
             const pinTransformed = transformPosition(pin);
             
             // Check if this pin contributes to row labels (within sidebar area)
-            // Use extended range to ensure labels don't disappear during pan
+            // Use extended tolerance range to ensure labels remain visible during viewport panning
             const sidebarX = 20; // Center of sidebar area
-            const extendedXTolerance = Math.max(300, stageSize.width * 0.8); // Dynamic tolerance
+            const extendedXTolerance = Math.max(300, stageSize.width * 0.8); // Dynamic tolerance based on screen size
             
             // Round position to avoid duplicate labels for nearby pins
             const roundedY = Math.round(pinTransformed.y / 25) * 25;
@@ -659,8 +650,8 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
               }
               const labelTop = Math.round(pinTransformed.y - 10);
               
-              // Check if position is within extended container bounds
-              const extendedHeight = containerHeight + 200; // Extended bounds for smooth panning
+              // Check if position is within extended container bounds to provide smooth panning experience
+              const extendedHeight = containerHeight + 200; // Extended bounds prevent label flickering during pan
               const isVisible = labelTop >= -100 && labelTop <= extendedHeight;
               
               if (isVisible) {
@@ -690,7 +681,6 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
             }
           });
           
-          console.log(`🏷️ Generated ${rowLabels.length} row labels`);
           return rowLabels;
         })()}
       </div>
