@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { enableMapSet } from 'immer';
 import { Pin, Package, ViewConfig, FilterState, FPGAProject, SortField, SortOrder, ListViewState, ViewMode } from '@/types';
+import { UndoRedoService, Action } from '@/services/undo-redo-service';
 
 // Enable Immer MapSet plugin
 enableMapSet();
@@ -31,6 +32,12 @@ interface AppState {
   
   // Recent files
   recentFiles: string[];
+
+  // Undo/Redo state
+  canUndo: boolean;
+  canRedo: boolean;
+  currentActionDescription: string | null;
+  nextRedoActionDescription: string | null;
 }
 
 interface AppActions {
@@ -86,6 +93,13 @@ interface AppActions {
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   addRecentFile: (filePath: string) => void;
+
+  // Undo/Redo actions
+  undo: () => void;
+  redo: () => void;
+  updateUndoRedoState: () => void;
+  clearHistory: () => void;
+  handleUndoRedoAction: (action: Action, operation: 'undo' | 'redo') => void;
 }
 
 const initialViewConfig: ViewConfig = {
@@ -133,6 +147,12 @@ export const useAppStore = create<AppState & AppActions>()(
     isLoading: false,
     error: null,
     recentFiles: [],
+
+    // Undo/Redo initial state
+    canUndo: false,
+    canRedo: false,
+    currentActionDescription: null,
+    nextRedoActionDescription: null,
 
     // Project management
     loadProject: (project) => {
@@ -230,6 +250,20 @@ export const useAppStore = create<AppState & AppActions>()(
       }),
 
     assignSignal: (pinId, signalName) => {
+      const state = get();
+      const pin = state.pins.find(p => p.id === pinId);
+      if (!pin) return;
+
+      const oldSignal = pin.signalName;
+      
+      // Record the action for undo/redo
+      const actionData = UndoRedoService.createPinAssignmentAction(pinId, oldSignal, signalName);
+      UndoRedoService.recordAction(
+        actionData.type,
+        actionData.data,
+        signalName ? `信号 "${signalName}" をピン ${pinId} に割り当て` : `ピン ${pinId} の信号割り当てを解除`
+      );
+
       set((state) => {
         const pin = state.pins.find(p => p.id === pinId);
         if (pin) {
@@ -237,18 +271,38 @@ export const useAppStore = create<AppState & AppActions>()(
           pin.isAssigned = signalName !== '';
         }
       });
+      
       // Apply filters after state update
       get().applyFilters();
+      get().updateUndoRedoState();
     },
 
-    clearSignal: (pinId) =>
+    clearSignal: (pinId) => {
+      const state = get();
+      const pin = state.pins.find(p => p.id === pinId);
+      if (!pin || !pin.signalName) return;
+
+      const oldSignal = pin.signalName;
+      
+      // Record the action for undo/redo
+      const actionData = UndoRedoService.createPinAssignmentAction(pinId, oldSignal, '');
+      UndoRedoService.recordAction(
+        actionData.type,
+        actionData.data,
+        `ピン ${pinId} の信号割り当てを解除`
+      );
+
       set((state) => {
         const pin = state.pins.find(p => p.id === pinId);
         if (pin) {
           pin.signalName = '';
           pin.isAssigned = false;
         }
-      }),
+      });
+      
+      get().applyFilters();
+      get().updateUndoRedoState();
+    },
 
     // Selection management
     selectPin: (pinId) =>
@@ -618,5 +672,103 @@ export const useAppStore = create<AppState & AppActions>()(
         const filtered = state.recentFiles.filter(f => f !== filePath);
         state.recentFiles = [filePath, ...filtered].slice(0, 10);
       }),
+
+    // Undo/Redo actions
+    undo: () => {
+      const action = UndoRedoService.undo();
+      if (action) {
+        get().handleUndoRedoAction(action, 'undo');
+        get().updateUndoRedoState();
+      }
+    },
+
+    redo: () => {
+      const action = UndoRedoService.redo();
+      if (action) {
+        get().handleUndoRedoAction(action, 'redo');
+        get().updateUndoRedoState();
+      }
+    },
+
+    updateUndoRedoState: () =>
+      set((state) => {
+        state.canUndo = UndoRedoService.canUndo();
+        state.canRedo = UndoRedoService.canRedo();
+        
+        const history = UndoRedoService.getHistory();
+        const currentIndex = UndoRedoService.getCurrentIndex();
+        
+        if (currentIndex >= 0 && currentIndex < history.length) {
+          state.currentActionDescription = UndoRedoService.getActionDescription(history[currentIndex]);
+        } else {
+          state.currentActionDescription = null;
+        }
+        
+        if (currentIndex + 1 < history.length) {
+          state.nextRedoActionDescription = UndoRedoService.getActionDescription(history[currentIndex + 1]);
+        } else {
+          state.nextRedoActionDescription = null;
+        }
+      }),
+
+    clearHistory: () => {
+      UndoRedoService.clear();
+      get().updateUndoRedoState();
+    },
+
+    // Helper method to handle undo/redo actions
+    handleUndoRedoAction: (action: Action, operation: 'undo' | 'redo') => {
+      const { type, data } = action;
+      
+      switch (type) {
+        case 'PIN_ASSIGNMENT':
+          const { pinId, oldSignal, newSignal } = data;
+          const targetSignal = operation === 'undo' ? oldSignal : newSignal;
+          set((state) => {
+            const pin = state.pins.find(p => p.id === pinId);
+            if (pin) {
+              pin.signalName = targetSignal || '';
+              pin.isAssigned = Boolean(targetSignal);
+            }
+          });
+          get().applyFilters();
+          break;
+
+        case 'BULK_ASSIGNMENT':
+          const { assignments } = data;
+          set((state) => {
+            assignments.forEach(({ pinId, oldSignal, newSignal }: any) => {
+              const pin = state.pins.find(p => p.id === pinId);
+              if (pin) {
+                const targetSignal = operation === 'undo' ? oldSignal : newSignal;
+                pin.signalName = targetSignal || '';
+                pin.isAssigned = Boolean(targetSignal);
+              }
+            });
+          });
+          get().applyFilters();
+          break;
+
+        case 'SELECTION_CHANGE':
+          const { oldSelection, newSelection } = data;
+          const targetSelection = operation === 'undo' ? oldSelection : newSelection;
+          set((state) => {
+            state.selectedPins = new Set(targetSelection);
+          });
+          break;
+
+        case 'VIEW_CHANGE':
+          const { oldView, newView } = data;
+          const targetView = operation === 'undo' ? oldView : newView;
+          set((state) => {
+            Object.assign(state.viewConfig, targetView);
+          });
+          break;
+
+        default:
+          console.warn(`Unhandled undo/redo action type: ${type}`);
+          break;
+      }
+    },
   }))
 );

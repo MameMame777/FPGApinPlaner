@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { useAppStore } from '@/stores/app-store';
 import { CSVReader } from '@/services/csv-reader';
 import { ExportService } from '@/services/export-service';
@@ -9,6 +9,8 @@ import { DifferentialPairManager } from '@/components/common/DifferentialPairMan
 import { PinListTabs } from '@/components/common/PinListTabs';
 import PackageCanvas from '@/components/common/PackageCanvas';
 import SaveLoadControls from '@/components/common/SaveLoadControls';
+import { UndoRedoControls, KeyboardShortcutsHelp } from '@/components/common/UndoRedoControls';
+import { useAppHotkeys } from '@/hooks/useHotkeys';
 import { loadSampleData } from '@/utils/sample-data';
 import { DifferentialPairUtils } from '@/utils/differential-pair-utils';
 
@@ -20,8 +22,25 @@ const App: React.FC<AppProps> = () => {
   const [lastViewerSelectedPin, setLastViewerSelectedPin] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showDifferentialPairs, setShowDifferentialPairs] = useState(false);
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(300);
   const [isResizing, setIsResizing] = useState(false);
+  
+  // Initialize hotkeys
+  useAppHotkeys();
+
+  // Handle keyboard help event
+  useEffect(() => {
+    const handleShowKeyboardHelp = () => {
+      setShowKeyboardHelp(true);
+    };
+
+    document.addEventListener('showKeyboardHelp', handleShowKeyboardHelp);
+    
+    return () => {
+      document.removeEventListener('showKeyboardHelp', handleShowKeyboardHelp);
+    };
+  }, []);
   
   const {
     pins,
@@ -712,6 +731,29 @@ const App: React.FC<AppProps> = () => {
             
             {/* Save & Load Controls */}
             <SaveLoadControls />
+
+            <div style={{ width: '1px', height: '20px', backgroundColor: '#555' }}></div>
+
+            {/* Undo/Redo Controls */}
+            <UndoRedoControls />
+
+            <div style={{ width: '1px', height: '20px', backgroundColor: '#555' }}></div>
+
+            <button 
+              onClick={() => setShowKeyboardHelp(true)}
+              style={{
+                padding: '6px 12px',
+                backgroundColor: '#333',
+                border: '1px solid #555',
+                borderRadius: '4px',
+                color: '#ccc',
+                cursor: 'pointer',
+                fontSize: '12px',
+              }}
+              title="キーボードショートカット (Ctrl+Shift+?)"
+            >
+              ⌨️ ショートカット
+            </button>
             
             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '12px', color: '#999' }}>Zoom:</span>
@@ -850,6 +892,12 @@ const App: React.FC<AppProps> = () => {
           </div>
         </div>
       )}
+
+      {/* Keyboard Shortcuts Help Dialog */}
+      <KeyboardShortcutsHelp 
+        isOpen={showKeyboardHelp} 
+        onClose={() => setShowKeyboardHelp(false)} 
+      />
     </div>
   );
 };
