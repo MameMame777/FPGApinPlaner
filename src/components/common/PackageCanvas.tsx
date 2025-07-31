@@ -222,17 +222,10 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
 
   const packageDims = getPackageDimensions();
 
-  // Package initialization logging (簡素化)
+  // Package initialization logging
   useEffect(() => {
     if (pins.length > 0) {
       console.log('📦 PackageCanvas: Package loaded with', pins.length, 'pins');
-      console.log('🔍 First pin data:', pins[0]);
-      console.log('🔍 First pin position:', pins[0]?.position);
-      console.log('🔍 First pin gridPosition:', pins[0]?.gridPosition);
-      // 全てのピンの座標をチェック
-      pins.forEach((pin, index) => {
-        console.log(`Pin ${index}: ${pin.pinNumber}, position: ${JSON.stringify(pin.position)}, grid: ${JSON.stringify(pin.gridPosition)}`);
-      });
     }
   }, [pins.length]);
 

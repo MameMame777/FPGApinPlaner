@@ -465,9 +465,6 @@ export class ProjectSaveService {
     
     const position = { x: Math.round(x), y: Math.round(y) };
     
-    // Debug output for verification
-    console.log(`🎯 Grid ${grid.row}${grid.col} → Position (${position.x}, ${position.y})`);
-    
     return position;
   }
 }

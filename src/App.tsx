@@ -768,44 +768,19 @@ const App: React.FC<AppProps> = () => {
             backgroundColor: '#1a1a1a',
             overflow: 'hidden',
           }}>
-            {/* Debug info */}
-            <div style={{
-              position: 'absolute',
-              top: '10px',
-              left: '10px',
-              background: 'rgba(0,0,0,0.7)',
-              color: 'white',
-              padding: '8px',
-              borderRadius: '4px',
-              fontSize: '12px',
-              zIndex: 1000
-            }}>
-              Package: {currentPackage?.name || 'null'} | 
-              Pins: {pins.length} | 
-              Filtered: {filteredPins.length}
-            </div>
-            
             {listView.viewMode === 'grid' ? (
-              <>
-                {/* デバッグ用コンソールログ - 一時的に無効化 */}
-                {/* {console.log('Rendering PackageCanvas with:', {
-                  package: currentPackage?.device,
-                  filteredPinsCount: filteredPins.length,
-                  totalPinsCount: pins.length
-                })} */}
-                <PackageCanvas
-                  package={currentPackage}
-                  pins={filteredPins}
-                  selectedPins={selectedPins}
-                  onPinSelect={handleViewerPinSelect}
-                  onPinDoubleClick={handlePinDoubleClick}
-                  zoom={viewConfig.zoom}
-                  rotation={viewConfig.rotation}
-                  isTopView={viewConfig.isTopView}
-                  onZoomChange={setZoom}
-                  resetTrigger={viewConfig.resetTrigger}
-                />
-              </>
+              <PackageCanvas
+                package={currentPackage}
+                pins={filteredPins}
+                selectedPins={selectedPins}
+                onPinSelect={handleViewerPinSelect}
+                onPinDoubleClick={handlePinDoubleClick}
+                zoom={viewConfig.zoom}
+                rotation={viewConfig.rotation}
+                isTopView={viewConfig.isTopView}
+                onZoomChange={setZoom}
+                resetTrigger={viewConfig.resetTrigger}
+              />
             ) : (
               <div style={{
                 height: '100%',

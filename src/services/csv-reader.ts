@@ -38,8 +38,6 @@ export class CSVReader {
       };
     }
 
-    console.log('🔍 CSV Lines:', lines.slice(0, 5));
-
     // Skip comment lines, license headers, and device info lines
     const dataLines = lines.filter(line => 
       !line.startsWith('#') && 

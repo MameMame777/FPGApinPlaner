@@ -136,10 +136,6 @@ export const useAppStore = create<AppState & AppActions>()(
 
     // Project management
     loadProject: (project) => {
-      console.log('Loading project in store:', project.name);
-      console.log('Package data:', project.packageData);
-      console.log('Pin assignments count:', project.pinAssignments.length);
-      
       set((state) => {
         state.currentProject = project;
         state.package = project.packageData;
@@ -151,8 +147,6 @@ export const useAppStore = create<AppState & AppActions>()(
       
       // フィルタを適用してfilteredPinsを正しく設定
       get().applyFilters();
-      
-      console.log('Project loaded. Filtered pins count:', get().filteredPins.length);
     },
 
     createNewProject: (name, packageData) =>
