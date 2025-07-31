@@ -70,7 +70,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
   // Set initial viewport position when package is loaded
   useEffect(() => {
     if (pkg && pins.length > 0 && stageSize.width > 0 && stageSize.height > 0) {
-      console.log('📍 Setting initial viewport position to screen center');
+      // console.log('📍 Setting initial viewport position to screen center'); // ログ無効化
       
       // Set initial position to center of drawing area (screen center)
       // This is independent of package dimensions and ensures consistent behavior
@@ -80,8 +80,8 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
         scale: 1
       };
       
-      console.log('📐 Initial position set to screen center (0, 0)');
-      console.log('📐 Stage size:', stageSize.width, 'x', stageSize.height);
+      // console.log('📐 Initial position set to screen center (0, 0)'); // ログ無効化
+      // console.log('📐 Stage size:', stageSize.width, 'x', stageSize.height); // ログ無効化
       
       setViewport(initialPosition);
     }
@@ -222,10 +222,17 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
 
   const packageDims = getPackageDimensions();
 
-  // Package initialization logging
+  // Package initialization logging (簡素化)
   useEffect(() => {
     if (pins.length > 0) {
-      console.log('Package loaded:', pins.length, 'pins');
+      console.log('📦 PackageCanvas: Package loaded with', pins.length, 'pins');
+      console.log('🔍 First pin data:', pins[0]);
+      console.log('🔍 First pin position:', pins[0]?.position);
+      console.log('🔍 First pin gridPosition:', pins[0]?.gridPosition);
+      // 全てのピンの座標をチェック
+      pins.forEach((pin, index) => {
+        console.log(`Pin ${index}: ${pin.pinNumber}, position: ${JSON.stringify(pin.position)}, grid: ${JSON.stringify(pin.gridPosition)}`);
+      });
     }
   }, [pins.length]);
 
@@ -369,7 +376,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
 
   // Reset viewport to screen center (100% zoom + screen center position)
   const resetViewport = () => {
-    console.log('🔄 Manual reset - returning to screen center');
+    // console.log('🔄 Manual reset - returning to screen center'); // ログ無効化
     
     // Always return to screen center (0, 0) regardless of current state
     const centeredPosition = {
@@ -378,7 +385,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
       scale: 1
     };
     
-    console.log('📐 Resetting to screen center (0, 0)');
+    // console.log('📐 Resetting to screen center (0, 0)'); // ログ無効化
     
     setViewport(centeredPosition);
     onZoomChange?.(1);
@@ -386,9 +393,9 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
 
   // Reset viewport when zoom is reset to 1.0 OR when resetTrigger changes
   useEffect(() => {
-    console.log('🔄 Zoom prop changed to:', zoom, 'resetTrigger:', resetTrigger);
+    // console.log('🔄 Zoom prop changed to:', zoom, 'resetTrigger:', resetTrigger); // ログ無効化
     if (Math.abs(zoom - 1.0) < 0.001) {
-      console.log('📍 Zoom is 1.0, returning to screen center');
+      // console.log('📍 Zoom is 1.0, returning to screen center'); // ログ無効化
       
       // Always return to screen center (0, 0) for consistent behavior
       setViewport({

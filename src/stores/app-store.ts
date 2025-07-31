@@ -135,15 +135,25 @@ export const useAppStore = create<AppState & AppActions>()(
     recentFiles: [],
 
     // Project management
-    loadProject: (project) =>
+    loadProject: (project) => {
+      console.log('Loading project in store:', project.name);
+      console.log('Package data:', project.packageData);
+      console.log('Pin assignments count:', project.pinAssignments.length);
+      
       set((state) => {
         state.currentProject = project;
         state.package = project.packageData;
         state.pins = project.pinAssignments;
         state.viewConfig = project.viewConfig;
         state.filters = project.filters;
-        state.filteredPins = project.pinAssignments;
-      }),
+        // filteredPinsはapplyFilters()で設定されるので、ここでは設定しない
+      });
+      
+      // フィルタを適用してfilteredPinsを正しく設定
+      get().applyFilters();
+      
+      console.log('Project loaded. Filtered pins count:', get().filteredPins.length);
+    },
 
     createNewProject: (name, packageData) =>
       set((state) => {

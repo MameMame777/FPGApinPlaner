@@ -1,0 +1,134 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "created": "2025-07-31T13:44:42.965Z",
+    "modified": "2025-07-31T13:44:42.965Z",
+    "appVersion": "1.0.0",
+    "description": "FPGA Pin Planning Project - Sample FPGA Package",
+    "author": "FPGA Pin Planner User"
+  },
+  "package": {
+    "device": "Sample FPGA Package",
+    "packageType": "Unknown"
+  },
+  "pins": [
+    {
+      "id": "9ec1ee11-c084-488c-8c43-2ace41d23d78",
+      "pinNumber": "A1",
+      "pinName": "IO_L1P_T0_D00_MOSI_14",
+      "assignedSignalName": "",
+      "bank": "14",
+      "pinType": "IO",
+      "gridPosition": {
+        "row": "A",
+        "col": 1
+      }
+    },
+    {
+      "id": "f463f8ad-a004-4080-8acc-50919e257d75",
+      "pinNumber": "A2",
+      "pinName": "IO_L1N_T0_D01_DIN_14",
+      "assignedSignalName": "",
+      "bank": "14",
+      "pinType": "IO",
+      "gridPosition": {
+        "row": "A",
+        "col": 2
+      }
+    },
+    {
+      "id": "5decb49b-ecb1-47b5-9775-eabdfabc62fb",
+      "pinNumber": "B1",
+      "pinName": "VCCINT",
+      "assignedSignalName": "",
+      "bank": "NA",
+      "pinType": "POWER",
+      "gridPosition": {
+        "row": "B",
+        "col": 1
+      }
+    },
+    {
+      "id": "6516690c-ffd8-4ac3-8a86-4552eae388f6",
+      "pinNumber": "B2",
+      "pinName": "GND",
+      "assignedSignalName": "",
+      "bank": "NA",
+      "pinType": "GROUND",
+      "gridPosition": {
+        "row": "B",
+        "col": 2
+      }
+    },
+    {
+      "id": "84425cf2-8343-47d6-916f-cf9cc8b074e0",
+      "pinNumber": "C1",
+      "pinName": "IO_L2P_T0_D02_14",
+      "assignedSignalName": "",
+      "bank": "14",
+      "pinType": "IO",
+      "gridPosition": {
+        "row": "C",
+        "col": 1
+      }
+    },
+    {
+      "id": "d58bfe78-8c46-42c8-afa1-3e5dde5774eb",
+      "pinNumber": "C2",
+      "pinName": "IO_L2N_T0_D03_14",
+      "assignedSignalName": "",
+      "bank": "14",
+      "pinType": "IO",
+      "gridPosition": {
+        "row": "C",
+        "col": 2
+      }
+    },
+    {
+      "id": "35448ed3-fce2-4cbb-baf4-6a320f64ffd0",
+      "pinNumber": "D1",
+      "pinName": "CONFIG_DONE",
+      "assignedSignalName": "",
+      "bank": "NA",
+      "pinType": "CONFIG",
+      "gridPosition": {
+        "row": "D",
+        "col": 1
+      }
+    },
+    {
+      "id": "57d92e9b-3ff3-4ac7-979b-6f11a09f6b56",
+      "pinNumber": "D2",
+      "pinName": "MGTPRXP1_216",
+      "assignedSignalName": "",
+      "bank": "216",
+      "pinType": "MGT",
+      "gridPosition": {
+        "row": "D",
+        "col": 2
+      }
+    }
+  ],
+  "viewSettings": {
+    "zoom": 1,
+    "rotation": 0,
+    "isTopView": true,
+    "viewport": {
+      "x": 0,
+      "y": 0,
+      "scale": 1
+    },
+    "selectedPins": [],
+    "filters": {}
+  },
+  "projectSettings": {
+    "listViewActiveTab": "overview",
+    "sidebarWidth": 300,
+    "showDifferentialPairs": false,
+    "customSettings": {}
+  },
+  "history": {
+    "currentIndex": 0,
+    "actions": []
+  }
+}

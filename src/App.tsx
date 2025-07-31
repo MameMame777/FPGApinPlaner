@@ -8,6 +8,7 @@ import { SettingsPanel } from '@/components/common/SettingsPanel';
 import { DifferentialPairManager } from '@/components/common/DifferentialPairManager';
 import { PinListTabs } from '@/components/common/PinListTabs';
 import PackageCanvas from '@/components/common/PackageCanvas';
+import SaveLoadControls from '@/components/common/SaveLoadControls';
 import { loadSampleData } from '@/utils/sample-data';
 import { DifferentialPairUtils } from '@/utils/differential-pair-utils';
 
@@ -708,6 +709,10 @@ const App: React.FC<AppProps> = () => {
             >
               ↕️ Flip View
             </button>
+            
+            {/* Save & Load Controls */}
+            <SaveLoadControls />
+            
             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '12px', color: '#999' }}>Zoom:</span>
               <button 
@@ -763,19 +768,44 @@ const App: React.FC<AppProps> = () => {
             backgroundColor: '#1a1a1a',
             overflow: 'hidden',
           }}>
+            {/* Debug info */}
+            <div style={{
+              position: 'absolute',
+              top: '10px',
+              left: '10px',
+              background: 'rgba(0,0,0,0.7)',
+              color: 'white',
+              padding: '8px',
+              borderRadius: '4px',
+              fontSize: '12px',
+              zIndex: 1000
+            }}>
+              Package: {currentPackage?.name || 'null'} | 
+              Pins: {pins.length} | 
+              Filtered: {filteredPins.length}
+            </div>
+            
             {listView.viewMode === 'grid' ? (
-              <PackageCanvas
-                package={currentPackage}
-                pins={filteredPins}
-                selectedPins={selectedPins}
-                onPinSelect={handleViewerPinSelect}
-                onPinDoubleClick={handlePinDoubleClick}
-                zoom={viewConfig.zoom}
-                rotation={viewConfig.rotation}
-                isTopView={viewConfig.isTopView}
-                onZoomChange={setZoom}
-                resetTrigger={viewConfig.resetTrigger}
-              />
+              <>
+                {/* デバッグ用コンソールログ - 一時的に無効化 */}
+                {/* {console.log('Rendering PackageCanvas with:', {
+                  package: currentPackage?.device,
+                  filteredPinsCount: filteredPins.length,
+                  totalPinsCount: pins.length
+                })} */}
+                <PackageCanvas
+                  package={currentPackage}
+                  pins={filteredPins}
+                  selectedPins={selectedPins}
+                  onPinSelect={handleViewerPinSelect}
+                  onPinDoubleClick={handlePinDoubleClick}
+                  zoom={viewConfig.zoom}
+                  rotation={viewConfig.rotation}
+                  isTopView={viewConfig.isTopView}
+                  onZoomChange={setZoom}
+                  resetTrigger={viewConfig.resetTrigger}
+                />
+              </>
             ) : (
               <div style={{
                 height: '100%',

@@ -33,7 +33,8 @@ export class DifferentialPairUtils {
     if (lvdsMatch) {
       const polarity = lvdsMatch[2];
       
-      console.log(`🔍 LVDS pattern detected: ${pinName} -> ${polarity === 'p' ? 'positive' : 'negative'}`);
+      // コンソールログを無効化（パフォーマンス改善のため）
+      // console.log(`🔍 LVDS pattern detected: ${pinName} -> ${polarity === 'p' ? 'positive' : 'negative'}`);
       
       if (polarity === 'p') return 'positive';
       if (polarity === 'n') return 'negative';
