@@ -763,8 +763,8 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
             );
           })()}
 
-          {/* Grid lines for reference */}
-          {viewport.scale > 0.5 && (() => {
+          {/* Grid lines for reference - DISABLED */}
+          {false && viewport.scale > 0.5 && (() => {
             const { gridSpacing, minRow, maxRow, minCol, maxCol } = packageDims as any;
             
             if (!gridSpacing) return null;
