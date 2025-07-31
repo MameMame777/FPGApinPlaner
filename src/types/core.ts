@@ -117,6 +117,12 @@ export interface Pin {
   
   // Generic attributes for extensibility
   attributes?: Record<string, string>;
+  
+  // Comment and annotation fields
+  comment?: string;              // User comment
+  autoComment?: string;          // Auto-generated comment
+  commentTimestamp?: Date;       // Comment last modified
+  commentAuthor?: string;        // Comment author
 }
 
 export interface Package {
@@ -262,3 +268,53 @@ export type Result<T, E = Error> = {
   success: false;
   error: E;
 };
+
+// Tab and list view types
+export interface ColumnConfig {
+  key: keyof Pin | string;
+  title: string;
+  width: number;
+  editable?: boolean;
+  render?: 'text' | 'datetime' | 'boolean' | 'custom';
+  customRender?: (value: any, pin: Pin) => React.ReactNode;
+  sortable?: boolean;
+}
+
+export interface TabConfiguration {
+  id: string;
+  title: string;
+  icon?: string;
+  columns: ColumnConfig[];
+  filter?: (pin: Pin) => boolean;
+  sort?: (a: Pin, b: Pin) => number;
+  description?: string;
+  showSearch?: boolean;
+  showFilters?: boolean;
+}
+
+export type ViewMode = 'grid' | 'list';
+
+export interface ListViewState {
+  activeTab: string;
+  viewMode: ViewMode;
+  searchQuery: string;
+  selectedRows: Set<string>;
+  sortColumn?: string;
+  sortDirection: 'asc' | 'desc';
+  commentFilter: 'all' | 'with-comments' | 'without-comments';
+}
+
+export interface CommentTemplate {
+  id: string;
+  name: string;
+  template: string;
+  category: 'power' | 'clock' | 'io' | 'differential' | 'custom';
+  variables?: string[];
+}
+
+export interface CommentHistoryEntry {
+  timestamp: Date;
+  author: string;
+  comment: string;
+  action: 'created' | 'updated' | 'deleted';
+}

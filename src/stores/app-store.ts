@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { enableMapSet } from 'immer';
-import { Pin, Package, ViewConfig, FilterState, FPGAProject, SortField, SortOrder } from '@/types';
+import { Pin, Package, ViewConfig, FilterState, FPGAProject, SortField, SortOrder, ListViewState, ViewMode } from '@/types';
 
 // Enable Immer MapSet plugin
 enableMapSet();
@@ -18,6 +18,9 @@ interface AppState {
   
   // View configuration
   viewConfig: ViewConfig;
+  
+  // List view state
+  listView: ListViewState;
   
   // Filter state
   filters: FilterState;
@@ -55,6 +58,14 @@ interface AppActions {
   setZoom: (zoom: number) => void;
   resetZoom: () => void;
   updateViewConfig: (config: Partial<ViewConfig>) => void;
+  
+  // List view management
+  setViewMode: (mode: ViewMode) => void;
+  setActiveTab: (tabId: string) => void;
+  setSearchQuery: (query: string) => void;
+  setCommentFilter: (filter: 'all' | 'with-comments' | 'without-comments') => void;
+  updateListViewState: (updates: Partial<ListViewState>) => void;
+  bulkUpdateComments: (pinIds: string[], comment: string) => void;
   
   // Filter management
   updateFilters: (filters: Partial<FilterState>) => void;
@@ -98,6 +109,16 @@ const initialFilters: FilterState = {
   sortOrder: 'asc',
 };
 
+const initialListView: ListViewState = {
+  activeTab: 'overview',
+  viewMode: 'grid',
+  searchQuery: '',
+  selectedRows: new Set(),
+  sortColumn: undefined,
+  sortDirection: 'asc',
+  commentFilter: 'all',
+};
+
 export const useAppStore = create<AppState & AppActions>()(
   immer((set, get) => ({
     // Initial state
@@ -107,6 +128,7 @@ export const useAppStore = create<AppState & AppActions>()(
     filteredPins: [],
     selectedPins: new Set(),
     viewConfig: initialViewConfig,
+    listView: initialListView,
     filters: initialFilters,
     isLoading: false,
     error: null,
@@ -544,6 +566,47 @@ export const useAppStore = create<AppState & AppActions>()(
     setError: (error) =>
       set((state) => {
         state.error = error;
+      }),
+
+    // List view management
+    setViewMode: (mode) =>
+      set((state) => {
+        state.listView.viewMode = mode;
+      }),
+
+    setActiveTab: (tabId) =>
+      set((state) => {
+        state.listView.activeTab = tabId;
+      }),
+
+    setSearchQuery: (query) =>
+      set((state) => {
+        state.listView.searchQuery = query;
+      }),
+
+    setCommentFilter: (filter) =>
+      set((state) => {
+        state.listView.commentFilter = filter;
+      }),
+
+    updateListViewState: (updates) =>
+      set((state) => {
+        Object.assign(state.listView, updates);
+      }),
+
+    bulkUpdateComments: (pinIds, comment) =>
+      set((state) => {
+        const timestamp = new Date();
+        pinIds.forEach(pinId => {
+          const pin = state.pins.find(p => p.id === pinId);
+          if (pin) {
+            pin.comment = comment;
+            pin.commentTimestamp = timestamp;
+            pin.commentAuthor = 'current_user'; // TODO: Get from auth system
+          }
+        });
+        // Clear selection after bulk update
+        state.listView.selectedRows.clear();
       }),
 
     addRecentFile: (filePath) =>

@@ -6,6 +6,7 @@ import { PinItem } from '@/components/common/PinItem';
 import { BGMControls } from '@/components/common/BGMControls';
 import { SettingsPanel } from '@/components/common/SettingsPanel';
 import { DifferentialPairManager } from '@/components/common/DifferentialPairManager';
+import { PinListTabs } from '@/components/common/PinListTabs';
 import PackageCanvas from '@/components/common/PackageCanvas';
 import { loadSampleData } from '@/utils/sample-data';
 import { DifferentialPairUtils } from '@/utils/differential-pair-utils';
@@ -26,6 +27,7 @@ const App: React.FC<AppProps> = () => {
     package: currentPackage,
     filters,
     viewConfig,
+    listView,
     loadPackage,
     selectPin,
     assignSignal,
@@ -38,6 +40,7 @@ const App: React.FC<AppProps> = () => {
     resetZoom,
     setSortField,
     setSortOrder,
+    setViewMode,
   } = useAppStore();
 
   const handleOpenCSV = () => {
@@ -574,6 +577,42 @@ const App: React.FC<AppProps> = () => {
             padding: '0 16px',
             gap: '12px',
           }}>
+            {/* View Mode Toggle */}
+            <div style={{ display: 'flex', gap: '4px' }}>
+              <button 
+                onClick={() => setViewMode('grid')}
+                style={{
+                  padding: '6px 12px',
+                  backgroundColor: listView.viewMode === 'grid' ? '#007acc' : '#333',
+                  border: '1px solid #555',
+                  borderRadius: '4px 0 0 4px',
+                  color: listView.viewMode === 'grid' ? '#fff' : '#ccc',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                }}
+                title="Grid View"
+              >
+                🎯 Grid
+              </button>
+              <button 
+                onClick={() => setViewMode('list')}
+                style={{
+                  padding: '6px 12px',
+                  backgroundColor: listView.viewMode === 'list' ? '#007acc' : '#333',
+                  border: '1px solid #555',
+                  borderRadius: '0 4px 4px 0',
+                  color: listView.viewMode === 'list' ? '#fff' : '#ccc',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                }}
+                title="List View"
+              >
+                📋 List
+              </button>
+            </div>
+
+            <div style={{ width: '1px', height: '20px', backgroundColor: '#555' }}></div>
+
             <button 
               onClick={handleRotate}
               style={{
@@ -651,24 +690,34 @@ const App: React.FC<AppProps> = () => {
             </div>
           </div>
 
-          {/* Canvas Area */}
+          {/* Main View Area */}
           <div style={{
             flex: 1,
             backgroundColor: '#1a1a1a',
             overflow: 'hidden',
           }}>
-            <PackageCanvas
-              package={currentPackage}
-              pins={filteredPins}
-              selectedPins={selectedPins}
-              onPinSelect={handleViewerPinSelect}
-              onPinDoubleClick={handlePinDoubleClick}
-              zoom={viewConfig.zoom}
-              rotation={viewConfig.rotation}
-              isTopView={viewConfig.isTopView}
-              onZoomChange={setZoom}
-              resetTrigger={viewConfig.resetTrigger}
-            />
+            {listView.viewMode === 'grid' ? (
+              <PackageCanvas
+                package={currentPackage}
+                pins={filteredPins}
+                selectedPins={selectedPins}
+                onPinSelect={handleViewerPinSelect}
+                onPinDoubleClick={handlePinDoubleClick}
+                zoom={viewConfig.zoom}
+                rotation={viewConfig.rotation}
+                isTopView={viewConfig.isTopView}
+                onZoomChange={setZoom}
+                resetTrigger={viewConfig.resetTrigger}
+              />
+            ) : (
+              <div style={{
+                height: '100%',
+                backgroundColor: '#1a1a1a',
+                overflow: 'hidden'
+              }}>
+                <PinListTabs onPinSelect={handleListPinSelect} />
+              </div>
+            )}
           </div>
         </main>
       </div>
