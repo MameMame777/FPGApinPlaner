@@ -24,6 +24,7 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect }) => {
 
   const [bulkComment, setBulkComment] = useState('');
   const [showBulkEditor, setShowBulkEditor] = useState(false);
+  const [hoveredRowId, setHoveredRowId] = useState<string | null>(null);
 
   const activeTabConfig = useMemo(() => 
     TAB_CONFIGS.find(tab => tab.id === listView.activeTab) || TAB_CONFIGS[0],
@@ -194,6 +195,49 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect }) => {
     return listView.sortDirection === 'asc' ? ' ↑' : ' ↓';
   };
 
+  // BANK別の背景色を取得する関数
+  const getBankBackgroundColor = (bank: string | undefined, isSelected: boolean, isHovered: boolean): string => {
+    if (isSelected) return '#2d4f75';
+    
+    if (!bank) {
+      return isHovered ? '#2a2a2a' : '#1a1a1a'; // BANKが未定義の場合はデフォルト色
+    }
+
+    // BANK番号に基づいて色を決定
+    const bankNum = parseInt(bank);
+    const bankColors = [
+      '#1a2332', // Bank 0 - 深い青
+      '#1a3221', // Bank 1 - 深い緑
+      '#321a32', // Bank 2 - 深い紫
+      '#322a1a', // Bank 3 - 深い茶
+      '#1a3232', // Bank 4 - 深いティール
+      '#321a1a', // Bank 5 - 深い赤
+      '#2a1a32', // Bank 6 - 深いマゼンタ
+      '#323221', // Bank 7 - 深いオリーブ
+      '#1a1a32', // Bank 8 - 深いネイビー
+      '#32321a', // Bank 9 - 深いイエロー
+      '#1a3232', // Bank 10+ - ティールの繰り返し
+    ];
+
+    const colorIndex = isNaN(bankNum) ? 0 : bankNum % bankColors.length;
+    const baseColor = bankColors[colorIndex];
+    
+    return isHovered ? lightenColor(baseColor, 0.2) : baseColor;
+  };
+
+  // 色を明るくするヘルパー関数
+  const lightenColor = (hex: string, factor: number): string => {
+    const num = parseInt(hex.replace("#", ""), 16);
+    const amt = Math.round(2.55 * factor * 100);
+    const R = (num >> 16) + amt;
+    const G = (num >> 8 & 0x00FF) + amt;
+    const B = (num & 0x0000FF) + amt;
+    return "#" + (0x1000000 + (R < 255 ? R < 1 ? 0 : R : 255) * 0x10000 +
+      (G < 255 ? G < 1 ? 0 : G : 255) * 0x100 +
+      (B < 255 ? B < 1 ? 0 : B : 255))
+      .toString(16).slice(1);
+  };
+
   return (
     <div className="pin-list-tabs">
       {/* Tab Headers */}
@@ -281,6 +325,35 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect }) => {
         {/* Results count */}
         <div style={{ color: '#cccccc', fontSize: '14px' }}>
           {filteredPins.length} pins
+        </div>
+
+        {/* BANK Color Legend */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ color: '#cccccc', fontSize: '12px' }}>BANKs:</span>
+          {Array.from(new Set(filteredPins.map(p => p.bank).filter(Boolean)))
+            .sort((a, b) => {
+              const aNum = parseInt(a!);
+              const bNum = parseInt(b!);
+              return isNaN(aNum) || isNaN(bNum) ? a!.localeCompare(b!) : aNum - bNum;
+            })
+            .slice(0, 8) // 最大8個のBANKを表示
+            .map(bank => (
+              <div
+                key={bank}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '2px 6px',
+                  borderRadius: '3px',
+                  backgroundColor: getBankBackgroundColor(bank, false, false),
+                  border: '1px solid #555'
+                }}
+              >
+                <span style={{ fontSize: '11px', color: '#ffffff' }}>{bank}</span>
+              </div>
+            ))
+          }
         </div>
 
         {/* Bulk actions */}
@@ -433,26 +506,22 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect }) => {
             </tr>
           </thead>
           <tbody>
-            {filteredPins.map(pin => (
+            {filteredPins.map(pin => {
+              const isHovered = hoveredRowId === pin.id;
+              const backgroundColor = getBankBackgroundColor(pin.bank, listView.selectedRows.has(pin.id), isHovered);
+              
+              return (
               <tr 
                 key={pin.id}
                 style={{
-                  backgroundColor: listView.selectedRows.has(pin.id) ? '#2d4f75' : '#1a1a1a',
+                  backgroundColor,
                   cursor: 'pointer',
                   borderBottom: '1px solid #333',
                   color: '#ffffff'
                 }}
                 onClick={() => onPinSelect?.(pin.id)}
-                onMouseEnter={(e) => {
-                  if (!listView.selectedRows.has(pin.id)) {
-                    e.currentTarget.style.backgroundColor = '#2a2a2a';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!listView.selectedRows.has(pin.id)) {
-                    e.currentTarget.style.backgroundColor = '#1a1a1a';
-                  }
-                }}
+                onMouseEnter={() => setHoveredRowId(pin.id)}
+                onMouseLeave={() => setHoveredRowId(null)}
               >
                 <td style={{ 
                   padding: '8px', 
@@ -520,7 +589,8 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect }) => {
                   </div>
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
