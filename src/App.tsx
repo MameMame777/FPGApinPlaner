@@ -19,6 +19,8 @@ const App: React.FC<AppProps> = () => {
   const [lastViewerSelectedPin, setLastViewerSelectedPin] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showDifferentialPairs, setShowDifferentialPairs] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(300);
+  const [isResizing, setIsResizing] = useState(false);
   
   const {
     pins,
@@ -178,6 +180,44 @@ const App: React.FC<AppProps> = () => {
     const filename = `${currentPackage?.device || 'fpga'}_pins.xdc`;
     ExportService.downloadFile(xdcContent, filename, 'text/plain');
   };
+
+  // Sidebar resize handlers
+  const handleMouseDown = (e: React.MouseEvent) => {
+    setIsResizing(true);
+    e.preventDefault();
+  };
+
+  const handleMouseMove = React.useCallback((e: MouseEvent) => {
+    if (!isResizing) return;
+    
+    const newWidth = e.clientX;
+    // Constrain width between 200px and 600px
+    if (newWidth >= 200 && newWidth <= 600) {
+      setSidebarWidth(newWidth);
+    }
+  }, [isResizing]);
+
+  const handleMouseUp = React.useCallback(() => {
+    setIsResizing(false);
+  }, []);
+
+  // Add event listeners for mouse move and up
+  React.useEffect(() => {
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      };
+    }
+    return undefined;
+  }, [isResizing, handleMouseMove, handleMouseUp]);
 
   const stats = getPinStats();
 
@@ -383,12 +423,13 @@ const App: React.FC<AppProps> = () => {
       }}>
         {/* Sidebar */}
         <aside style={{
-          width: '300px',
+          width: `${sidebarWidth}px`,
           backgroundColor: '#252525',
           borderRight: '1px solid #444',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
+          position: 'relative',
         }}>
           {/* Search and Filters */}
           <div style={{
@@ -558,6 +599,32 @@ const App: React.FC<AppProps> = () => {
               </>
             )}
           </div>
+          
+          {/* Resize Handle */}
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              right: 0,
+              width: '4px',
+              height: '100%',
+              backgroundColor: isResizing ? '#007acc' : 'transparent',
+              cursor: 'col-resize',
+              zIndex: 10,
+              transition: isResizing ? 'none' : 'background-color 0.2s ease',
+            }}
+            onMouseDown={handleMouseDown}
+            onMouseEnter={(e) => {
+              if (!isResizing) {
+                e.currentTarget.style.backgroundColor = '#555';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!isResizing) {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }
+            }}
+          />
         </aside>
 
         {/* Main View */}

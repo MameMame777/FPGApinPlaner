@@ -1062,12 +1062,12 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                   {pin.signalName && pin.signalName.trim() !== '' && (
                     <>
                       <Rect
-                        x={pos.x - ((pin.signalName.length > 12 ? 15 : pin.signalName.length) * smallFontSize / 4) - 2}
-                        y={pos.y + fontSize / 2 + 3 + smallFontSize}
-                        width={(pin.signalName.length > 12 ? 15 : pin.signalName.length) * smallFontSize / 2 + 4}
-                        height={smallFontSize + 4}
-                        fill="rgba(255, 215, 0, 0.8)"
-                        cornerRadius={2}
+                        x={pos.x - ((pin.signalName.length > 12 ? 15 : pin.signalName.length) * smallFontSize * 0.35) - 6}
+                        y={pos.y + fontSize / 2 + 3 + smallFontSize - 1}
+                        width={(pin.signalName.length > 12 ? 15 : pin.signalName.length) * smallFontSize * 0.7 + 12}
+                        height={smallFontSize + 6}
+                        fill="rgba(255, 215, 0, 0.9)"
+                        cornerRadius={3}
                         listening={false}
                       />
                       <Text
