@@ -1,0 +1,192 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ master, develop ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  # 🧪 テストジョブ
+  test:
+    name: Test & Lint
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 🔧 Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        
+    - name: 📦 Install dependencies
+      run: npm ci
+      
+    - name: 🔍 Type check
+      run: npm run type-check
+      
+    - name: 🧪 Run tests
+      run: npm run test
+      
+    - name: 📊 Upload coverage reports
+      if: matrix.node-version == '20.x'
+      uses: codecov/codecov-action@v3
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        fail_ci_if_error: false
+
+  # 🏗️ ビルドジョブ
+  build:
+    name: Build Application
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 🔧 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+        
+    - name: 📦 Install dependencies
+      run: npm ci
+      
+    - name: 🏗️ Build for production
+      run: npm run build
+      
+    - name: 📤 Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: dist-files
+        path: dist/
+        retention-days: 7
+
+  # 🚀 デプロイジョブ (GitHub Pages)
+  deploy:
+    name: Deploy to GitHub Pages
+    runs-on: ubuntu-latest
+    needs: [test, build]
+    if: github.ref == 'refs/heads/master'
+    
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 🔧 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+        
+    - name: 📦 Install dependencies
+      run: npm ci
+      
+    - name: 🏗️ Build for production
+      run: npm run build
+      
+    - name: 🔧 Setup Pages
+      uses: actions/configure-pages@v4
+      
+    - name: 📤 Upload to Pages
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: dist/
+        
+    - name: 🚀 Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4
+
+  # 📦 リリースジョブ
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [test, build]
+    if: github.ref == 'refs/heads/master' && contains(github.event.head_commit.message, 'release:')
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: 🔧 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+        
+    - name: 📦 Install dependencies
+      run: npm ci
+      
+    - name: 🏗️ Build for production
+      run: npm run build
+      
+    - name: 📦 Create distribution package
+      run: |
+        mkdir -p release
+        cp -r dist/* release/
+        cp README.md release/
+        cp package.json release/
+        tar -czf fpga-pin-planner-release.tar.gz -C release .
+        zip -r fpga-pin-planner-release.zip release/
+        
+    - name: 📝 Extract version from package.json
+      id: version
+      run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+      
+    - name: 🏷️ Create Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ steps.version.outputs.version }}
+        release_name: FPGA Pin Planner v${{ steps.version.outputs.version }}
+        body: |
+          ## 🎉 FPGA Pin Planner v${{ steps.version.outputs.version }}
+          
+          ### ✨ 主要機能
+          - 📊 電圧・I/O規格プルダウン選択
+          - 🔄 スマート連携機能
+          - 📦 バッチ操作機能
+          - 🔍 高度な検索・フィルタ
+          - ✅ リアルタイム検証
+          
+          ### 📥 ダウンロード
+          - **Webアプリ**: [GitHub Pages でアクセス](https://your-username.github.io/FPGApinPlaner/)
+          - **ソースコード**: 下記のアセットからダウンロード
+          
+          ### 🛠️ 技術スタック
+          - React 18 + TypeScript 5.0
+          - Vite 4.5 + Vitest
+          - Zustand + Immer
+        draft: false
+        prerelease: false
+        
+    - name: 📤 Upload Release Assets
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./fpga-pin-planner-release.tar.gz
+        asset_name: fpga-pin-planner-v${{ steps.version.outputs.version }}.tar.gz
+        asset_content_type: application/gzip

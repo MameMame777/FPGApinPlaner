@@ -1,0 +1,85 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: 🔧 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+        
+    - name: 📦 Install dependencies
+      run: npm ci
+      
+    - name: 🧪 Run tests
+      run: npm run test:run
+      
+    - name: 🏗️ Build for production
+      run: npm run build
+      
+    - name: 📦 Create distribution package
+      run: |
+        mkdir -p release
+        cp -r dist/* release/
+        cp README.md release/
+        cp CONTRIBUTING.md release/
+        cp LICENSE release/ 2>/dev/null || echo "LICENSE file not found"
+        cp package.json release/
+        
+        # Create archives
+        tar -czf fpga-pin-planner-${GITHUB_REF#refs/tags/}.tar.gz -C release .
+        cd release && zip -r ../fpga-pin-planner-${GITHUB_REF#refs/tags/}.zip . && cd ..
+        
+    - name: 📝 Generate changelog
+      id: changelog
+      run: |
+        echo "## 🎉 FPGA Pin Planner ${GITHUB_REF#refs/tags/}" > CHANGELOG.md
+        echo "" >> CHANGELOG.md
+        echo "### ✨ 主要機能" >> CHANGELOG.md
+        echo "- 📊 電圧・I/O規格プルダウン選択機能" >> CHANGELOG.md
+        echo "- 🔄 スマート連携機能（電圧変更時のI/O規格自動更新）" >> CHANGELOG.md
+        echo "- 📦 バッチ操作機能（配列パターン、差動ペア、電圧・I/O規格）" >> CHANGELOG.md
+        echo "- 🔍 高度な検索・フィルタ機能" >> CHANGELOG.md
+        echo "- ✅ リアルタイム検証機能" >> CHANGELOG.md
+        echo "- 💬 コメント管理機能" >> CHANGELOG.md
+        echo "" >> CHANGELOG.md
+        echo "### 🛠️ 技術スタック" >> CHANGELOG.md
+        echo "- React 18 + TypeScript 5.0" >> CHANGELOG.md
+        echo "- Vite 4.5 + Vitest" >> CHANGELOG.md
+        echo "- Zustand + Immer" >> CHANGELOG.md
+        echo "- Modern CSS + Custom Components" >> CHANGELOG.md
+        echo "" >> CHANGELOG.md
+        echo "### 📥 使用方法" >> CHANGELOG.md
+        echo "1. **Webアプリ**: [GitHub Pages でアクセス](https://your-username.github.io/FPGApinPlaner/)" >> CHANGELOG.md
+        echo "2. **ローカル実行**: ダウンロードしたファイルを展開し、\`npm install && npm run dev\`" >> CHANGELOG.md
+        echo "" >> CHANGELOG.md
+        echo "### 📋 サポートフォーマット" >> CHANGELOG.md
+        echo "- **入力**: Xilinx CSV, Intel Quartus CSV" >> CHANGELOG.md
+        echo "- **出力**: XDC (Xilinx), SDC, QSF (Intel)" >> CHANGELOG.md
+        
+    - name: 🏷️ Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        name: FPGA Pin Planner ${{ github.ref_name }}
+        body_path: CHANGELOG.md
+        files: |
+          fpga-pin-planner-*.tar.gz
+          fpga-pin-planner-*.zip
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

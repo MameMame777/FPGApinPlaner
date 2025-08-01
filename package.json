@@ -1,7 +1,7 @@
 {
   "name": "fpga-pin-planner",
-  "version": "0.1.0",
-  "description": "FPGA Pin Assignment and Management Tool",
+  "version": "1.0.0",
+  "description": "Advanced FPGA Pin Assignment and Management Tool with Voltage/IO Standard Selection",
   "main": "dist-electron/main.js",
   "homepage": "./",
   "scripts": {
@@ -11,17 +11,30 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "format": "prettier --write src/**/*.{ts,tsx}",
     "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
     "electron:pack": "npm run build && electron-builder",
-    "electron:dist": "npm run build && electron-builder --publish=never"
+    "electron:dist": "npm run build && electron-builder --publish=never",
+    "release:patch": "node scripts/prepare-release.mjs patch",
+    "release:minor": "node scripts/prepare-release.mjs minor",
+    "release:major": "node scripts/prepare-release.mjs major"
   },
   "keywords": [
     "fpga",
     "pin-assignment",
+    "pin-planner",
     "xilinx",
-    "quartus",
-    "electron",
-    "typescript"
+    "intel-quartus",
+    "voltage-io-standards",
+    "differential-pairs",
+    "batch-operations",
+    "constraint-validation",
+    "react",
+    "typescript",
+    "vite"
   ],
   "author": "FPGA Pin Planner Team",
   "license": "MIT",
