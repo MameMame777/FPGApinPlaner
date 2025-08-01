@@ -31,6 +31,17 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect }) => {
     [listView.activeTab]
   );
 
+  const getColumnValue = (pin: Pin, columnKey: string): any => {
+    switch (columnKey) {
+      case 'differentialPair':
+        return pin.differentialPair ? `${pin.differentialPair.pair}_${pin.differentialPair.type}` : '';
+      case 'commentTimestamp':
+        return pin.commentTimestamp?.getTime() || 0;
+      default:
+        return (pin as any)[columnKey] || '';
+    }
+  };
+
   const filteredPins = useMemo(() => {
     let result = pins;
 
@@ -81,17 +92,6 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect }) => {
 
     return result;
   }, [pins, activeTabConfig, listView.searchQuery, listView.commentFilter, listView.sortColumn, listView.sortDirection]);
-
-  const getColumnValue = (pin: Pin, columnKey: string): any => {
-    switch (columnKey) {
-      case 'differentialPair':
-        return pin.differentialPair ? `${pin.differentialPair.pair}_${pin.differentialPair.type}` : '';
-      case 'commentTimestamp':
-        return pin.commentTimestamp?.getTime() || 0;
-      default:
-        return (pin as any)[columnKey] || '';
-    }
-  };
 
   const renderCellContent = (pin: Pin, column: ColumnConfig) => {
     const value = getColumnValue(pin, column.key);
