@@ -15,7 +15,9 @@ export const TAB_CONFIGS: TabConfiguration[] = [
       { key: 'signalName', title: 'Signal', width: 120, editable: true, sortable: true },
       { key: 'bank', title: 'Bank', width: 50, sortable: true },
       { key: 'pinType', title: 'Type', width: 80, sortable: true },
-      { key: 'comment', title: 'Comment', width: 200, editable: true }
+      { key: 'voltage', title: 'Voltage', width: 70, editable: true, sortable: true },
+      { key: 'ioStandard', title: 'I/O Standard', width: 100, editable: true, sortable: true },
+      { key: 'comment', title: 'Comment', width: 180, editable: true }
     ]
   },
   {
@@ -29,7 +31,8 @@ export const TAB_CONFIGS: TabConfiguration[] = [
       { key: 'signalName', title: 'Signal Name', width: 140, editable: true, sortable: true },
       { key: 'pinNumber', title: 'Pin#', width: 60, sortable: true },
       { key: 'direction', title: 'Direction', width: 80, sortable: true },
-      { key: 'voltage', title: 'Voltage', width: 70, sortable: true },
+      { key: 'voltage', title: 'Voltage', width: 70, editable: true, sortable: true },
+      { key: 'ioStandard', title: 'I/O Standard', width: 100, editable: true, sortable: true },
       { key: 'bank', title: 'Bank', width: 50, sortable: true },
       { key: 'comment', title: 'Comment', width: 180, editable: true }
     ],
@@ -46,8 +49,9 @@ export const TAB_CONFIGS: TabConfiguration[] = [
     columns: [
       { key: 'bank', title: 'Bank', width: 50, sortable: true },
       { key: 'pinNumber', title: 'Pin#', width: 60, sortable: true },
-      { key: 'voltage', title: 'Voltage', width: 70, sortable: true },
+      { key: 'voltage', title: 'Voltage', width: 70, editable: true, sortable: true },
       { key: 'ioType', title: 'I/O Type', width: 80, sortable: true },
+      { key: 'ioStandard', title: 'I/O Standard', width: 100, editable: true, sortable: true },
       { key: 'signalName', title: 'Signal', width: 120, editable: true },
       { key: 'comment', title: 'Comment', width: 160, editable: true }
     ],

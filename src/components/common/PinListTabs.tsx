@@ -4,6 +4,12 @@ import { TAB_CONFIGS } from '../../constants/tab-configs';
 import { EditableTableCell } from '../common/EditableTableCell';
 import { CommentTemplateSelector } from '../common/CommentTemplateSelector';
 import { CommentManager } from '../../services/comment-service';
+import { 
+  VOLTAGE_LEVELS, 
+  IO_STANDARDS, 
+  getCompatibleIOStandards, 
+  getDefaultIOStandard 
+} from '../../constants/pin-constants';
 import { Pin, ColumnConfig } from '../../types';
 
 interface PinListTabsProps {
@@ -37,6 +43,8 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect }) => {
         return pin.differentialPair ? `${pin.differentialPair.pair}_${pin.differentialPair.type}` : '';
       case 'commentTimestamp':
         return pin.commentTimestamp?.getTime() || 0;
+      case 'ioStandard':
+        return pin.attributes?.['IO_Standard'] || pin.ioType || 'AUTO';
       default:
         return (pin as any)[columnKey] || '';
     }
@@ -110,6 +118,40 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect }) => {
     }
 
     if (column.editable) {
+      // Special handling for voltage and I/O standard columns
+      if (column.key === 'voltage') {
+        return (
+          <EditableTableCell
+            value={String(value)}
+            onSave={(newValue) => handleCellEdit(pin.id, column.key, newValue)}
+            editable={true}
+            placeholder="Select voltage..."
+            type="select"
+            options={[...VOLTAGE_LEVELS]}
+            allowCustomValue={true}
+          />
+        );
+      }
+      
+      if (column.key === 'ioStandard' || column.key === 'ioType') {
+        const compatibleStandards = pin.voltage ? 
+          getCompatibleIOStandards(pin.voltage) : 
+          [...IO_STANDARDS];
+        
+        return (
+          <EditableTableCell
+            value={String(value)}
+            onSave={(newValue) => handleCellEdit(pin.id, column.key, newValue)}
+            editable={true}
+            placeholder="Select I/O standard..."
+            type="select"
+            options={compatibleStandards}
+            allowCustomValue={true}
+            getDisplayValue={(val) => val === 'AUTO' ? `Auto (${getDefaultIOStandard(pin.voltage || '3.3V')})` : val}
+          />
+        );
+      }
+      
       return (
         <EditableTableCell
           value={String(value)}
@@ -125,12 +167,36 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect }) => {
   };
 
   const handleCellEdit = (pinId: string, columnKey: string, newValue: string) => {
+    const pin = pins.find(p => p.id === pinId);
+    if (!pin) return;
+    
     const updates: Partial<Pin> = {};
     
     if (columnKey === 'comment') {
       updates.comment = newValue;
       updates.commentTimestamp = new Date();
       updates.commentAuthor = 'current_user'; // TODO: Get from auth system
+    } else if (columnKey === 'voltage') {
+      updates.voltage = newValue;
+      
+      // Auto-update I/O standard if it's currently AUTO or incompatible
+      const currentIOStandard = pin.attributes?.['IO_Standard'] || pin.ioType || 'AUTO';
+      if (currentIOStandard === 'AUTO' || !getCompatibleIOStandards(newValue).includes(currentIOStandard)) {
+        const defaultIOStandard = getDefaultIOStandard(newValue);
+        updates.attributes = {
+          ...pin.attributes,
+          'IO_Standard': defaultIOStandard
+        };
+        // Also update ioType for backward compatibility
+        updates.ioType = defaultIOStandard;
+      }
+    } else if (columnKey === 'ioStandard' || columnKey === 'ioType') {
+      // Store I/O standard in both attributes and ioType for compatibility
+      updates.attributes = {
+        ...pin.attributes,
+        'IO_Standard': newValue
+      };
+      updates.ioType = newValue;
     } else {
       (updates as any)[columnKey] = newValue;
     }

@@ -5,15 +5,21 @@ import {
   BatchOperationService, 
   ArrayPatternConfig, 
   DifferentialPatternConfig,
+  VoltageIOConfig,
   PinSelectionCriteria,
   BatchOperationResult
 } from '@/services/batch-operation-service';
+import { 
+  VOLTAGE_LEVELS, 
+  IO_STANDARDS, 
+  getDefaultIOStandard 
+} from '@/constants/pin-constants';
 
 interface BatchOperationPanelProps {
   isVisible: boolean;
 }
 
-type OperationType = 'array' | 'differential' | 'clear';
+type OperationType = 'array' | 'differential' | 'voltage-io' | 'direction' | 'clear';
 type SelectionMode = 'manual' | 'criteria';
 
 export const BatchOperationPanel: React.FC<BatchOperationPanelProps> = ({ isVisible }) => {
@@ -48,6 +54,18 @@ export const BatchOperationPanel: React.FC<BatchOperationPanelProps> = ({ isVisi
     padding: 0
   });
 
+  // Voltage and I/O standard configuration
+  const [voltageIOConfig, setVoltageIOConfig] = useState<VoltageIOConfig>({
+    voltage: '3.3V',
+    ioStandard: 'AUTO',
+    autoDetectIO: true,
+    driveStrength: 12,
+    slewRate: 'FAST'
+  });
+
+  // Direction configuration
+  const [directionConfig, setDirectionConfig] = useState<string>('Input');
+
   // Selection criteria state
   const [criteria, setCriteria] = useState<PinSelectionCriteria>({
     pinTypes: ['IO'],
@@ -68,7 +86,12 @@ export const BatchOperationPanel: React.FC<BatchOperationPanelProps> = ({ isVisi
   // Validation errors
   const validationErrors = useMemo(() => {
     if (operationType === 'clear') return [];
-    return BatchOperationService.validateBatchOperation(targetPins, operationType);
+    if (operationType === 'voltage-io' || operationType === 'direction') {
+      // Simple validation for new operations
+      if (targetPins.length === 0) return ['No pins selected'];
+      return [];
+    }
+    return BatchOperationService.validateBatchOperation(targetPins, operationType as 'array' | 'differential');
   }, [targetPins, operationType]);
 
   // Generate preview
@@ -81,6 +104,12 @@ export const BatchOperationPanel: React.FC<BatchOperationPanelProps> = ({ isVisi
         break;
       case 'differential':
         result = BatchOperationService.assignDifferentialPattern(targetPins, diffConfig);
+        break;
+      case 'voltage-io':
+        result = BatchOperationService.setVoltageAndIO(targetPins, voltageIOConfig);
+        break;
+      case 'direction':
+        result = BatchOperationService.setPinDirections(targetPins, directionConfig);
         break;
       case 'clear':
         result = BatchOperationService.clearSignals(targetPins);
@@ -109,9 +138,32 @@ export const BatchOperationPanel: React.FC<BatchOperationPanelProps> = ({ isVisi
     // Record action for undo/redo
     UndoRedoService.recordAction('batch_operation', undoData, actionDescription);
 
-    // Apply changes using assignSignal
+    // Apply changes based on operation type
     previewResult.assignments.forEach(assignment => {
-      assignSignal(assignment.pinId, assignment.newSignal);
+      if (operationType === 'voltage-io') {
+        // Update voltage and I/O standard
+        const { updatePin } = useAppStore.getState();
+        updatePin(assignment.pinId, {
+          voltage: voltageIOConfig.voltage,
+          attributes: {
+            'IO_Standard': voltageIOConfig.ioStandard === 'AUTO' ? 
+              getDefaultIOStandard(voltageIOConfig.voltage || '3.3V') : 
+              (voltageIOConfig.ioStandard || 'LVCMOS33')
+          },
+          ioType: voltageIOConfig.ioStandard === 'AUTO' ? 
+            getDefaultIOStandard(voltageIOConfig.voltage || '3.3V') : 
+            (voltageIOConfig.ioStandard || 'LVCMOS33')
+        });
+      } else if (operationType === 'direction') {
+        // Update pin direction
+        const { updatePin } = useAppStore.getState();
+        updatePin(assignment.pinId, {
+          direction: directionConfig as any
+        });
+      } else {
+        // Signal assignment operations
+        assignSignal(assignment.pinId, assignment.newSignal);
+      }
     });
 
     setShowPreview(false);
@@ -162,6 +214,28 @@ export const BatchOperationPanel: React.FC<BatchOperationPanelProps> = ({ isVisi
                 className="mr-2"
               />
               <span className="text-sm">Differential Pairs (CLK_P, CLK_N)</span>
+            </label>
+            <label className="flex items-center">
+              <input
+                type="radio"
+                name="operationType"
+                value="voltage-io"
+                checked={operationType === 'voltage-io'}
+                onChange={(e) => setOperationType(e.target.value as OperationType)}
+                className="mr-2"
+              />
+              <span className="text-sm">Voltage & I/O Standards</span>
+            </label>
+            <label className="flex items-center">
+              <input
+                type="radio"
+                name="operationType"
+                value="direction"
+                checked={operationType === 'direction'}
+                onChange={(e) => setOperationType(e.target.value as OperationType)}
+                className="mr-2"
+              />
+              <span className="text-sm">Pin Directions</span>
             </label>
             <label className="flex items-center">
               <input
@@ -440,6 +514,126 @@ export const BatchOperationPanel: React.FC<BatchOperationPanelProps> = ({ isVisi
 
             <div className="text-xs text-gray-600">
               Preview: {diffConfig.baseName}{(diffConfig.indexFormat || '{i}').replace('{i}', (diffConfig.startIndex || 0).toString())}{diffConfig.positiveFormat}, {diffConfig.baseName}{(diffConfig.indexFormat || '{i}').replace('{i}', (diffConfig.startIndex || 0).toString())}{diffConfig.negativeFormat}
+            </div>
+          </div>
+        )}
+
+        {/* Voltage & I/O Standard Configuration */}
+        {operationType === 'voltage-io' && (
+          <div className="space-y-3 p-3 bg-blue-50 rounded-lg">
+            <h4 className="text-sm font-medium text-gray-800">Voltage & I/O Standard Configuration</h4>
+            
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Voltage Level
+                </label>
+                <select
+                  value={voltageIOConfig.voltage || ''}
+                  onChange={(e) => setVoltageIOConfig(prev => ({ ...prev, voltage: e.target.value }))}
+                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="">Keep current</option>
+                  {VOLTAGE_LEVELS.map(voltage => (
+                    <option key={voltage} value={voltage}>{voltage}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  I/O Standard
+                </label>
+                <select
+                  value={voltageIOConfig.ioStandard || ''}
+                  onChange={(e) => setVoltageIOConfig(prev => ({ ...prev, ioStandard: e.target.value }))}
+                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="">Keep current</option>
+                  <option value="AUTO">AUTO (based on voltage)</option>
+                  {IO_STANDARDS.map(standard => (
+                    <option key={standard} value={standard}>{standard}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-4">
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={voltageIOConfig.autoDetectIO || false}
+                  onChange={(e) => setVoltageIOConfig(prev => ({ ...prev, autoDetectIO: e.target.checked }))}
+                  className="mr-2"
+                />
+                <span className="text-xs">Auto-detect I/O standard</span>
+              </label>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Drive Strength (mA)
+                </label>
+                <select
+                  value={voltageIOConfig.driveStrength || ''}
+                  onChange={(e) => setVoltageIOConfig(prev => ({ ...prev, driveStrength: parseInt(e.target.value) }))}
+                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="">Keep current</option>
+                  <option value="2">2 mA</option>
+                  <option value="4">4 mA</option>
+                  <option value="6">6 mA</option>
+                  <option value="8">8 mA</option>
+                  <option value="12">12 mA</option>
+                  <option value="16">16 mA</option>
+                  <option value="20">20 mA</option>
+                  <option value="24">24 mA</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Slew Rate
+                </label>
+                <select
+                  value={voltageIOConfig.slewRate || ''}
+                  onChange={(e) => setVoltageIOConfig(prev => ({ ...prev, slewRate: e.target.value as 'SLOW' | 'FAST' }))}
+                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="">Keep current</option>
+                  <option value="SLOW">SLOW</option>
+                  <option value="FAST">FAST</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Pin Direction Configuration */}
+        {operationType === 'direction' && (
+          <div className="space-y-3 p-3 bg-orange-50 rounded-lg">
+            <h4 className="text-sm font-medium text-gray-800">Pin Direction Configuration</h4>
+            
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-2">
+                Direction
+              </label>
+              <div className="space-y-2">
+                {['Input', 'Output', 'InOut', 'Clock', 'Reset'].map(direction => (
+                  <label key={direction} className="flex items-center">
+                    <input
+                      type="radio"
+                      name="direction"
+                      value={direction}
+                      checked={directionConfig === direction}
+                      onChange={(e) => setDirectionConfig(e.target.value)}
+                      className="mr-2"
+                    />
+                    <span className="text-sm">{direction}</span>
+                  </label>
+                ))}
+              </div>
             </div>
           </div>
         )}

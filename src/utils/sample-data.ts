@@ -85,6 +85,9 @@ export const createSamplePackage = (): Package => {
       bank: '14',
       memoryByteGroup: '0',
       ioType: 'HR',
+      attributes: {
+        'IO_Standard': 'LVCMOS33'
+      },
     },
     {
       id: '6',
@@ -101,6 +104,9 @@ export const createSamplePackage = (): Package => {
       bank: '14',
       memoryByteGroup: '0',
       ioType: 'HR',
+      attributes: {
+        'IO_Standard': 'LVCMOS33'
+      },
     },
     // 通常のピン（差動ペアではない）
     {

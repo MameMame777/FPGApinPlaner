@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FPGA Pin Planner - Voltage & I/O Standard Test</title>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="module">
+        import { createRoot } from 'react-dom/client';
+        import { TestApp } from './src/TestApp.tsx';
+        
+        const container = document.getElementById('root');
+        const root = createRoot(container);
+        root.render(<TestApp />);
+    </script>
+</body>
+</html>

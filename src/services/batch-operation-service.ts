@@ -1,4 +1,10 @@
 import { Pin } from '@/types';
+import { 
+  VOLTAGE_LEVELS, 
+  IO_STANDARDS, 
+  getDefaultIOStandard,
+  isIOStandardCompatible 
+} from '@/constants/pin-constants';
 
 export interface ArrayPatternConfig {
   baseName: string;          // "DATA"
@@ -17,6 +23,15 @@ export interface DifferentialPatternConfig {
   endIndex?: number;
   indexFormat?: string;      // For numbered diff pairs: "CLK{i}_P"
   padding?: number;
+}
+
+export interface VoltageIOConfig {
+  voltage?: string;          // "3.3V", "1.8V", etc.
+  ioStandard?: string;       // "LVCMOS33", "LVCMOS18", etc.
+  autoDetectIO?: boolean;    // Auto-detect I/O standard based on voltage
+  driveStrength?: number;    // 2, 4, 6, 8, 12, 16, 20, 24 (mA)
+  slewRate?: 'SLOW' | 'FAST';
+  termination?: string;      // "NONE", "UNTUNED_SPLIT_40", etc.
 }
 
 export interface BatchOperationResult {
@@ -383,5 +398,141 @@ export class BatchOperationService {
     } catch {
       return [];
     }
+  }
+
+  /**
+   * Batch set voltage and I/O standards for selected pins
+   */
+  static setVoltageAndIO(pins: Pin[], config: VoltageIOConfig): BatchOperationResult {
+    const result: BatchOperationResult = {
+      success: true,
+      processedPins: 0,
+      skippedPins: 0,
+      errors: [],
+      assignments: []
+    };
+
+    try {
+      // Validate configuration
+      if (!config.voltage && !config.ioStandard) {
+        throw new Error('At least voltage or I/O standard must be specified');
+      }
+
+      // Validate voltage
+      if (config.voltage && !(VOLTAGE_LEVELS as readonly string[]).includes(config.voltage)) {
+        result.errors.push(`Invalid voltage: ${config.voltage}`);
+      }
+
+      // Validate I/O standard
+      if (config.ioStandard && !(IO_STANDARDS as readonly string[]).includes(config.ioStandard) && config.ioStandard !== 'AUTO') {
+        result.errors.push(`Invalid I/O standard: ${config.ioStandard}`);
+      }
+
+      // Process each pin
+      for (const pin of pins) {
+        // Skip non-I/O pins unless explicitly targeting them
+        if (!['IO', 'CLOCK'].includes(pin.pinType) && config.voltage) {
+          result.skippedPins++;
+          continue;
+        }
+
+        let newVoltage = pin.voltage;
+        let newIOStandard = pin.attributes?.['IO_Standard'] || pin.ioType || 'AUTO';
+
+        // Set voltage
+        if (config.voltage) {
+          newVoltage = config.voltage;
+        }
+
+        // Set I/O standard
+        if (config.ioStandard) {
+          if (config.ioStandard === 'AUTO' || config.autoDetectIO) {
+            newIOStandard = getDefaultIOStandard(newVoltage || '3.3V');
+          } else {
+            // Validate compatibility
+            if (newVoltage && !isIOStandardCompatible(newVoltage, config.ioStandard)) {
+              result.errors.push(`I/O standard ${config.ioStandard} is not compatible with voltage ${newVoltage} for pin ${pin.pinNumber}`);
+              result.skippedPins++;
+              continue;
+            }
+            newIOStandard = config.ioStandard;
+          }
+        } else if (config.autoDetectIO && newVoltage) {
+          newIOStandard = getDefaultIOStandard(newVoltage);
+        }
+
+        // Create assignment record
+        result.assignments.push({
+          pinId: pin.id,
+          pinNumber: pin.pinNumber,
+          oldSignal: `${pin.voltage || 'Unknown'}V / ${pin.attributes?.['IO_Standard'] || pin.ioType || 'Unknown'}`,
+          newSignal: `${newVoltage}V / ${newIOStandard}`
+        });
+
+        result.processedPins++;
+      }
+
+      if (result.processedPins === 0 && result.skippedPins > 0) {
+        result.errors.push('No pins were processed. All pins were skipped.');
+        result.success = false;
+      }
+
+    } catch (error) {
+      result.success = false;
+      result.errors.push(error instanceof Error ? error.message : 'Unknown error occurred');
+    }
+
+    return result;
+  }
+
+  /**
+   * Batch set pin directions
+   */
+  static setPinDirections(pins: Pin[], direction: string): BatchOperationResult {
+    const result: BatchOperationResult = {
+      success: true,
+      processedPins: 0,
+      skippedPins: 0,
+      errors: [],
+      assignments: []
+    };
+
+    try {
+      const validDirections = ['Input', 'Output', 'InOut', 'Clock', 'Reset'];
+      
+      if (!validDirections.includes(direction)) {
+        throw new Error(`Invalid direction: ${direction}`);
+      }
+
+      for (const pin of pins) {
+        // Skip non-I/O pins
+        if (!['IO', 'CLOCK'].includes(pin.pinType)) {
+          result.skippedPins++;
+          continue;
+        }
+
+        const oldSignal = pin.direction || 'Unknown';
+
+        result.assignments.push({
+          pinId: pin.id,
+          pinNumber: pin.pinNumber,
+          oldSignal: `Direction: ${oldSignal}`,
+          newSignal: `Direction: ${direction}`
+        });
+
+        result.processedPins++;
+      }
+
+      if (result.processedPins === 0) {
+        result.errors.push('No I/O pins found to update');
+        result.success = false;
+      }
+
+    } catch (error) {
+      result.success = false;
+      result.errors.push(error instanceof Error ? error.message : 'Unknown error occurred');
+    }
+
+    return result;
   }
 }
