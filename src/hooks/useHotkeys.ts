@@ -53,12 +53,24 @@ export const useGeneralHotkeys = () => {
     rotatePins, 
     flipView, 
     setZoom,
-    viewConfig 
+    viewConfig,
+    pins,
+    selectPins
   } = useAppStore();
 
   useEffect(() => {
     // Register general shortcuts
     KeyboardService.registerShortcut('escape', () => {
+      clearSelection();
+    });
+
+    // Select all pins
+    KeyboardService.registerShortcut('ctrl+a', () => {
+      selectPins(pins.map(p => p.id));
+    });
+
+    // Deselect all pins  
+    KeyboardService.registerShortcut('ctrl+d', () => {
       clearSelection();
     });
     
@@ -96,6 +108,8 @@ export const useGeneralHotkeys = () => {
     
     return () => {
       KeyboardService.unregisterShortcut('escape');
+      KeyboardService.unregisterShortcut('ctrl+a');
+      KeyboardService.unregisterShortcut('ctrl+d');
       KeyboardService.unregisterShortcut('r');
       KeyboardService.unregisterShortcut('space');
       KeyboardService.unregisterShortcut('f');
@@ -104,7 +118,7 @@ export const useGeneralHotkeys = () => {
       KeyboardService.unregisterShortcut('0');
       KeyboardService.unregisterShortcut('ctrl+shift+?');
     };
-  }, [clearSelection, resetZoom, rotatePins, flipView, setZoom, viewConfig.zoom]);
+  }, [clearSelection, resetZoom, rotatePins, flipView, setZoom, viewConfig.zoom, pins, selectPins]);
 };
 
 export const useAppHotkeys = () => {

@@ -11,8 +11,10 @@ import PackageCanvas from '@/components/common/PackageCanvas';
 import SaveLoadControls from '@/components/common/SaveLoadControls';
 import { UndoRedoControls, KeyboardShortcutsHelp } from '@/components/common/UndoRedoControls';
 import { ValidationPanel, ValidationStatusIcon } from '@/components/common/ValidationPanel';
+import { BatchOperationPanel } from '@/components/common/BatchOperationPanel';
 import { useAppHotkeys } from '@/hooks/useHotkeys';
 import { useValidation } from '@/hooks/useValidation';
+import { ValidationIssue } from '@/services/validation-service';
 import { loadSampleData } from '@/utils/sample-data';
 import { DifferentialPairUtils } from '@/utils/differential-pair-utils';
 
@@ -25,7 +27,7 @@ const App: React.FC<AppProps> = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [showDifferentialPairs, setShowDifferentialPairs] = useState(false);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
-  const [showValidationPanel, setShowValidationPanel] = useState(true);
+  const [rightSidebarTab, setRightSidebarTab] = useState<'validation' | 'batch' | null>('validation');
   const [sidebarWidth, setSidebarWidth] = useState(300);
   const [isResizing, setIsResizing] = useState(false);
   
@@ -758,10 +760,10 @@ const App: React.FC<AppProps> = () => {
 
             {/* Validation Status */}
             <button 
-              onClick={() => setShowValidationPanel(!showValidationPanel)}
+              onClick={() => setRightSidebarTab(rightSidebarTab === 'validation' ? null : 'validation')}
               style={{
                 padding: '6px 12px',
-                backgroundColor: hasErrors ? '#dc2626' : hasWarnings ? '#d97706' : '#333',
+                backgroundColor: rightSidebarTab === 'validation' ? '#4a5568' : (hasErrors ? '#dc2626' : hasWarnings ? '#d97706' : '#333'),
                 border: '1px solid #555',
                 borderRadius: '4px',
                 color: '#ccc',
@@ -776,6 +778,27 @@ const App: React.FC<AppProps> = () => {
               <ValidationStatusIcon validationResult={validationResult} />
               <span>Validation</span>
               {isValidating && <span className="animate-spin">⚡</span>}
+            </button>
+
+            {/* Batch Operations */}
+            <button 
+              onClick={() => setRightSidebarTab(rightSidebarTab === 'batch' ? null : 'batch')}
+              style={{
+                padding: '6px 12px',
+                backgroundColor: rightSidebarTab === 'batch' ? '#4a5568' : '#333',
+                border: '1px solid #555',
+                borderRadius: '4px',
+                color: '#ccc',
+                cursor: 'pointer',
+                fontSize: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+              }}
+              title="Batch Operations - Assign patterns to multiple pins"
+            >
+              <span>🔧</span>
+              <span>Batch Ops</span>
             </button>
 
             <div style={{ width: '1px', height: '20px', backgroundColor: '#555' }}></div>
@@ -871,33 +894,45 @@ const App: React.FC<AppProps> = () => {
                   height: '100%',
                   backgroundColor: '#1a1a1a',
                   overflow: 'hidden'
-                }}>
+                }} className="custom-scrollbar">
                   <PinListTabs onPinSelect={handleListPinSelect} />
                 </div>
               )}
             </div>
 
-            {/* Right Sidebar - Validation Panel */}
-            {showValidationPanel && (
+            {/* Right Sidebar */}
+            {rightSidebarTab && (
               <div 
                 style={{ 
                   width: '300px',
                   borderLeft: '1px solid #555',
                   backgroundColor: '#1e1e1e',
                   display: 'flex',
-                  flexDirection: 'column'
+                  flexDirection: 'column',
+                  height: '100%',
+                  overflow: 'hidden'
                 }}
               >
-                <ValidationPanel 
-                  validationResult={validationResult}
-                  onIssueClick={(issue) => {
-                    // Highlight pins
-                    if (issue.affectedPins && issue.affectedPins.length > 0) {
-                      console.log('Pins to highlight:', issue.affectedPins);
-                      // TODO: Add pin highlighting functionality to PackageCanvas
-                    }
-                  }}
-                />
+                {rightSidebarTab === 'validation' && (
+                  <div style={{ height: '100%', overflow: 'hidden' }} className="custom-scrollbar">
+                    <ValidationPanel 
+                      validationResult={validationResult}
+                      onIssueClick={(issue: ValidationIssue) => {
+                        // Highlight pins
+                        if (issue.affectedPins && issue.affectedPins.length > 0) {
+                          console.log('Pins to highlight:', issue.affectedPins);
+                          // TODO: Add pin highlighting functionality to PackageCanvas
+                        }
+                      }}
+                    />
+                  </div>
+                )}
+                
+                {rightSidebarTab === 'batch' && (
+                  <div style={{ height: '100%', overflow: 'auto' }} className="custom-scrollbar">
+                    <BatchOperationPanel isVisible={true} />
+                  </div>
+                )}
               </div>
             )}
           </div>

@@ -453,7 +453,7 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect }) => {
       )}
 
       {/* Table */}
-      <div style={{ overflow: 'auto', maxHeight: '500px' }}>
+      <div style={{ overflow: 'auto', maxHeight: '500px' }} className="custom-scrollbar">
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead style={{ position: 'sticky', top: 0, backgroundColor: '#2a2a2a', zIndex: 1 }}>
             <tr>

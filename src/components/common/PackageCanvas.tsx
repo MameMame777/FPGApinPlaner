@@ -3,6 +3,7 @@ import { Stage, Layer, Rect, Text, Group, Line, Circle } from 'react-konva';
 import { KonvaEventObject } from 'konva/lib/Node';
 import { Pin, Package } from '@/types';
 import { DifferentialPairUtils } from '@/utils/differential-pair-utils';
+import { useAppStore } from '@/stores/app-store';
 
 interface PackageCanvasProps {
   package: Package | null;
@@ -29,8 +30,12 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
   onZoomChange,
   resetTrigger = 0
 }) => {
+  const { togglePinSelection, selectPins } = useAppStore();
   const stageRef = useRef<any>(null);
   const [stageSize, setStageSize] = useState({ width: 800, height: 600 });
+  
+  // Last selected pin for shift-click range selection
+  const [lastSelectedPinId, setLastSelectedPinId] = useState<string | null>(null);
   
   // Viewport management for pan and zoom
   const [viewport, setViewport] = useState({
@@ -48,6 +53,36 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
   // Constants for mouse interaction
   const DRAG_THRESHOLD_TIME = 200; // ms - time before starting drag (slightly longer for better UX)
   const DRAG_THRESHOLD_DISTANCE = 8; // pixels - distance before starting drag (slightly more forgiving)
+
+  // Handle multiple pin selection with keyboard modifiers
+  const handlePinSelection = (pinId: string, mouseEvent: MouseEvent) => {
+    if (mouseEvent.ctrlKey || mouseEvent.metaKey) {
+      // Ctrl+Click: Toggle individual pin selection
+      togglePinSelection(pinId);
+      setLastSelectedPinId(pinId);
+    } else if (mouseEvent.shiftKey && lastSelectedPinId) {
+      // Shift+Click: Range selection
+      const currentIndex = pins.findIndex(p => p.id === pinId);
+      const lastIndex = pins.findIndex(p => p.id === lastSelectedPinId);
+      
+      if (currentIndex !== -1 && lastIndex !== -1) {
+        const startIndex = Math.min(currentIndex, lastIndex);
+        const endIndex = Math.max(currentIndex, lastIndex);
+        const rangeIds = pins.slice(startIndex, endIndex + 1).map(p => p.id);
+        
+        // Merge with existing selection
+        const newSelection = new Set(selectedPins);
+        rangeIds.forEach(id => newSelection.add(id));
+        selectPins(Array.from(newSelection));
+        
+        // Don't update lastSelectedPinId for range selection to allow extending
+      }
+    } else {
+      // Normal click: Single selection
+      onPinSelect(pinId);
+      setLastSelectedPinId(pinId);
+    }
+  };
 
   // Canvas size management
   useEffect(() => {
@@ -435,7 +470,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
         // Only treat as pin click if mouse didn't move much and it was quick
         if (distance < DRAG_THRESHOLD_DISTANCE && !isDragging) {
           e.cancelBubble = true;
-          onPinSelect(pin.id);
+          handlePinSelection(pin.id, e.evt);
         }
       }
     }
