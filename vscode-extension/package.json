@@ -1,0 +1,247 @@
+{
+  "name": "fpga-pin-planner",
+  "displayName": "FPGA Pin Planner",
+  "description": "Advanced FPGA Pin Assignment and Management Tool with Voltage/IO Standard Selection",
+  "version": "1.0.0",
+  "publisher": "fpga-tools",
+  "author": "FPGA Pin Planner Team <contact@fpga-pin-planner.dev>",
+  "license": "MIT",
+  "homepage": "https://github.com/your-username/FPGApinPlaner",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/your-username/FPGApinPlaner.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-username/FPGApinPlaner/issues"
+  },
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Other",
+    "Visualization",
+    "Data Science"
+  ],
+  "keywords": [
+    "fpga",
+    "pin-assignment",
+    "pin-planner",
+    "xilinx",
+    "intel-quartus",
+    "voltage-io-standards",
+    "differential-pairs",
+    "constraint-validation",
+    "hardware-design"
+  ],
+  "activationEvents": [
+    "onCommand:fpgaPinPlanner.openPlanner",
+    "onLanguage:csv",
+    "workspaceContains:**/*.csv",
+    "workspaceContains:**/*.xdc",
+    "workspaceContains:**/*.qsf",
+    "workspaceContains:**/*.sdc"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "fpgaPinPlanner.openPlanner",
+        "title": "Open FPGA Pin Planner",
+        "category": "FPGA",
+        "icon": "$(circuit-board)"
+      },
+      {
+        "command": "fpgaPinPlanner.importCSV",
+        "title": "Import CSV Pin Data",
+        "category": "FPGA"
+      },
+      {
+        "command": "fpgaPinPlanner.exportXDC",
+        "title": "Export XDC Constraints",
+        "category": "FPGA"
+      },
+      {
+        "command": "fpgaPinPlanner.exportSDC",
+        "title": "Export SDC Constraints",
+        "category": "FPGA"
+      },
+      {
+        "command": "fpgaPinPlanner.exportQSF",
+        "title": "Export QSF Constraints",
+        "category": "FPGA"
+      },
+      {
+        "command": "fpgaPinPlanner.validateConstraints",
+        "title": "Validate Pin Constraints",
+        "category": "FPGA"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "fpgaPinPlanner.importCSV",
+          "when": "resourceExtname == .csv",
+          "group": "fpga"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "fpgaPinPlanner.openPlanner",
+          "when": "resourceExtname == .csv || resourceExtname == .xdc || resourceExtname == .qsf || resourceExtname == .sdc",
+          "group": "fpga"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "fpgaPinPlanner.openPlanner"
+        },
+        {
+          "command": "fpgaPinPlanner.importCSV"
+        },
+        {
+          "command": "fpgaPinPlanner.exportXDC"
+        },
+        {
+          "command": "fpgaPinPlanner.exportSDC"
+        },
+        {
+          "command": "fpgaPinPlanner.exportQSF"
+        },
+        {
+          "command": "fpgaPinPlanner.validateConstraints"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "fpga-pin-planner",
+          "title": "FPGA Pin Planner",
+          "icon": "$(circuit-board)"
+        }
+      ]
+    },
+    "views": {
+      "fpga-pin-planner": [
+        {
+          "id": "fpgaPinPlanner.pinList",
+          "name": "Pin List",
+          "when": "fpgaPinPlanner.active"
+        },
+        {
+          "id": "fpgaPinPlanner.validation",
+          "name": "Validation",
+          "when": "fpgaPinPlanner.active"
+        },
+        {
+          "id": "fpgaPinPlanner.batchOperations",
+          "name": "Batch Operations",
+          "when": "fpgaPinPlanner.active"
+        }
+      ]
+    },
+    "webviews": [
+      {
+        "viewType": "fpgaPinPlanner.mainView",
+        "displayName": "FPGA Pin Planner"
+      }
+    ],
+    "configuration": {
+      "title": "FPGA Pin Planner",
+      "properties": {
+        "fpgaPinPlanner.defaultVoltage": {
+          "type": "string",
+          "default": "3.3V",
+          "enum": [
+            "1.0V",
+            "1.2V",
+            "1.5V",
+            "1.8V",
+            "2.5V",
+            "3.3V",
+            "5.0V"
+          ],
+          "description": "Default voltage level for new pins"
+        },
+        "fpgaPinPlanner.defaultIOStandard": {
+          "type": "string",
+          "default": "AUTO",
+          "description": "Default I/O standard for new pins"
+        },
+        "fpgaPinPlanner.autoSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically save changes"
+        },
+        "fpgaPinPlanner.validationLevel": {
+          "type": "string",
+          "default": "strict",
+          "enum": [
+            "strict",
+            "moderate",
+            "relaxed"
+          ],
+          "description": "Validation strictness level"
+        },
+        "fpgaPinPlanner.exportFormat": {
+          "type": "string",
+          "default": "xdc",
+          "enum": [
+            "xdc",
+            "sdc",
+            "qsf"
+          ],
+          "description": "Default export format"
+        }
+      }
+    },
+    "languages": [
+      {
+        "id": "fpga-constraints",
+        "aliases": [
+          "XDC",
+          "SDC",
+          "QSF"
+        ],
+        "extensions": [
+          ".xdc",
+          ".sdc",
+          ".qsf"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "fpga-constraints",
+        "scopeName": "source.fpga-constraints",
+        "path": "./syntaxes/fpga-constraints.tmGrammar.json"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js",
+    "package": "vsce package",
+    "publish": "vsce publish"
+  },
+  "devDependencies": {
+    "@types/node": "^16.18.126",
+    "@types/vscode": "^1.74.0",
+    "@typescript-eslint/eslint-plugin": "^5.62.0",
+    "@typescript-eslint/parser": "^5.62.0",
+    "@vscode/test-electron": "^2.2.0",
+    "eslint": "^8.57.1",
+    "typescript": "^4.9.5",
+    "vsce": "^2.15.0"
+  },
+  "dependencies": {
+    "csv-parser": "^3.0.0",
+    "csv-stringify": "^6.2.3"
+  },
+  "type": "commonjs"
+}

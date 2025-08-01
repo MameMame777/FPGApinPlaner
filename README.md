@@ -59,6 +59,24 @@ FPGAのピン配置を効率的に行うためのモダンなGUIツールです�
 
 ### インストール & 起動
 
+#### VS Code拡張機能 (推奨)
+
+最も簡単な使用方法はVS Code拡張機能です：
+
+1. **拡張機能のインストール:**
+   - リリースから `fpga-pin-planner-1.0.0.vsix` をダウンロード
+   - VS Codeで: `Ctrl+Shift+P` → "Extensions: Install from VSIX..."
+   - ダウンロードしたファイルを選択
+
+2. **使用開始:**
+   - `Ctrl+Shift+P` → "FPGA: Open Pin Planner"
+   - CSVファイルを右クリック → "Import CSV Pin Data"
+   - コマンドパレットから制約ファイルをエクスポート
+
+#### Webアプリケーション
+
+スタンドアロン使用または開発用：
+
 ```bash
 # リポジトリをクローン
 git clone https://github.com/your-username/fpga-pin-planner.git
