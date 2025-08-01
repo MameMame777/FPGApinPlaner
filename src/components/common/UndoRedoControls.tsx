@@ -39,7 +39,7 @@ export const UndoRedoControls: React.FC<UndoRedoControlsProps> = ({ className = 
       <button
         onClick={undo}
         disabled={!canUndo}
-        title={`元に戻す${currentActionDescription ? `: ${currentActionDescription}` : ''} (Ctrl+Z)`}
+        title={`Undo${currentActionDescription ? `: ${currentActionDescription}` : ''} (Ctrl+Z)`}
         style={{
           ...buttonStyle(canUndo),
           borderRadius: '4px 0 0 4px',
@@ -62,7 +62,7 @@ export const UndoRedoControls: React.FC<UndoRedoControlsProps> = ({ className = 
       <button
         onClick={redo}
         disabled={!canRedo}
-        title={`やり直し${nextRedoActionDescription ? `: ${nextRedoActionDescription}` : ''} (Ctrl+Y)`}
+        title={`Redo${nextRedoActionDescription ? `: ${nextRedoActionDescription}` : ''} (Ctrl+Y)`}
         style={{
           ...buttonStyle(canRedo),
           borderRadius: '0 4px 4px 0',
@@ -134,7 +134,7 @@ export const ActionHistoryPanel: React.FC<ActionHistoryPanelProps> = ({ isOpen, 
     <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
       <div className="bg-white rounded-lg p-6 w-96 max-h-96 overflow-hidden flex flex-col">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-800">操作履歴</h3>
+          <h3 className="text-lg font-semibold text-gray-800">Action History</h3>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 text-xl"
@@ -146,7 +146,7 @@ export const ActionHistoryPanel: React.FC<ActionHistoryPanelProps> = ({ isOpen, 
         <div className="flex-1 overflow-y-auto">
           <div className="space-y-2">
             <div className="text-sm text-gray-500 mb-2">
-              履歴機能は実装中です
+              History feature is under development
             </div>
             {/* TODO: Implement actual history display */}
           </div>
@@ -164,7 +164,7 @@ export const ActionHistoryPanel: React.FC<ActionHistoryPanelProps> = ({ isOpen, 
               }
             `}
           >
-            元に戻す
+            Undo
           </button>
           <button
             onClick={redo}
@@ -177,7 +177,7 @@ export const ActionHistoryPanel: React.FC<ActionHistoryPanelProps> = ({ isOpen, 
               }
             `}
           >
-            やり直し
+            Redo
           </button>
         </div>
       </div>
@@ -195,29 +195,29 @@ export const KeyboardShortcutsHelp: React.FC<KeyboardShortcutsHelpProps> = ({ is
   if (!isOpen) return null;
 
   const shortcuts = [
-    { key: 'Ctrl+Z', description: '元に戻す' },
-    { key: 'Ctrl+Y', description: 'やり直し' },
-    { key: 'Ctrl+O', description: 'CSVファイルを開く' },
-    { key: 'Ctrl+S', description: 'プロジェクトを保存' },
-    { key: 'Ctrl+E', description: 'XDCファイルをエクスポート' },
-    { key: 'Ctrl+F', description: '検索フィールドにフォーカス' },
-    { key: 'Ctrl+A', description: 'すべてのピンを選択' },
-    { key: 'Ctrl+D', description: '選択を解除' },
-    { key: 'Space', description: 'ビューを90度回転' },
-    { key: 'F', description: 'トップ/ボトムビューを切り替え' },
-    { key: 'R', description: 'ズームとパンをリセット' },
-    { key: '+', description: 'ズームイン' },
-    { key: '-', description: 'ズームアウト' },
-    { key: '0', description: 'ズームを100%にリセット' },
-    { key: 'Escape', description: '選択を解除' },
-    { key: 'Delete', description: '選択したピンの割り当てを解除' },
+    { key: 'Ctrl+Z', description: 'Undo' },
+    { key: 'Ctrl+Y', description: 'Redo' },
+    { key: 'Ctrl+O', description: 'Open CSV file' },
+    { key: 'Ctrl+S', description: 'Save project' },
+    { key: 'Ctrl+E', description: 'Export XDC file' },
+    { key: 'Ctrl+F', description: 'Focus search field' },
+    { key: 'Ctrl+A', description: 'Select all pins' },
+    { key: 'Ctrl+D', description: 'Deselect all' },
+    { key: 'Space', description: 'Rotate view 90 degrees' },
+    { key: 'F', description: 'Toggle top/bottom view' },
+    { key: 'R', description: 'Reset zoom and pan' },
+    { key: '+', description: 'Zoom in' },
+    { key: '-', description: 'Zoom out' },
+    { key: '0', description: 'Reset zoom to 100%' },
+    { key: 'Escape', description: 'Deselect all' },
+    { key: 'Delete', description: 'Unassign selected pins' },
   ];
 
   return (
     <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
       <div className="bg-white rounded-lg p-6 w-96 max-h-96 overflow-hidden flex flex-col">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-800">キーボードショートカット</h3>
+          <h3 className="text-lg font-semibold text-gray-800">Keyboard Shortcuts</h3>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 text-xl"
@@ -247,7 +247,7 @@ export const KeyboardShortcutsHelp: React.FC<KeyboardShortcutsHelpProps> = ({ is
             onClick={onClose}
             className="w-full py-2 px-4 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
           >
-            閉じる
+            Close
           </button>
         </div>
       </div>

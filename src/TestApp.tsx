@@ -28,7 +28,7 @@ const TestApp: React.FC = () => {
       </div>
       
       <button 
-        onClick={() => alert('ボタンクリックが動作しました！')}
+        onClick={() => alert('Button click works!')}
         style={{
           padding: '10px 20px',
           backgroundColor: '#4A90E2',

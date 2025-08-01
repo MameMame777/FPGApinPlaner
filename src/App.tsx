@@ -10,7 +10,9 @@ import { PinListTabs } from '@/components/common/PinListTabs';
 import PackageCanvas from '@/components/common/PackageCanvas';
 import SaveLoadControls from '@/components/common/SaveLoadControls';
 import { UndoRedoControls, KeyboardShortcutsHelp } from '@/components/common/UndoRedoControls';
+import { ValidationPanel, ValidationStatusIcon } from '@/components/common/ValidationPanel';
 import { useAppHotkeys } from '@/hooks/useHotkeys';
+import { useValidation } from '@/hooks/useValidation';
 import { loadSampleData } from '@/utils/sample-data';
 import { DifferentialPairUtils } from '@/utils/differential-pair-utils';
 
@@ -23,6 +25,7 @@ const App: React.FC<AppProps> = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [showDifferentialPairs, setShowDifferentialPairs] = useState(false);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
+  const [showValidationPanel, setShowValidationPanel] = useState(true);
   const [sidebarWidth, setSidebarWidth] = useState(300);
   const [isResizing, setIsResizing] = useState(false);
   
@@ -64,6 +67,20 @@ const App: React.FC<AppProps> = () => {
     setSortOrder,
     setViewMode,
   } = useAppStore();
+
+  // Background validation
+  const {
+    validationResult,
+    isValidating,
+    hasErrors,
+    hasWarnings,
+    errorCount,
+    warningCount
+  } = useValidation(currentPackage, pins, {
+    enabled: true,
+    debounceMs: 1000,
+    backgroundCheck: true
+  });
 
   const handleOpenCSV = () => {
     fileInputRef.current?.click();
@@ -739,6 +756,30 @@ const App: React.FC<AppProps> = () => {
 
             <div style={{ width: '1px', height: '20px', backgroundColor: '#555' }}></div>
 
+            {/* Validation Status */}
+            <button 
+              onClick={() => setShowValidationPanel(!showValidationPanel)}
+              style={{
+                padding: '6px 12px',
+                backgroundColor: hasErrors ? '#dc2626' : hasWarnings ? '#d97706' : '#333',
+                border: '1px solid #555',
+                borderRadius: '4px',
+                color: '#ccc',
+                cursor: 'pointer',
+                fontSize: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+              }}
+              title={`Validation: ${errorCount} errors, ${warningCount} warnings (click for details)`}
+            >
+              <ValidationStatusIcon validationResult={validationResult} />
+              <span>Validation</span>
+              {isValidating && <span className="animate-spin">⚡</span>}
+            </button>
+
+            <div style={{ width: '1px', height: '20px', backgroundColor: '#555' }}></div>
+
             <button 
               onClick={() => setShowKeyboardHelp(true)}
               style={{
@@ -750,9 +791,9 @@ const App: React.FC<AppProps> = () => {
                 cursor: 'pointer',
                 fontSize: '12px',
               }}
-              title="キーボードショートカット (Ctrl+Shift+?)"
+              title="Keyboard Shortcuts (Ctrl+Shift+?)"
             >
-              ⌨️ ショートカット
+              ⌨️ Shortcuts
             </button>
             
             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -809,27 +850,54 @@ const App: React.FC<AppProps> = () => {
             flex: 1,
             backgroundColor: '#1a1a1a',
             overflow: 'hidden',
+            display: 'flex',
           }}>
-            {listView.viewMode === 'grid' ? (
-              <PackageCanvas
-                package={currentPackage}
-                pins={filteredPins}
-                selectedPins={selectedPins}
-                onPinSelect={handleViewerPinSelect}
-                onPinDoubleClick={handlePinDoubleClick}
-                zoom={viewConfig.zoom}
-                rotation={viewConfig.rotation}
-                isTopView={viewConfig.isTopView}
-                onZoomChange={setZoom}
-                resetTrigger={viewConfig.resetTrigger}
-              />
-            ) : (
-              <div style={{
-                height: '100%',
-                backgroundColor: '#1a1a1a',
-                overflow: 'hidden'
-              }}>
-                <PinListTabs onPinSelect={handleListPinSelect} />
+            <div style={{ flex: 1, overflow: 'hidden' }}>
+              {listView.viewMode === 'grid' ? (
+                <PackageCanvas
+                  package={currentPackage}
+                  pins={filteredPins}
+                  selectedPins={selectedPins}
+                  onPinSelect={handleViewerPinSelect}
+                  onPinDoubleClick={handlePinDoubleClick}
+                  zoom={viewConfig.zoom}
+                  rotation={viewConfig.rotation}
+                  isTopView={viewConfig.isTopView}
+                  onZoomChange={setZoom}
+                  resetTrigger={viewConfig.resetTrigger}
+                />
+              ) : (
+                <div style={{
+                  height: '100%',
+                  backgroundColor: '#1a1a1a',
+                  overflow: 'hidden'
+                }}>
+                  <PinListTabs onPinSelect={handleListPinSelect} />
+                </div>
+              )}
+            </div>
+
+            {/* Right Sidebar - Validation Panel */}
+            {showValidationPanel && (
+              <div 
+                style={{ 
+                  width: '300px',
+                  borderLeft: '1px solid #555',
+                  backgroundColor: '#1e1e1e',
+                  display: 'flex',
+                  flexDirection: 'column'
+                }}
+              >
+                <ValidationPanel 
+                  validationResult={validationResult}
+                  onIssueClick={(issue) => {
+                    // Highlight pins
+                    if (issue.affectedPins && issue.affectedPins.length > 0) {
+                      console.log('Pins to highlight:', issue.affectedPins);
+                      // TODO: Add pin highlighting functionality to PackageCanvas
+                    }
+                  }}
+                />
               </div>
             )}
           </div>
@@ -864,7 +932,7 @@ const App: React.FC<AppProps> = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg w-11/12 max-w-4xl h-5/6 overflow-hidden">
             <div className="flex justify-between items-center p-4 border-b">
-              <h2 className="text-xl font-semibold text-gray-800">差動ペア管理</h2>
+              <h2 className="text-xl font-semibold text-gray-800">Differential Pair Management</h2>
               <button
                 onClick={() => setShowDifferentialPairs(false)}
                 className="text-gray-500 hover:text-gray-700"

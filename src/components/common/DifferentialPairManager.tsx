@@ -54,7 +54,7 @@ export const DifferentialPairManager: React.FC<DifferentialPairManagerProps> = (
     const negativePin = pins.find(p => p.id === selectedNegativePin);
 
     if (!positivePin || !negativePin) {
-      alert('選択されたピンが見つかりません');
+      alert('Selected pin not found');
       return;
     }
 
@@ -156,7 +156,7 @@ export const DifferentialPairManager: React.FC<DifferentialPairManagerProps> = (
   return (
     <div className="differential-pair-manager p-4 bg-white rounded-lg shadow">
       <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-semibold">差動ペア管理</h3>
+        <h3 className="text-lg font-semibold">Differential Pair Management</h3>
         <div className="flex gap-2">
           <button
             onClick={() => setShowCreateDialog(true)}
@@ -261,7 +261,7 @@ export const DifferentialPairManager: React.FC<DifferentialPairManagerProps> = (
         })}
       </div>
 
-      {/* 作成ダイアログ */}
+      {/* Creation Dialog */}
       {showCreateDialog && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg w-96 max-h-[80vh] overflow-y-auto">
@@ -286,7 +286,7 @@ export const DifferentialPairManager: React.FC<DifferentialPairManagerProps> = (
                   onChange={(e) => setSelectedTemplate(e.target.value)}
                   className="w-full border rounded px-3 py-2"
                 >
-                  <option value="">カスタム</option>
+                  <option value="">Custom</option>
                   {templates.map(template => (
                     <option key={template.id} value={template.id}>
                       {template.name} - {template.description}
@@ -331,7 +331,7 @@ export const DifferentialPairManager: React.FC<DifferentialPairManagerProps> = (
 
               {availablePins.length === 0 && (
                 <div className="text-sm text-yellow-600 bg-yellow-100 p-2 rounded">
-                  利用可能なI/Oピンがありません。
+                  No available I/O pins.
                 </div>
               )}
             </div>
