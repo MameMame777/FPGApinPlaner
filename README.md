@@ -1,53 +1,90 @@
 # FPGA Pin Planner
 
-## 概要
-FPGAのピン配置を視覚的に行うためのGUIツールです。
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/badge/React-18.0-blue)](https://reactjs.org/)
+[![Vite](https://img.shields.io/badge/Vite-4.5-yellow)](https://vitejs.dev/)
+[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
-## 機能
-- CSV形式ピン情報の読み込み（Xilinx公式フォーマット対応）
-- ピン配置の視覚的表示（座標系、グリッド表示）
-- 90度回転、トップ/ボトムビュー切り替え
-- 高度な検索・フィルタ機能
-- XDC/SDC/QSF制約ファイル出力
-- 外部ツール連携（Vivado, Quartus, KiCad等）
+FPGAのピン配置を効率的に行うためのモダンなGUIツールです。直感的なインターフェースと高度な機能により、FPGAピンプランニング作業を大幅に効率化します。
 
-## 技術スタック
-- **フロントエンド**: React + TypeScript
-- **デスクトップ**: Electron
-- **状態管理**: Zustand + Immer
-- **描画エンジン**: Konva.js
-- **ビルドツール**: Vite
+## ✨ 主要機能
 
-## 開発計画
-### Phase 1: MVP機能（6ヶ月）
-- ファイル入出力: 3週間
-- 基本表示機能: 4週間
-- 座標変換: 2週間
-- 基本UI: 6週間
-- 検索・フィルタ: 3週間
-- 制約ファイル出力: 2週間
-- 外部ツール連携: 3週間
-- テスト・統合: 4週間
+### 📁 ファイル入出力
+- **CSV読み込み**: Xilinx公式フォーマット完全対応
+- **制約ファイル出力**: XDC (Xilinx)、SDC、QSF (Intel) 形式
+- **プロジェクト管理**: .fpgaproj 独自形式での保存/読み込み
 
-### Phase 2: 拡張機能（6-12ヶ月）
-- 差動ペア管理: 6週間
-- 制約ルールチェック: 8週間
-- レポート生成: 4週間
-- プロジェクト管理: 6週間
+### 🎯 ピン編集・管理
+- **プルダウン選択**: Voltage (1.0V-5.0V) と I/O Standard (LVCMOS, LVDS等)
+- **スマート連携**: 電圧変更時のI/O規格自動更新
+- **バッチ操作**: 複数ピンの一括設定 (信号、電圧、I/O規格、方向)
+- **差動ペア管理**: 自動検出・検証・制約チェック
 
-## ドキュメント
-- [要件定義書](docs/requirements.md)
-- [詳細仕様書](docs/detailed-spec.md)
-- [技術的実現性分析](docs/technical-feasibility.md)
+### 🔍 高度な検索・フィルタ
+- **多条件検索**: ピン番号、信号名、バンク、電圧レベル等
+- **タブ別表示**: Overview、Signals、Banks、Differential Pairs
+- **リアルタイムフィルタ**: 条件変更時の即座な結果更新
 
-## サンプルデータ
-- [Xilinx XC7A12T CSG325](docs/sample/a7all/a7all/xc7a12tcsg325pkg.csv)
+### ⚡ バッチ処理機能
+- **配列パターン**: DATA[0]〜DATA[31] 等の連続信号割り当て
+- **差動ペア**: CLK_P/CLK_N ペアの一括生成
+- **電圧・I/O規格**: 互換性チェック付き一括設定
+- **プレビュー機能**: 実行前の変更内容確認
 
-## 開発環境
-Node.js 18+が必要です。
+### 🛡️ 検証・制約チェック
+- **AMD/Xilinx UltraScale準拠**: 業界標準の制約ルール
+- **バンク互換性**: 電圧レベル・I/O規格の適合性チェック
+- **差動ペア検証**: 物理的近接性・電気的特性の確認
+- **リアルタイム警告**: 設定エラーの即座通知
+
+### 🎨 ユーザーエクスペリエンス
+- **Undo/Redo**: 全操作の取り消し・やり直し対応
+- **コメント機能**: テンプレート・自動生成・履歴管理
+- **カスタマイズ**: 設定パネルでの表示・動作調整
+
+## 🚀 技術スタック
+
+- **Frontend**: React 18 + TypeScript 5.0
+- **State Management**: Zustand + Immer
+- **UI Framework**: Modern CSS with custom components
+- **Build Tool**: Vite 4.5
+- **Testing**: Vitest + React Testing Library
+- **Development**: Hot Module Replacement (HMR)
+
+## 📦 クイックスタート
+
+### 前提条件
+- Node.js 18.0+ 
+- npm 9.0+
+
+### インストール & 起動
 
 ```bash
-# 依存関係のインストール（プロトタイプ作成後）
+# リポジトリをクローン
+git clone https://github.com/your-username/fpga-pin-planner.git
+cd fpga-pin-planner
+
+# 依存関係のインストール
+npm install
+
+# 開発サーバー起動
+npm run dev
+
+# ブラウザで http://localhost:5173 を開く
+```
+
+### ビルド & テスト
+
+```bash
+# プロダクションビルド
+npm run build
+
+# テスト実行
+npm run test
+
+# 型チェック
+npm run type-check
+```
 npm install
 
 # 開発サーバー起動（プロトタイプ作成後）
