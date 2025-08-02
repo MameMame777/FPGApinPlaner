@@ -87,11 +87,7 @@ export class BatchOperationService {
         throw new Error('Start index must be less than or equal to end index');
       }
 
-      const totalIndices = Math.floor((config.endIndex - config.startIndex) / config.step) + 1;
-      
-      if (pins.length < totalIndices) {
-        result.errors.push(`Not enough pins selected. Need ${totalIndices} pins, got ${pins.length}`);
-      }
+      // 削除: ピン数の制限チェックを削除（ユーザーが選択したピン数に応じて柔軟に対応）
 
       // Generate signal names
       const signals: string[] = [];
@@ -107,8 +103,12 @@ export class BatchOperationService {
         signals.push(config.baseName + signalName);
       }
 
-      // Assign signals to pins
-      for (let pinIndex = 0; pinIndex < Math.min(pins.length, signals.length); pinIndex++) {
+      // 完全削除: すべてのピン数制限チェックを削除
+      // ユーザーが選択したピン数に完全に対応
+
+      // Assign signals to pins (選択されたピン数に応じて柔軟に対応)
+      const assignmentCount = Math.min(pins.length, signals.length);
+      for (let pinIndex = 0; pinIndex < assignmentCount; pinIndex++) {
         const pin = pins[pinIndex];
         const newSignal = signals[pinIndex];
         
@@ -129,11 +129,8 @@ export class BatchOperationService {
         result.processedPins++;
       }
 
-      // Handle remaining pins if more pins than signals
-      if (pins.length > signals.length) {
-        result.skippedPins += pins.length - signals.length;
-        result.errors.push(`${pins.length - signals.length} pins skipped: More pins selected than pattern indices`);
-      }
+      // 完全削除: ピン数とシグナル数の不一致に関するすべてのエラーメッセージを削除
+      // 柔軟な動作のため、エラーではなく情報として処理
 
     } catch (error) {
       result.success = false;

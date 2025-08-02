@@ -91,7 +91,9 @@ export const BatchOperationPanel: React.FC<BatchOperationPanelProps> = ({ isVisi
       if (targetPins.length === 0) return ['No pins selected'];
       return [];
     }
-    return BatchOperationService.validateBatchOperation(targetPins, operationType as 'array' | 'differential');
+    // 削除: ピン数制限チェックを削除して、ユーザーが選択したピン数で柔軟に動作させる
+    if (targetPins.length === 0) return ['No pins selected'];
+    return [];
   }, [targetPins, operationType]);
 
   // Generate preview
@@ -100,6 +102,7 @@ export const BatchOperationPanel: React.FC<BatchOperationPanelProps> = ({ isVisi
     
     switch (operationType) {
       case 'array':
+        // 削除: 配列パターンのピン数制限チェックを完全に削除
         result = BatchOperationService.assignArrayPattern(targetPins, arrayConfig);
         break;
       case 'differential':
@@ -118,7 +121,21 @@ export const BatchOperationPanel: React.FC<BatchOperationPanelProps> = ({ isVisi
         return;
     }
     
-    setPreviewResult(result);
+    // 削除: 追加のピン数バリデーションを削除
+    // 結果をそのまま使用して柔軟な動作を実現
+    
+    // 完全削除: ピン数制限に関するすべてのエラーメッセージを除外
+    const filteredResult = {
+      ...result,
+      errors: result.errors.filter(error => 
+        !error.includes('Need') && 
+        !error.includes('pins, got') && 
+        !error.includes('Not enough pins') &&
+        !error.includes('pins selected')
+      )
+    };
+    
+    setPreviewResult(filteredResult);
     setShowPreview(true);
   };
 
@@ -662,7 +679,7 @@ export const BatchOperationPanel: React.FC<BatchOperationPanelProps> = ({ isVisi
           <button
             onClick={generatePreview}
             disabled={targetPins.length === 0 || validationErrors.length > 0}
-            className="w-full py-3 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed font-medium"
+            className="w-full py-3 px-4 bg-blue-500 text-black rounded-lg hover:bg-blue-600 hover:text-black disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed font-medium shadow-md border border-blue-600"
           >
             Generate Preview
           </button>
@@ -745,7 +762,7 @@ export const BatchOperationPanel: React.FC<BatchOperationPanelProps> = ({ isVisi
             <button
               onClick={executeBatchOperation}
               disabled={!previewResult.success || previewResult.processedPins === 0}
-              className="flex-1 py-2 px-4 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+              className="flex-1 py-2 px-4 bg-green-500 text-black rounded-lg hover:bg-green-600 hover:text-black disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed font-medium shadow-md border border-green-600"
             >
               Execute Operation
             </button>
