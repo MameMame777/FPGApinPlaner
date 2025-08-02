@@ -6,7 +6,8 @@ All notable changes to the "FPGA Pin Planner" extension will be documented in th
 
 ### Added
 - 🎉 **初回リリース**: FPGA Pin Planner VS Code拡張機能
-- 📥 **CSV Import**: ピンデータのCSVファイルインポート機能
+- � **VS Code Marketplace公開**: [marketplace.visualstudio.com](https://marketplace.visualstudio.com/items?itemName=MameMame777.fpga-pin-planner)
+- �📥 **CSV Import**: ピンデータのCSVファイルインポート機能
 - 📤 **Multi-Format Export**: XDC、SDC、QSF形式での制約ファイルエクスポート
 - ⚡ **Voltage & I/O Standards**: 電圧レベルとI/O規格の包括的管理
 - 🔍 **Pin Validation**: リアルタイム制約検証とエラー検出

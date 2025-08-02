@@ -3,9 +3,13 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-18.0-blue)](https://reactjs.org/)
 [![Vite](https://img.shields.io/badge/Vite-4.5-yellow)](https://vitejs.dev/)
-[![VS Code Extension](https://img.shields.io/badge/VS%20Code-Extension-blue)](https://marketplace.visualstudio.com/vscode)
+[![VS Code Extension](https://img.shields.io/visual-studio-marketplace/v/MameMame777.fpga-pin-planner?label=VS%20Code%20Marketplace&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=MameMame777.fpga-pin-planner)
+[![Downloads](https://img.shields.io/visual-studio-marketplace/d/MameMame777.fpga-pin-planner)](https://marketplace.visualstudio.com/items?itemName=MameMame777.fpga-pin-planner)
+[![Rating](https://img.shields.io/visual-studio-marketplace/r/MameMame777.fpga-pin-planner)](https://marketplace.visualstudio.com/items?itemName=MameMame777.fpga-pin-planner)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 [![Security](https://img.shields.io/badge/Security-Audited-green)](docs/security-audit.md)
+
+🎉 **VS Code Marketplace公開済み！** [今すぐインストール →](https://marketplace.visualstudio.com/items?itemName=MameMame777.fpga-pin-planner)
 
 FPGAのピン配置を効率的に行うためのモダンなGUIツールです。直感的なインターフェースと高度な機能により、FPGAピンプランニング作業を大幅に効率化します。
 
@@ -71,9 +75,17 @@ FPGAのピン配置を効率的に行うためのモダンなGUIツールです�
 
 1. **VS Code拡張機能版（推奨）**:
 
+   **方法1: VS Code内から**
+   - `Ctrl+Shift+X` で拡張機能タブを開く
+   - "FPGA Pin Planner" で検索
+   - [インストール] ボタンをクリック
+
+   **方法2: Marketplaceから**
+   - [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=MameMame777.fpga-pin-planner) でインストール
+
+   **方法3: コマンドライン**
    ```bash
-   # VS Code Marketplaceからインストール
-   code --install-extension fpga-pin-planner
+   code --install-extension MameMame777.fpga-pin-planner
    ```
 
 2. **スタンドアロン版**:
