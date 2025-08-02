@@ -84,22 +84,20 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
     }
   };
 
-  // Canvas size management
+  // Canvas size management - Completely disable ResizeObserver to prevent infinite loops
   useEffect(() => {
-    const updateSize = () => {
-      const container = stageRef.current?.container();
-      if (container) {
-        const rect = container.getBoundingClientRect();
-        setStageSize({
-          width: rect.width,
-          height: rect.height
-        });
-      }
-    };
-
-    updateSize();
-    window.addEventListener('resize', updateSize);
-    return () => window.removeEventListener('resize', updateSize);
+    // Set initial size once on mount
+    const container = stageRef.current?.container();
+    if (container) {
+      const rect = container.getBoundingClientRect();
+      const initialSize = {
+        width: Math.max(400, rect.width),
+        height: Math.max(300, rect.height)
+      };
+      
+      console.log('📏 Setting initial canvas size:', initialSize);
+      setStageSize(initialSize);
+    }
   }, []);
 
   // Set initial viewport position when package is loaded
@@ -294,6 +292,21 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
     return { x: transformedX, y: transformedY };
   };
 
+  // Apply viewport boundaries to prevent canvas from disappearing off screen
+  const applyViewportBounds = (pos: { x: number; y: number }, scale: number) => {
+    // Define reasonable bounds based on stage size and scale
+    const maxOffset = Math.max(stageSize.width, stageSize.height) * scale * 0.5;
+    const minX = -maxOffset;
+    const maxX = maxOffset;
+    const minY = -maxOffset;
+    const maxY = maxOffset;
+    
+    return {
+      x: Math.max(minX, Math.min(maxX, pos.x)),
+      y: Math.max(minY, Math.min(maxY, pos.y))
+    };
+  };
+
   // Mouse event handlers
   const handleWheel = (e: KonvaEventObject<WheelEvent>) => {
     e.evt.preventDefault();
@@ -323,19 +336,26 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
         y: pointer.y - mousePointTo.y * clampedScale,
       };
       
+      // Apply viewport boundaries to prevent canvas from disappearing
+      const boundedPos = applyViewportBounds(newPos, clampedScale);
+      
       setViewport({
         scale: clampedScale,
-        x: newPos.x,
-        y: newPos.y,
+        x: boundedPos.x,
+        y: boundedPos.y,
       });
       
       // Notify parent component of zoom change
       onZoomChange?.(clampedScale);
     } else {
       // Wheel: Pan up/down
+      const newY = viewport.y - e.evt.deltaY * 0.5;
+      const boundedPos = applyViewportBounds({ x: viewport.x, y: newY }, viewport.scale);
+      
       setViewport(prev => ({
         ...prev,
-        y: prev.y - e.evt.deltaY * 0.5,
+        x: boundedPos.x,
+        y: boundedPos.y,
       }));
     }
   };
@@ -381,10 +401,17 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
       const dx = pointer.x - lastPointerPosition.x;
       const dy = pointer.y - lastPointerPosition.y;
       
+      const newPos = {
+        x: viewport.x + dx,
+        y: viewport.y + dy
+      };
+      
+      const boundedPos = applyViewportBounds(newPos, viewport.scale);
+      
       setViewport(prev => ({
         ...prev,
-        x: prev.x + dx,
-        y: prev.y + dy,
+        x: boundedPos.x,
+        y: boundedPos.y,
       }));
     }
     
@@ -517,6 +544,23 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
         fontSize: '18px'
       }}>
         No package loaded. Please import a CSV file.
+      </div>
+    );
+  }
+
+  // Prevent rendering if stage size is invalid to avoid canvas errors
+  if (stageSize.width <= 0 || stageSize.height <= 0) {
+    return (
+      <div style={{
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#999',
+        fontSize: '18px'
+      }}>
+        Loading canvas...
       </div>
     );
   }
@@ -723,8 +767,8 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
       {/* Main Canvas */}
       <Stage
         ref={stageRef}
-        width={stageSize.width - 40} // Account for left margin
-        height={stageSize.height - 30} // Account for top margin
+        width={Math.max(100, stageSize.width - 40)} // Account for left margin with minimum
+        height={Math.max(100, stageSize.height - 30)} // Account for top margin with minimum
         x={40} // Offset for left label area
         y={30} // Offset for top label area
         onClick={handleStageClick}

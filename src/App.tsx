@@ -30,6 +30,7 @@ const App: React.FC<AppProps> = () => {
   const [rightSidebarTab, setRightSidebarTab] = useState<'validation' | 'batch' | null>('validation');
   const [sidebarWidth, setSidebarWidth] = useState(300);
   const [isResizing, setIsResizing] = useState(false);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
   
   // Initialize hotkeys
   useAppHotkeys();
@@ -46,6 +47,23 @@ const App: React.FC<AppProps> = () => {
       document.removeEventListener('showKeyboardHelp', handleShowKeyboardHelp);
     };
   }, []);
+
+  // Close export menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (exportMenuOpen) {
+        const target = event.target as Element;
+        if (!target.closest('[data-export-menu]')) {
+          setExportMenuOpen(false);
+        }
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, [exportMenuOpen]);
   
   const {
     pins,
@@ -69,6 +87,49 @@ const App: React.FC<AppProps> = () => {
     setSortOrder,
     setViewMode,
   } = useAppStore();
+
+  // Handle VS Code messages
+  useEffect(() => {
+    const handleVSCodeMessage = (event: MessageEvent) => {
+      const message = event.data;
+      switch (message.command) {
+        case 'loadProject':
+          try {
+            if (message.projectData) {
+              console.log('Loading project from VS Code:', message.projectData);
+              // Convert the loaded data to the expected format using ProjectSaveService
+              const projectData = message.projectData;
+              if (projectData.package && projectData.pins) {
+                // Use createPackageFromPins to create proper Package object
+                const pins = projectData.pins.map((pin: any) => ({
+                  ...pin,
+                  isAssigned: Boolean(pin.assignedSignalName),
+                  signalName: pin.assignedSignalName || ''
+                }));
+                const packageData = CSVReader.createPackageFromPins(pins, projectData.package.name || 'Loaded Project');
+                loadPackage(packageData);
+                console.log('✅ Project loaded successfully from VS Code');
+              }
+            }
+          } catch (error) {
+            console.error('Failed to load project from VS Code:', error);
+            setError(`Failed to load project: ${error}`);
+          }
+          break;
+      }
+    };
+
+    // Check if we're in VS Code environment
+    if (typeof (window as any).vscode !== 'undefined') {
+      window.addEventListener('message', handleVSCodeMessage);
+      return () => {
+        window.removeEventListener('message', handleVSCodeMessage);
+      };
+    }
+    
+    // Return cleanup function even if not in VS Code
+    return () => {};
+  }, [loadPackage, setError]);
 
   // Background validation
   const {
@@ -211,13 +272,152 @@ const App: React.FC<AppProps> = () => {
     // Don't update lastViewerSelectedPin to prevent list reordering
   };
 
+  // VS Code API helper functions
+  const isInVSCode = () => {
+    return typeof (window as any).vscode !== 'undefined';
+  };
+
+  const saveFileInVSCode = async (content: string, defaultFilename: string, filters: Record<string, string[]>, saveLabel: string) => {
+    if (!isInVSCode()) {
+      return false;
+    }
+
+    try {
+      const vscode = (window as any).vscode;
+      
+      // Step 1: Show save dialog
+      const uri = await new Promise((resolve) => {
+        const handler = (event: MessageEvent) => {
+          if (event.data.command === 'saveDialogResult') {
+            window.removeEventListener('message', handler);
+            resolve(event.data.result);
+          }
+        };
+        window.addEventListener('message', handler);
+        
+        vscode.postMessage({
+          command: 'showSaveDialog',
+          options: {
+            saveLabel: saveLabel,
+            filters: filters
+          }
+        });
+      });
+
+      if (uri) {
+        // URIオブジェクトから適切にパスを抽出
+        let filePath: string | undefined;
+        
+        if (typeof uri === 'string') {
+          filePath = uri;
+        } else if (uri && typeof uri === 'object') {
+          // URIオブジェクトの場合、安全にプロパティにアクセス
+          const uriObj = uri as any;
+          filePath = uriObj.fsPath || uriObj.path;
+          
+          // fsPathもpathもない場合は、toString()を試行
+          if (!filePath && typeof uri.toString === 'function') {
+            filePath = uri.toString();
+          }
+        }
+        
+        // ファイルパスの有効性をチェック
+        if (!filePath || filePath === 'undefined' || filePath === '[object Object]') {
+          console.error('Failed to extract valid file path from URI');
+          return false;
+        }
+        
+        // Step 2: Save file content
+        const saveResult = await new Promise((resolve) => {
+          const handler = (event: MessageEvent) => {
+            if (event.data.command === 'saveFileResult') {
+              window.removeEventListener('message', handler);
+              resolve(event.data.success);
+            }
+          };
+          window.addEventListener('message', handler);
+          
+          vscode.postMessage({
+            command: 'saveFile',
+            filePath: filePath,
+            content: content,
+            filename: defaultFilename
+          });
+        });
+
+        return saveResult;
+      }
+    } catch (error) {
+      console.error('VS Code save failed:', error);
+    }
+    return false;
+  };
+
   // Export handlers
-  const handleExportXDC = () => {
+  const handleExportXDC = async () => {
     if (pins.length === 0) return;
     
     const xdcContent = ExportService.exportToXDC(pins, currentPackage);
-    const filename = `${currentPackage?.device || 'fpga'}_pins.xdc`;
-    ExportService.downloadFile(xdcContent, filename, 'text/plain');
+    const defaultFilename = `${currentPackage?.device || 'fpga'}_pins.xdc`;
+    
+    const saved = await saveFileInVSCode(
+      xdcContent, 
+      defaultFilename,
+      {
+        'XDC Files': ['xdc'],
+        'All Files': ['*']
+      },
+      'Export XDC Constraints'
+    );
+
+    if (!saved) {
+      // Fallback to browser download
+      ExportService.downloadFile(xdcContent, defaultFilename, 'text/plain');
+    }
+  };
+
+  const handleExportCSV = async () => {
+    if (pins.length === 0) return;
+    
+    const csvContent = ExportService.exportToCSV(pins);
+    const defaultFilename = `${currentPackage?.device || 'fpga'}_pins.csv`;
+    
+    const saved = await saveFileInVSCode(
+      csvContent, 
+      defaultFilename,
+      {
+        'CSV Files': ['csv'],
+        'All Files': ['*']
+      },
+      'Export Pin Data to CSV'
+    );
+
+    if (!saved) {
+      // Fallback to browser download
+      ExportService.downloadFile(csvContent, defaultFilename, 'text/csv');
+    }
+  };
+
+  const handleExportReport = async () => {
+    if (pins.length === 0) return;
+    
+    const reportContent = ExportService.exportReport(pins, currentPackage);
+    const defaultFilename = `${currentPackage?.device || 'fpga'}_report.txt`;
+    
+    const saved = await saveFileInVSCode(
+      reportContent, 
+      defaultFilename,
+      {
+        'Text Files': ['txt'],
+        'All Files': ['*']
+      },
+      'Export Pin Assignment Report'
+    );
+
+    if (!saved) {
+      // Fallback to browser download
+      ExportService.downloadFile(reportContent, defaultFilename, 'text/plain');
+    }
   };
 
   // Sidebar resize handlers
@@ -229,11 +429,16 @@ const App: React.FC<AppProps> = () => {
   const handleMouseMove = React.useCallback((e: MouseEvent) => {
     if (!isResizing) return;
     
-    const newWidth = e.clientX;
-    // Constrain width between 200px and 600px
-    if (newWidth >= 200 && newWidth <= 600) {
-      setSidebarWidth(newWidth);
-    }
+    requestAnimationFrame(() => {
+      const newWidth = e.clientX;
+      // Dynamic max width: 60% of window width, min 200px
+      const maxWidth = Math.max(400, window.innerWidth * 0.6);
+      
+      // Constrain width between 200px and dynamic max width
+      if (newWidth >= 200 && newWidth <= maxWidth) {
+        setSidebarWidth(newWidth);
+      }
+    });
   }, [isResizing]);
 
   const handleMouseUp = React.useCallback(() => {
@@ -400,9 +605,9 @@ const App: React.FC<AppProps> = () => {
           </button>
           
           {/* Export dropdown menu */}
-          <div style={{ position: 'relative' }}>
+          <div style={{ position: 'relative' }} data-export-menu>
             <button 
-              onClick={handleExportXDC}
+              onClick={() => setExportMenuOpen(!exportMenuOpen)}
               disabled={pins.length === 0}
               style={{
                 padding: '8px 16px',
@@ -412,11 +617,91 @@ const App: React.FC<AppProps> = () => {
                 color: 'white',
                 cursor: pins.length > 0 ? 'pointer' : 'not-allowed',
                 fontSize: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
               }}
-              title="Export as XDC (Xilinx Design Constraints)"
+              title="Export Pin Data"
             >
-              💾 Export XDC
+              💾 Export {exportMenuOpen ? '▲' : '▼'}
             </button>
+            
+            {exportMenuOpen && pins.length > 0 && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                backgroundColor: '#2a2a2a',
+                border: '1px solid #555',
+                borderRadius: '4px',
+                zIndex: 1000,
+                minWidth: '160px',
+                boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
+              }}>
+                <button
+                  onClick={() => {
+                    handleExportXDC();
+                    setExportMenuOpen(false);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    color: 'white',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    fontSize: '14px',
+                    borderBottom: '1px solid #444',
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#3a3a3a'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                >
+                  📄 XDC (Xilinx)
+                </button>
+                <button
+                  onClick={() => {
+                    handleExportCSV();
+                    setExportMenuOpen(false);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    color: 'white',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    fontSize: '14px',
+                    borderBottom: '1px solid #444',
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#3a3a3a'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                >
+                  � CSV Data
+                </button>
+                <button
+                  onClick={() => {
+                    handleExportReport();
+                    setExportMenuOpen(false);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    color: 'white',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    fontSize: '14px',
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#3a3a3a'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                >
+                  📋 Report
+                </button>
+              </div>
+            )}
           </div>
           
           <button 
@@ -674,17 +959,21 @@ const App: React.FC<AppProps> = () => {
           overflow: 'hidden',
         }}>
           {/* Toolbar */}
-          <div style={{
-            height: '50px',
-            backgroundColor: '#2a2a2a',
-            borderBottom: '1px solid #444',
-            display: 'flex',
-            alignItems: 'center',
-            padding: '0 16px',
-            gap: '12px',
-          }}>
+          <div 
+            className="toolbar-scrollbar"
+            style={{
+              height: '50px',
+              backgroundColor: '#2a2a2a',
+              borderBottom: '1px solid #444',
+              display: 'flex',
+              alignItems: 'center',
+              padding: '0 16px',
+              gap: '12px',
+              overflowX: 'auto',
+              overflowY: 'hidden',
+            }}>
             {/* View Mode Toggle */}
-            <div style={{ display: 'flex', gap: '4px' }}>
+            <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
               <button 
                 onClick={() => setViewMode('grid')}
                 style={{
@@ -695,6 +984,7 @@ const App: React.FC<AppProps> = () => {
                   color: listView.viewMode === 'grid' ? '#fff' : '#ccc',
                   cursor: 'pointer',
                   fontSize: '12px',
+                  whiteSpace: 'nowrap',
                 }}
                 title="Grid View"
               >
@@ -710,6 +1000,7 @@ const App: React.FC<AppProps> = () => {
                   color: listView.viewMode === 'list' ? '#fff' : '#ccc',
                   cursor: 'pointer',
                   fontSize: '12px',
+                  whiteSpace: 'nowrap',
                 }}
                 title="List View"
               >
@@ -717,7 +1008,7 @@ const App: React.FC<AppProps> = () => {
               </button>
             </div>
 
-            <div style={{ width: '1px', height: '20px', backgroundColor: '#555' }}></div>
+            <div style={{ width: '1px', height: '20px', backgroundColor: '#555', flexShrink: 0 }}></div>
 
             <button 
               onClick={handleRotate}
@@ -729,6 +1020,8 @@ const App: React.FC<AppProps> = () => {
                 color: '#ccc',
                 cursor: 'pointer',
                 fontSize: '12px',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
               }}
             >
               🔄 Rotate 90°
@@ -743,20 +1036,26 @@ const App: React.FC<AppProps> = () => {
                 color: '#ccc',
                 cursor: 'pointer',
                 fontSize: '12px',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
               }}
             >
               ↕️ Flip View
             </button>
             
             {/* Save & Load Controls */}
-            <SaveLoadControls />
+            <div style={{ flexShrink: 0 }}>
+              <SaveLoadControls />
+            </div>
 
-            <div style={{ width: '1px', height: '20px', backgroundColor: '#555' }}></div>
+            <div style={{ width: '1px', height: '20px', backgroundColor: '#555', flexShrink: 0 }}></div>
 
             {/* Undo/Redo Controls */}
-            <UndoRedoControls />
+            <div style={{ flexShrink: 0 }}>
+              <UndoRedoControls />
+            </div>
 
-            <div style={{ width: '1px', height: '20px', backgroundColor: '#555' }}></div>
+            <div style={{ width: '1px', height: '20px', backgroundColor: '#555', flexShrink: 0 }}></div>
 
             {/* Validation Status */}
             <button 
@@ -772,6 +1071,8 @@ const App: React.FC<AppProps> = () => {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '4px',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
               }}
               title={`Validation: ${errorCount} errors, ${warningCount} warnings (click for details)`}
             >
@@ -794,6 +1095,8 @@ const App: React.FC<AppProps> = () => {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '4px',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
               }}
               title="Batch Operations - Assign patterns to multiple pins"
             >
@@ -801,7 +1104,7 @@ const App: React.FC<AppProps> = () => {
               <span>Batch Ops</span>
             </button>
 
-            <div style={{ width: '1px', height: '20px', backgroundColor: '#555' }}></div>
+            <div style={{ width: '1px', height: '20px', backgroundColor: '#555', flexShrink: 0 }}></div>
 
             <button 
               onClick={() => setShowKeyboardHelp(true)}
@@ -813,14 +1116,28 @@ const App: React.FC<AppProps> = () => {
                 color: '#ccc',
                 cursor: 'pointer',
                 fontSize: '12px',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
               }}
               title="Keyboard Shortcuts (Ctrl+Shift+?)"
             >
               ⌨️ Shortcuts
             </button>
             
-            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '12px', color: '#999' }}>Zoom:</span>
+            {/* Spacer to push zoom controls to the right */}
+            <div style={{ flex: 1, minWidth: '20px' }}></div>
+            
+            {/* Zoom Controls - Always visible at the right */}
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px',
+              flexShrink: 0,
+              backgroundColor: '#2a2a2a',
+              padding: '0 8px',
+              borderRadius: '4px',
+            }}>
+              <span style={{ fontSize: '12px', color: '#999', whiteSpace: 'nowrap' }}>Zoom:</span>
               <button 
                 onClick={handleZoomOut}
                 style={{
@@ -831,6 +1148,8 @@ const App: React.FC<AppProps> = () => {
                   color: '#ccc',
                   cursor: 'pointer',
                   fontSize: '12px',
+                  whiteSpace: 'nowrap',
+                  minWidth: '32px',
                 }}
               >
                 -
@@ -846,6 +1165,7 @@ const App: React.FC<AppProps> = () => {
                   cursor: 'pointer',
                   fontSize: '12px',
                   minWidth: '50px',
+                  whiteSpace: 'nowrap',
                 }}
                 title="Reset zoom to 100%"
               >
@@ -861,6 +1181,8 @@ const App: React.FC<AppProps> = () => {
                   color: '#ccc',
                   cursor: 'pointer',
                   fontSize: '12px',
+                  whiteSpace: 'nowrap',
+                  minWidth: '32px',
                 }}
               >
                 +
@@ -871,11 +1193,18 @@ const App: React.FC<AppProps> = () => {
           {/* Main View Area */}
           <div style={{
             flex: 1,
+            minWidth: '400px', // Ensure minimum width to prevent complete collapse
             backgroundColor: '#1a1a1a',
             overflow: 'hidden',
             display: 'flex',
+            flexShrink: 1, // Allow shrinking but respect minWidth
           }}>
-            <div style={{ flex: 1, overflow: 'hidden' }}>
+            <div style={{ 
+              flex: 1, 
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column'
+            }}>
               {listView.viewMode === 'grid' ? (
                 <PackageCanvas
                   package={currentPackage}

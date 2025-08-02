@@ -39,7 +39,13 @@ const SaveLoadControls: React.FC<SaveLoadControlsProps> = () => {
     setTimeout(() => setNotification(''), duration);
   };
 
+  // VS Code API helper functions
+  const isInVSCode = () => {
+    return typeof (window as any).vscode !== 'undefined';
+  };
+
   const handleSave = async () => {
+    console.log('💾 handleSave called');
     try {
       setIsLoading(true);
       
@@ -49,9 +55,107 @@ const SaveLoadControls: React.FC<SaveLoadControlsProps> = () => {
 
       const currentState = getCurrentAppState();
       const saveData = ProjectSaveService.createSaveData(currentState);
-      await ProjectSaveService.saveToFile(saveData);
+      console.log('📦 Save data created:', saveData);
       
-      showNotification('✅ Project saved successfully!');
+      if (isInVSCode()) {
+        console.log('🔧 VS Code environment detected');
+        // VS Code environment - use save dialog
+        try {
+          const vscode = (window as any).vscode;
+          const deviceName = saveData.package.device.replace(/[^a-zA-Z0-9]/g, '_');
+          const timestamp = new Date().toISOString().split('T')[0];
+          const defaultFilename = `${deviceName}_project_${timestamp}.fpgaproj`;
+          console.log('📁 Default filename:', defaultFilename);
+          
+          const uri = await new Promise((resolve) => {
+            const handler = (event: MessageEvent) => {
+              console.log('📨 Received save dialog message:', event.data);
+              if (event.data.command === 'saveDialogResult') {
+                window.removeEventListener('message', handler);
+                resolve(event.data.result);
+              }
+            };
+            window.addEventListener('message', handler);
+            
+            console.log('📤 Sending showSaveDialog message');
+            vscode.postMessage({
+              command: 'showSaveDialog',
+              options: {
+                saveLabel: 'Save FPGA Project',
+                filters: {
+                  'FPGA Project Files': ['fpgaproj'],
+                  'JSON Files': ['json'],
+                  'All Files': ['*']
+                }
+                // defaultUriを削除 - エラーの原因
+              }
+            });
+          });
+
+          if (uri) {
+            console.log('📁 Save location selected:', uri);
+            // URIオブジェクトから安全にパスを取得
+            let filePath: string | undefined;
+            
+            if (typeof uri === 'string') {
+              filePath = uri;
+            } else if (uri && typeof uri === 'object') {
+              const uriObj = uri as any;
+              filePath = uriObj.fsPath || uriObj.path;
+              
+              if (!filePath && typeof uri.toString === 'function') {
+                filePath = uri.toString();
+              }
+            }
+            
+            console.log('📂 Extracted file path:', filePath);
+            
+            if (!filePath) {
+              throw new Error('Failed to extract file path from URI');
+            }
+            
+            // Send file content to VS Code for saving and wait for result
+            const jsonString = JSON.stringify(saveData, null, 2);
+            console.log('💾 Sending file save request');
+            
+            const saveSuccess = await new Promise<boolean>((resolve) => {
+              const saveHandler = (event: MessageEvent) => {
+                console.log('📨 Received save result:', event.data);
+                if (event.data.command === 'saveFileResult') {
+                  window.removeEventListener('message', saveHandler);
+                  resolve(event.data.success);
+                }
+              };
+              window.addEventListener('message', saveHandler);
+              
+              vscode.postMessage({
+                command: 'saveFile',
+                filePath: filePath,
+                content: jsonString,
+                filename: defaultFilename
+              });
+            });
+            
+            console.log('✅ Save result:', saveSuccess);
+            if (saveSuccess) {
+              showNotification('✅ Project saved successfully!');
+            } else {
+              throw new Error('File save operation failed');
+            }
+          } else {
+            console.log('❌ No save location selected');
+          }
+        } catch (error) {
+          console.error('VS Code save failed:', error);
+          // Fallback to browser download
+          await ProjectSaveService.saveToFile(saveData);
+          showNotification('✅ Project saved successfully!');
+        }
+      } else {
+        // Browser environment - direct download
+        await ProjectSaveService.saveToFile(saveData);
+        showNotification('✅ Project saved successfully!');
+      }
     } catch (error) {
       console.error('Save failed:', error);
       showNotification(`❌ Save failed: ${error}`, 5000);

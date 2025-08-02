@@ -2,6 +2,9 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 
+// Global panel reference
+let currentPanel: vscode.WebviewPanel | undefined;
+
 // File Manager Tree Data Provider
 class FileManagerProvider implements vscode.TreeDataProvider<FileManagerItem> {
     constructor(private context: vscode.ExtensionContext) {}
@@ -45,44 +48,58 @@ class FileManagerItem extends vscode.TreeItem {
 }
 
 // Helper function to handle file save requests from webview
-async function handleFileSave(filePath: string, content: string, filename: string): Promise<void> {
+async function handleFileSave(filePath: string, content: string, filename: string): Promise<boolean> {
     try {
-        console.log('💾 Handling file save:', filename);
-        console.log('❌ Original filePath:', filePath);
-        
-        // Convert URI-style path to Windows path
-        let normalizedPath = filePath;
-        
-        // Handle case where filePath starts with /Drive:/ pattern
-        if (normalizedPath.startsWith('/') && normalizedPath.match(/^\/[A-Z]:\//)) {
-            // Remove leading slash: /E:/... -> E:/...
-            normalizedPath = normalizedPath.substring(1);
+        if (!filePath || filePath === '[object Object]' || filePath === 'undefined') {
+            throw new Error('Invalid file path received');
         }
         
-        // Convert forward slashes to backslashes for Windows
-        normalizedPath = normalizedPath.replace(/\//g, '\\');
+        // Convert to VS Code URI
+        let fileUri: vscode.Uri;
         
-        console.log('📁 Normalized file path:', normalizedPath);
-        
-        // Ensure directory exists
-        const dir = path.dirname(normalizedPath);
-        console.log('📁 Target directory:', dir);
-        console.log('📁 Creating directory:', dir);
-        
-        if (!fs.existsSync(dir)) {
-            fs.mkdirSync(dir, { recursive: true });
+        try {
+            let normalizedPath = filePath.toString();
+            
+            // URI scheme prefix を除去 (file:// など)
+            if (normalizedPath.startsWith('file://')) {
+                normalizedPath = normalizedPath.substring(7);
+            }
+            
+            // Handle case where filePath starts with /Drive:/ pattern
+            if (normalizedPath.startsWith('/') && normalizedPath.match(/^\/[A-Z]:\//)) {
+                normalizedPath = normalizedPath.substring(1);
+            }
+            
+            // Convert forward slashes to backslashes for Windows
+            normalizedPath = normalizedPath.replace(/\//g, '\\');
+            
+            // Windows用パスの正規化 - 大文字小文字を問わない
+            if (process.platform === 'win32' && !normalizedPath.match(/^[A-Za-z]:\\/)) {
+                throw new Error(`Invalid Windows path format: ${normalizedPath}`);
+            }
+            
+            fileUri = vscode.Uri.file(normalizedPath);
+            console.log('📂 Final file path:', fileUri.fsPath);
+        } catch (parseError) {
+            console.error('❌ Path parsing error:', parseError);
+            throw new Error(`Failed to parse file path: ${filePath}`);
         }
 
-        // Write file
-        await fs.promises.writeFile(normalizedPath, content, 'utf8');
+        console.log('💾 Saving file to:', fileUri.fsPath);
+        
+        // Write file using VS Code workspace API
+        const contentBuffer = Buffer.from(content, 'utf8');
+        await vscode.workspace.fs.writeFile(fileUri, contentBuffer);
         
         // Show success message
-        vscode.window.showInformationMessage(`✅ File saved: ${path.basename(normalizedPath)}`);
+        vscode.window.showInformationMessage(`✅ File saved: ${path.basename(fileUri.fsPath)}`);
         
-        console.log('✅ File saved successfully:', normalizedPath);
+        console.log('✅ File saved successfully:', fileUri.fsPath);
+        return true;
     } catch (error) {
         console.error('❌ File save failed:', error);
         vscode.window.showErrorMessage(`❌ Failed to save file: ${error}`);
+        return false;
     }
 }
 
@@ -131,7 +148,12 @@ export function activate(context: vscode.ExtensionContext) {
         () => {
             console.log('🚀 openGUI command triggered');
             
-            const panel = vscode.window.createWebviewPanel(
+            // Close existing panel if any
+            if (currentPanel) {
+                currentPanel.dispose();
+            }
+            
+            currentPanel = vscode.window.createWebviewPanel(
                 'fpgaPinPlanner',
                 'FPGA Pin Planner',
                 vscode.ViewColumn.One,
@@ -144,7 +166,7 @@ export function activate(context: vscode.ExtensionContext) {
             console.log('📱 Webview panel created');
             
             try {
-                panel.webview.html = getWebviewContent(panel.webview, context.extensionUri);
+                currentPanel.webview.html = getWebviewContent(currentPanel.webview, context.extensionUri);
                 console.log('✅ Webview HTML content set successfully');
             } catch (error) {
                 console.error('❌ Error setting webview content:', error);
@@ -152,28 +174,79 @@ export function activate(context: vscode.ExtensionContext) {
                 return;
             }
 
-            panel.webview.onDidReceiveMessage(
-                message => {
+            // Handle panel disposal
+            currentPanel.onDidDispose(
+                () => {
+                    currentPanel = undefined;
+                },
+                null,
+                context.subscriptions
+            );
+
+            currentPanel.webview.onDidReceiveMessage(
+                async message => {
                     switch (message.command) {
                         case 'showOpenDialog':
-                            vscode.window.showOpenDialog(message.options).then(result => {
-                                panel.webview.postMessage({
-                                    command: 'fileSelected',
-                                    file: result
+                            try {
+                                const result = await vscode.window.showOpenDialog(message.options);
+                                currentPanel?.webview.postMessage({
+                                    command: 'openDialogResult',
+                                    result: result
                                 });
-                            });
+                            } catch (error) {
+                                console.error('Open dialog error:', error);
+                                currentPanel?.webview.postMessage({
+                                    command: 'openDialogResult',
+                                    result: undefined,
+                                    error: error
+                                });
+                            }
                             return;
                         case 'showSaveDialog':
-                            vscode.window.showSaveDialog(message.options).then(result => {
-                                panel.webview.postMessage({
-                                    command: 'fileSelected', 
-                                    file: result
+                            try {
+                                const options = { ...message.options };
+                                if (options.defaultUri) {
+                                    delete options.defaultUri;
+                                }
+                                
+                                const result = await vscode.window.showSaveDialog(options);
+                                
+                                // URIを安全にシリアライズ - fsPathのみを送信
+                                let serializedResult = null;
+                                if (result && result.fsPath) {
+                                    serializedResult = {
+                                        fsPath: result.fsPath
+                                    };
+                                }
+                                
+                                currentPanel?.webview.postMessage({
+                                    command: 'saveDialogResult', 
+                                    result: serializedResult
                                 });
-                            });
+                            } catch (error) {
+                                console.error('Save dialog error:', error);
+                                currentPanel?.webview.postMessage({
+                                    command: 'saveDialogResult',
+                                    result: undefined,
+                                    error: error
+                                });
+                            }
                             return;
                         case 'saveFile':
-                            // Handle file save request from webview
-                            handleFileSave(message.filePath, message.content, message.filename);
+                            try {
+                                const success = await handleFileSave(message.filePath, message.content, message.filename);
+                                currentPanel?.webview.postMessage({
+                                    command: 'saveFileResult',
+                                    success: success
+                                });
+                            } catch (error) {
+                                console.error('File save error:', error);
+                                currentPanel?.webview.postMessage({
+                                    command: 'saveFileResult',
+                                    success: false,
+                                    error: error
+                                });
+                            }
                             return;
                         case 'appReady':
                             console.log('FPGA Pin Planner webview is ready');
@@ -342,8 +415,28 @@ export function activate(context: vscode.ExtensionContext) {
             });
 
             if (uri && uri[0]) {
-                vscode.window.showInformationMessage(`Loading project from: ${uri[0].fsPath}`);
-                // TODO: Implement actual load logic and send to webview
+                try {
+                    // Read the project file
+                    const fileContent = await vscode.workspace.fs.readFile(uri[0]);
+                    const projectData = JSON.parse(Buffer.from(fileContent).toString('utf8'));
+                    
+                    // Open FPGA GUI if not already open
+                    await vscode.commands.executeCommand('fpgaPinPlanner.openGUI');
+                    
+                    // Wait for the panel to be ready and send project data
+                    setTimeout(() => {
+                        if (currentPanel) {
+                            currentPanel.webview.postMessage({
+                                command: 'loadProject',
+                                projectData: projectData
+                            });
+                            vscode.window.showInformationMessage(`Project loaded: ${uri[0].fsPath}`);
+                        }
+                    }, 1000);
+                } catch (error) {
+                    console.error('Failed to load project:', error);
+                    vscode.window.showErrorMessage(`Failed to load project: ${error}`);
+                }
             }
         }
     );
@@ -540,9 +633,9 @@ function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): s
                     });
                     
                     const handler = (event) => {
-                        if (event.data.command === 'fileSelected') {
+                        if (event.data.command === 'openDialogResult') {
                             window.removeEventListener('message', handler);
-                            resolve(event.data.file);
+                            resolve(event.data.result);
                         }
                     };
                     window.addEventListener('message', handler);
@@ -553,13 +646,16 @@ function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): s
                 return new Promise((resolve) => {
                     vscode.postMessage({
                         command: 'showSaveDialog', 
-                        options: options
+                        options: {
+                            ...options,
+                            defaultUri: options.defaultUri || undefined
+                        }
                     });
                     
                     const handler = (event) => {
-                        if (event.data.command === 'fileSelected') {
+                        if (event.data.command === 'saveDialogResult') {
                             window.removeEventListener('message', handler);
-                            resolve(event.data.file);
+                            resolve(event.data.result);
                         }
                     };
                     window.addEventListener('message', handler);
