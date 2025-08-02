@@ -2,6 +2,61 @@
 
 ## 📚 **技術選択の理由と学び**
 
+### **最新開発状況 (2025年8月3日更新)**
+
+#### **最近の重要な修正と学び**
+
+**1. VS Code WebView通信問題 (2025/8/2)**
+```typescript
+// 問題: 拡張機能とWebView間の通信プロトコル不一致
+// 拡張機能側: { type: 'loadSampleData' }
+// WebView側: message.command を期待
+
+// 解決策: プロトコル統一
+currentPanel.webview.postMessage({
+  command: 'loadSampleData'  // type → command に変更
+});
+
+// 学び: WebView通信では命名規則の一貫性が重要
+```
+
+**2. ビューポートパン境界問題 (2025/8/3)**
+```typescript
+// 問題: 大きなCSVで右端ピンが表示できない
+// 原因: 固定的な境界制限
+const maxOffset = Math.max(stageSize.width, stageSize.height) * scale * 0.5;
+
+// 解決策: コンテンツベース動的境界
+const applyViewportBounds = (pos, scale) => {
+  const packageDims = getPackageDimensions();
+  const contentWidth = packageDims.width * scale;
+  const paddingX = canvasWidth * 0.5;
+  const minX = -(contentWidth / 2 + paddingX);
+  const maxX = contentWidth / 2 + paddingX;
+  // 実際のコンテンツサイズに基づく境界設定
+};
+
+// 学び: UI制限は静的ではなく動的にコンテンツに応じて調整する
+```
+
+**3. GUI クリーンアップ戦略 (2025/8/2)**
+```typescript
+// 戦略: ボタンGUI → コマンドパレット移行
+// 削除: Sample Data, Differential Pairs ボタン
+// 追加: VS Code コマンド統合
+
+// 実装パターン:
+const handleVSCodeMessage = (event: MessageEvent) => {
+  switch (event.data.command) {
+    case 'loadSampleData':
+      // コマンドパレットからの直接実行
+      break;
+  }
+};
+
+// 学び: VS Code拡張機能ではネイティブUIパターンを活用する
+```
+
 ### **React + TypeScript + Zustand の選択理由**
 
 #### **なぜReactか**
@@ -517,6 +572,105 @@ FPGA設計者の日常業務を効率化し、エラーを減らし、より良�
 
 技術的な完璧さを追求しつつも、実用性と使いやすさを忘れずに、継続的に改善を重ねていってください。
 
+## 🔒 **セキュリティ監査チェックリスト** (2025年8月3日更新)
+
+### **1. 依存関係の脆弱性チェック**
+
+**現在の既知脆弱性:**
+```bash
+# npm audit結果 (2025/8/3)
+electron  <28.3.2  # moderate - Heap Buffer Overflow
+esbuild   <=0.24.2 # moderate - Development server vulnerability
+vite      0.11.0 - 6.1.6 # esbuildに依存
+
+# 対策状況:
+- 開発環境でのみ使用される脆弱性
+- プロダクション環境には影響なし
+- 破壊的変更のためフリーズ中
+```
+
+### **2. ファイル処理のセキュリティ**
+
+**CSV読み込み処理:**
+```typescript
+// セキュリティ対策済み:
+// 1. ファイルサイズ制限
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+
+// 2. 拡張子検証
+const allowedExtensions = ['.csv', '.fpgaproj'];
+
+// 3. 内容のサニタイゼーション
+const sanitizeInput = (input: string) => {
+  return input.replace(/[<>\"'&]/g, '');
+};
+
+// 4. エラーハンドリング
+try {
+  const result = await parseCSV(file);
+} catch (error) {
+  // 詳細エラー情報は非表示
+  showError('ファイルの読み込みに失敗しました');
+}
+```
+
+### **3. VS Code拡張機能のセキュリティ**
+
+**WebView通信のセキュリティ:**
+```typescript
+// セキュリティ対策:
+// 1. Content Security Policy
+const csp = `
+  default-src 'none';
+  script-src 'unsafe-inline' ${webview.cspSource};
+  style-src 'unsafe-inline' ${webview.cspSource};
+`;
+
+// 2. メッセージ検証
+const handleMessage = (message: any) => {
+  if (!isValidCommand(message.command)) {
+    return; // 不正なコマンドは無視
+  }
+  // 処理続行
+};
+
+// 3. パス検証
+const validatePath = (path: string) => {
+  return path.startsWith(workspace.rootPath);
+};
+```
+
+### **4. データプライバシー**
+
+**ユーザーデータの取り扱い:**
+```typescript
+// プライバシー対策:
+// 1. ローカルストレージのみ使用
+// 2. 外部送信なし
+// 3. 一時ファイルの適切な削除
+// 4. 機密情報のログ出力禁止
+
+const debugLog = (message: string, data?: any) => {
+  // プロダクション環境では出力しない
+  if (process.env.NODE_ENV !== 'development') return;
+  
+  // 機密データのマスキング
+  const sanitizedData = sanitizeForLog(data);
+  console.log(message, sanitizedData);
+};
+```
+
+### **5. セキュリティ監査の定期実施**
+
+**監査項目:**
+- [ ] `npm audit` の実行とレビュー
+- [ ] 依存関係の最新化計画
+- [ ] ファイル処理のテスト
+- [ ] WebView通信の検証
+- [ ] CSP設定の確認
+- [ ] エラーハンドリングの網羅性確認
+
+**推奨監査サイクル:** 月1回または重要なリリース前
 
 📋 VS Code拡張機能開発の作業指針
 🔄 必須のビルド・デプロイメント手順
