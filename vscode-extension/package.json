@@ -3,16 +3,16 @@
   "displayName": "FPGA Pin Planner",
   "description": "Advanced FPGA Pin Assignment and Management Tool with Voltage/IO Standard Selection",
   "version": "1.0.0",
-  "publisher": "fpga-tools",
-  "author": "FPGA Pin Planner Team <contact@fpga-pin-planner.dev>",
+  "publisher": "MameMame777",
+  "author": "MameMame777 <mame@example.com>",
   "license": "MIT",
-  "homepage": "https://github.com/your-username/FPGApinPlaner",
+  "homepage": "https://github.com/MameMame777/FPGApinPlaner",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/your-username/FPGApinPlaner.git"
+    "url": "git+https://github.com/MameMame777/FPGApinPlaner.git"
   },
   "bugs": {
-    "url": "https://github.com/your-username/FPGApinPlaner/issues"
+    "url": "https://github.com/MameMame777/FPGApinPlaner/issues"
   },
   "engines": {
     "vscode": "^1.74.0"
