@@ -294,12 +294,24 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
 
   // Apply viewport boundaries to prevent canvas from disappearing off screen
   const applyViewportBounds = (pos: { x: number; y: number }, scale: number) => {
-    // Define reasonable bounds based on stage size and scale
-    const maxOffset = Math.max(stageSize.width, stageSize.height) * scale * 0.5;
-    const minX = -maxOffset;
-    const maxX = maxOffset;
-    const minY = -maxOffset;
-    const maxY = maxOffset;
+    // Get actual content dimensions
+    const packageDims = getPackageDimensions();
+    const contentWidth = packageDims.width * scale;
+    const contentHeight = packageDims.height * scale;
+    
+    // Calculate how much we can pan based on content vs stage size
+    const canvasWidth = stageSize.width;
+    const canvasHeight = stageSize.height;
+    
+    // Allow panning beyond content boundaries to show all pins
+    const paddingX = canvasWidth * 0.5; // Allow half screen padding
+    const paddingY = canvasHeight * 0.5;
+    
+    // Calculate bounds that ensure content is accessible
+    const minX = -(contentWidth / 2 + paddingX);
+    const maxX = contentWidth / 2 + paddingX;
+    const minY = -(contentHeight / 2 + paddingY);
+    const maxY = contentHeight / 2 + paddingY;
     
     return {
       x: Math.max(minX, Math.min(maxX, pos.x)),
