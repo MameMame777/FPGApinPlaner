@@ -2,6 +2,15 @@
 
 All notable changes to the "FPGA Pin Planner" extension will be documented in this file.
 
+## [1.0.1] - 2025-08-03
+
+### Changed
+- 🎨 **Icon Update**: Updated extension icon to use `icon.png` for better visibility
+- 📦 **Package Enhancement**: Improved marketplace presentation with new icon
+
+### Fixed
+- 🔧 **Icon Display**: Fixed icon display issues in VS Code marketplace and extension list
+
 ## [1.0.0] - 2025-08-03
 
 ### Added
