@@ -210,19 +210,23 @@
       "fpga-pin-planner": [
         {
           "id": "fpgaPinPlanner.fileManager",
-          "name": "File Manager"
+          "name": "File Manager",
+          "icon": "$(folder)"
         },
         {
           "id": "fpgaPinPlanner.pinList",
-          "name": "Pin List"
+          "name": "Pin List",
+          "icon": "$(list-unordered)"
         },
         {
           "id": "fpgaPinPlanner.validation", 
-          "name": "Validation"
+          "name": "Validation",
+          "icon": "$(check)"
         },
         {
           "id": "fpgaPinPlanner.batchOperations",
-          "name": "Batch Operations"
+          "name": "Batch Operations",
+          "icon": "$(gear)"
         }
       ]
     },

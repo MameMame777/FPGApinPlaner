@@ -129,6 +129,8 @@ export function activate(context: vscode.ExtensionContext) {
     const openGUICommand = vscode.commands.registerCommand(
         'fpgaPinPlanner.openGUI',
         () => {
+            console.log('🚀 openGUI command triggered');
+            
             const panel = vscode.window.createWebviewPanel(
                 'fpgaPinPlanner',
                 'FPGA Pin Planner',
@@ -139,7 +141,16 @@ export function activate(context: vscode.ExtensionContext) {
                 }
             );
 
-            panel.webview.html = getWebviewContent(panel.webview, context.extensionUri);
+            console.log('📱 Webview panel created');
+            
+            try {
+                panel.webview.html = getWebviewContent(panel.webview, context.extensionUri);
+                console.log('✅ Webview HTML content set successfully');
+            } catch (error) {
+                console.error('❌ Error setting webview content:', error);
+                vscode.window.showErrorMessage(`Failed to load FPGA Pin Planner: ${error}`);
+                return;
+            }
 
             panel.webview.onDidReceiveMessage(
                 message => {
@@ -436,12 +447,45 @@ class PinItem extends vscode.TreeItem {
 }
 
 function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): string {
+    console.log('🔧 Building webview content...');
+    
     const webviewDistUri = vscode.Uri.joinPath(extensionUri, 'webview-dist');
-    const indexHtmlUri = vscode.Uri.joinPath(webviewDistUri, 'index.html');
     const assetsUri = vscode.Uri.joinPath(webviewDistUri, 'assets');
     
-    const cssUri = webview.asWebviewUri(vscode.Uri.joinPath(assetsUri, 'index-ed718810.css'));
-          const jsUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'webview-dist', 'assets', 'main-f7fe07c6.js'));
+    console.log('📁 Extension URI:', extensionUri.toString());
+    console.log('📁 Webview-dist URI:', webviewDistUri.toString());
+    console.log('📁 Assets URI:', assetsUri.toString());
+    
+    // Dynamically find the CSS and JS files
+    let cssFileName = 'index-ed718810.css'; // fallback
+    let jsFileName = 'main-ce665afa.js'; // fallback
+    
+    try {
+        const assetsPath = assetsUri.fsPath;
+        console.log('📁 Assets path:', assetsPath);
+        const files = fs.readdirSync(assetsPath);
+        console.log('📄 Available files:', files);
+        
+        const cssFile = files.find(f => f.startsWith('index-') && f.endsWith('.css'));
+        const jsFile = files.find(f => f.startsWith('main-') && f.endsWith('.js'));
+        
+        if (cssFile) {
+            cssFileName = cssFile;
+            console.log('✅ Found CSS file:', cssFileName);
+        }
+        if (jsFile) {
+            jsFileName = jsFile;
+            console.log('✅ Found JS file:', jsFileName);
+        }
+    } catch (error) {
+        console.warn('⚠️ Could not read assets directory, using fallback file names:', error);
+    }
+    
+    const cssUri = webview.asWebviewUri(vscode.Uri.joinPath(assetsUri, cssFileName));
+    const jsUri = webview.asWebviewUri(vscode.Uri.joinPath(assetsUri, jsFileName));
+    
+    console.log('🎨 CSS URI:', cssUri.toString());
+    console.log('⚡ JS URI:', jsUri.toString());
     
     const nonce = getNonce();
     
