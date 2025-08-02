@@ -2,7 +2,7 @@
   "name": "fpga-pin-planner",
   "displayName": "FPGA Pin Planner",
   "description": "Advanced FPGA Pin Assignment and Management Tool with Voltage/IO Standard Selection",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "publisher": "MameMame777",
   "author": "MameMame777 <mame@example.com>",
   "license": "MIT",
@@ -33,6 +33,7 @@
     "constraint-validation",
     "hardware-design"
   ],
+  "icon": "images/icon.png",
   "activationEvents": [
     "onCommand:fpgaPinPlanner.openPlanner",
     "onLanguage:csv",
@@ -95,14 +96,14 @@
       },
       {
         "command": "fpgaPinPlanner.saveProjectWithDialog",
-        "title": "Save Project with Dialog", 
+        "title": "Save Project with Dialog",
         "category": "FPGA",
         "icon": "$(save)"
       },
       {
         "command": "fpgaPinPlanner.importCSVWithDialog",
         "title": "Import CSV with Dialog",
-        "category": "FPGA", 
+        "category": "FPGA",
         "icon": "$(folder-opened)"
       },
       {
@@ -190,7 +191,7 @@
           "group": "navigation"
         },
         {
-          "command": "fpgaPinPlanner.importCSVWithDialog", 
+          "command": "fpgaPinPlanner.importCSVWithDialog",
           "when": "view == fpgaPinPlanner.pinList",
           "group": "navigation"
         },
@@ -201,7 +202,7 @@
         },
         {
           "command": "fpgaPinPlanner.saveProjectWithDialog",
-          "when": "view == fpgaPinPlanner.batchOperations", 
+          "when": "view == fpgaPinPlanner.batchOperations",
           "group": "navigation"
         }
       ]
@@ -228,7 +229,7 @@
           "icon": "$(list-unordered)"
         },
         {
-          "id": "fpgaPinPlanner.validation", 
+          "id": "fpgaPinPlanner.validation",
           "name": "Validation",
           "icon": "$(check)"
         },
