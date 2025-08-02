@@ -1,4 +1,48 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
+
+// Helper function to handle file save requests from webview
+async function handleFileSave(filePath: string, content: string, filename: string): Promise<void> {
+    try {
+        console.log('💾 Handling file save:', filename);
+        console.log('❌ Original filePath:', filePath);
+        
+        // Convert URI-style path to Windows path
+        let normalizedPath = filePath;
+        
+        // Handle case where filePath starts with /Drive:/ pattern
+        if (normalizedPath.startsWith('/') && normalizedPath.match(/^\/[A-Z]:\//)) {
+            // Remove leading slash: /E:/... -> E:/...
+            normalizedPath = normalizedPath.substring(1);
+        }
+        
+        // Convert forward slashes to backslashes for Windows
+        normalizedPath = normalizedPath.replace(/\//g, '\\');
+        
+        console.log('📁 Normalized file path:', normalizedPath);
+        
+        // Ensure directory exists
+        const dir = path.dirname(normalizedPath);
+        console.log('📁 Target directory:', dir);
+        console.log('📁 Creating directory:', dir);
+        
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+        }
+
+        // Write file
+        await fs.promises.writeFile(normalizedPath, content, 'utf8');
+        
+        // Show success message
+        vscode.window.showInformationMessage(`✅ File saved: ${path.basename(normalizedPath)}`);
+        
+        console.log('✅ File saved successfully:', normalizedPath);
+    } catch (error) {
+        console.error('❌ File save failed:', error);
+        vscode.window.showErrorMessage(`❌ Failed to save file: ${error}`);
+    }
+}
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('FPGA Pin Planner extension is now active!');
@@ -17,8 +61,8 @@ export function activate(context: vscode.ExtensionContext) {
                 }
             );
 
-            // Set the webview's html content
-            panel.webview.html = getWebviewContent();
+            // Set the webview's html content 
+            panel.webview.html = getWebviewContent(panel.webview, context.extensionUri);
 
             // Handle messages from the webview
             panel.webview.onDidReceiveMessage(
@@ -26,6 +70,31 @@ export function activate(context: vscode.ExtensionContext) {
                     switch (message.command) {
                         case 'alert':
                             vscode.window.showInformationMessage(message.text);
+                            return;
+                        case 'showOpenDialog':
+                            vscode.window.showOpenDialog(message.options).then(result => {
+                                panel.webview.postMessage({
+                                    command: 'fileSelected',
+                                    file: result
+                                });
+                            });
+                            return;
+                        case 'showSaveDialog':
+                            console.log('💾 Opening save dialog...');
+                            vscode.window.showSaveDialog(message.options).then(result => {
+                                console.log('💾 Save dialog result:', result);
+                                panel.webview.postMessage({
+                                    command: 'fileSelected', 
+                                    file: result
+                                });
+                            });
+                            return;
+                        case 'saveFile':
+                            // Handle file save request from webview
+                            handleFileSave(message.filePath, message.content, message.filename);
+                            return;
+                        case 'appReady':
+                            console.log('✅ FPGA Pin Planner webview is ready');
                             return;
                     }
                 },
@@ -137,7 +206,72 @@ export function deactivate() {
     console.log('FPGA Pin Planner extension is deactivated');
 }
 
-function getWebviewContent() {
+function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri) {
+    // Get path to the built webview files
+    const webviewDistPath = vscode.Uri.joinPath(extensionUri, 'webview-dist');
+    const indexPath = vscode.Uri.joinPath(webviewDistPath, 'index.html');
+    
+    try {
+        // Read the HTML file
+        const htmlContent = fs.readFileSync(indexPath.fsPath, 'utf8');
+        
+        // Replace relative paths with webview URIs
+        const assetsPath = webview.asWebviewUri(vscode.Uri.joinPath(webviewDistPath, 'assets'));
+        
+        return htmlContent
+            .replace(/assets\//g, `${assetsPath}/`)
+            .replace(/<script>/, `<script>
+                // Setup VS Code API
+                const vscode = acquireVsCodeApi();
+                
+                // Expose VS Code APIs to the application
+                window.vscode = vscode;
+                window.vsCodeFileAPI = {
+                    showOpenDialog: (options) => {
+                        return new Promise((resolve) => {
+                            const messageHandler = (event) => {
+                                if (event.data.command === 'fileSelected') {
+                                    window.removeEventListener('message', messageHandler);
+                                    resolve(event.data.file);
+                                }
+                            };
+                            window.addEventListener('message', messageHandler);
+                            vscode.postMessage({
+                                command: 'showOpenDialog',
+                                options: options
+                            });
+                        });
+                    },
+                    showSaveDialog: (options) => {
+                        return new Promise((resolve) => {
+                            const timeout = setTimeout(() => {
+                                console.log('⏱️ Save dialog timeout');
+                                resolve(null);
+                            }, 30000);
+                            
+                            const messageHandler = (event) => {
+                                if (event.data.command === 'fileSelected') {
+                                    clearTimeout(timeout);
+                                    window.removeEventListener('message', messageHandler);
+                                    resolve(event.data.file);
+                                }
+                            };
+                            window.addEventListener('message', messageHandler);
+                            vscode.postMessage({
+                                command: 'showSaveDialog',
+                                options: options
+                            });
+                        });
+                    }
+                };
+            <\/script><script>`);
+    } catch (error) {
+        console.error('Failed to load webview content:', error);
+        return getBasicWebviewContent();
+    }
+}
+
+function getBasicWebviewContent() {
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
