@@ -24,6 +24,10 @@ class FileManagerProvider implements vscode.TreeDataProvider<FileManagerItem> {
                 new FileManagerItem('📂 Load Project File', 'loadProject', vscode.TreeItemCollapsibleState.None, {
                     command: 'fpgaPinPlanner.loadProjectWithDialog',
                     title: 'Load Project File',
+                }),
+                new FileManagerItem('🧪 Load Sample Data', 'loadSample', vscode.TreeItemCollapsibleState.None, {
+                    command: 'fpgaPinPlanner.loadSampleData',
+                    title: 'Load Sample Data',
                 })
             ]);
         }
@@ -449,6 +453,21 @@ export function activate(context: vscode.ExtensionContext) {
         }
     );
 
+    const loadSampleDataCommand = vscode.commands.registerCommand(
+        'fpgaPinPlanner.loadSampleData',
+        () => {
+            // Sample data loading will be handled by the webview
+            if (currentPanel) {
+                currentPanel.webview.postMessage({
+                    command: 'loadSampleData'
+                });
+                vscode.window.showInformationMessage('Loading sample FPGA package data...');
+            } else {
+                vscode.window.showWarningMessage('FPGA Pin Planner is not open. Please open the planner first.');
+            }
+        }
+    );
+
     // Register Tree Data Providers
     const pinListProvider = new PinListProvider();
     const validationProvider = new ValidationProvider();
@@ -469,7 +488,8 @@ export function activate(context: vscode.ExtensionContext) {
         exportSDCCommand,
         exportQSFCommand,
         saveProjectWithDialogCommand,
-        validateConstraintsCommand
+        validateConstraintsCommand,
+        loadSampleDataCommand
     );
 }
 

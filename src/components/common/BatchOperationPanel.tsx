@@ -4,7 +4,6 @@ import { UndoRedoService } from '@/services/undo-redo-service';
 import { 
   BatchOperationService, 
   ArrayPatternConfig, 
-  DifferentialPatternConfig,
   VoltageIOConfig,
   PinSelectionCriteria,
   BatchOperationResult
@@ -19,7 +18,7 @@ interface BatchOperationPanelProps {
   isVisible: boolean;
 }
 
-type OperationType = 'array' | 'differential' | 'voltage-io' | 'direction' | 'clear';
+type OperationType = 'array' | 'voltage-io' | 'direction' | 'clear';
 type SelectionMode = 'manual' | 'criteria';
 
 export const BatchOperationPanel: React.FC<BatchOperationPanelProps> = ({ isVisible }) => {
@@ -41,17 +40,6 @@ export const BatchOperationPanel: React.FC<BatchOperationPanelProps> = ({ isVisi
     indexFormat: '[{i}]',
     padding: 0,
     step: 1
-  });
-
-  // Differential pattern state
-  const [diffConfig, setDiffConfig] = useState<DifferentialPatternConfig>({
-    baseName: 'CLK',
-    positiveFormat: '_P',
-    negativeFormat: '_N',
-    startIndex: 0,
-    endIndex: 3,
-    indexFormat: '{i}',
-    padding: 0
   });
 
   // Voltage and I/O standard configuration
@@ -104,9 +92,6 @@ export const BatchOperationPanel: React.FC<BatchOperationPanelProps> = ({ isVisi
       case 'array':
         // 削除: 配列パターンのピン数制限チェックを完全に削除
         result = BatchOperationService.assignArrayPattern(targetPins, arrayConfig);
-        break;
-      case 'differential':
-        result = BatchOperationService.assignDifferentialPattern(targetPins, diffConfig);
         break;
       case 'voltage-io':
         result = BatchOperationService.setVoltageAndIO(targetPins, voltageIOConfig);
@@ -220,17 +205,6 @@ export const BatchOperationPanel: React.FC<BatchOperationPanelProps> = ({ isVisi
                 className="mr-2"
               />
               <span className="text-sm">Array Pattern (DATA[0], DATA[1], ...)</span>
-            </label>
-            <label className="flex items-center">
-              <input
-                type="radio"
-                name="operationType"
-                value="differential"
-                checked={operationType === 'differential'}
-                onChange={(e) => setOperationType(e.target.value as OperationType)}
-                className="mr-2"
-              />
-              <span className="text-sm">Differential Pairs (CLK_P, CLK_N)</span>
             </label>
             <label className="flex items-center">
               <input
@@ -442,95 +416,6 @@ export const BatchOperationPanel: React.FC<BatchOperationPanelProps> = ({ isVisi
 
             <div className="text-xs text-gray-600">
               Preview: {arrayConfig.baseName}{arrayConfig.indexFormat.replace('{i}', arrayConfig.startIndex.toString().padStart(arrayConfig.padding, '0'))}
-            </div>
-          </div>
-        )}
-
-        {/* Differential Configuration */}
-        {operationType === 'differential' && (
-          <div className="space-y-3 p-3 bg-purple-50 rounded-lg">
-            <h4 className="text-sm font-medium text-gray-800">Differential Pair Configuration</h4>
-            
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Base Name
-                </label>
-                <input
-                  type="text"
-                  value={diffConfig.baseName}
-                  onChange={(e) => setDiffConfig(prev => ({ ...prev, baseName: e.target.value }))}
-                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
-                  placeholder="CLK"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Index Format
-                </label>
-                <input
-                  type="text"
-                  value={diffConfig.indexFormat}
-                  onChange={(e) => setDiffConfig(prev => ({ ...prev, indexFormat: e.target.value }))}
-                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
-                  placeholder="{i}"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Positive Suffix
-                </label>
-                <input
-                  type="text"
-                  value={diffConfig.positiveFormat}
-                  onChange={(e) => setDiffConfig(prev => ({ ...prev, positiveFormat: e.target.value }))}
-                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
-                  placeholder="_P"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Negative Suffix
-                </label>
-                <input
-                  type="text"
-                  value={diffConfig.negativeFormat}
-                  onChange={(e) => setDiffConfig(prev => ({ ...prev, negativeFormat: e.target.value }))}
-                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
-                  placeholder="_N"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Start Index
-                </label>
-                <input
-                  type="number"
-                  value={diffConfig.startIndex}
-                  onChange={(e) => setDiffConfig(prev => ({ ...prev, startIndex: parseInt(e.target.value) || 0 }))}
-                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  End Index
-                </label>
-                <input
-                  type="number"
-                  value={diffConfig.endIndex}
-                  onChange={(e) => setDiffConfig(prev => ({ ...prev, endIndex: parseInt(e.target.value) || 0 }))}
-                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-
-            <div className="text-xs text-gray-600">
-              Preview: {diffConfig.baseName}{(diffConfig.indexFormat || '{i}').replace('{i}', (diffConfig.startIndex || 0).toString())}{diffConfig.positiveFormat}, {diffConfig.baseName}{(diffConfig.indexFormat || '{i}').replace('{i}', (diffConfig.startIndex || 0).toString())}{diffConfig.negativeFormat}
             </div>
           </div>
         )}

@@ -110,6 +110,12 @@
         "title": "Load Project with Dialog",
         "category": "FPGA",
         "icon": "$(file-directory)"
+      },
+      {
+        "command": "fpgaPinPlanner.loadSampleData",
+        "title": "Load Sample Data",
+        "category": "FPGA",
+        "icon": "$(beaker)"
       }
     ],
     "menus": {
@@ -160,6 +166,9 @@
         },
         {
           "command": "fpgaPinPlanner.loadProjectWithDialog"
+        },
+        {
+          "command": "fpgaPinPlanner.loadSampleData"
         }
       ],
       "view/title": [

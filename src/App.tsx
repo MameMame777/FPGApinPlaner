@@ -5,7 +5,6 @@ import { ExportService } from '@/services/export-service';
 import { PinItem } from '@/components/common/PinItem';
 import { BGMControls } from '@/components/common/BGMControls';
 import { SettingsPanel } from '@/components/common/SettingsPanel';
-import { DifferentialPairManager } from '@/components/common/DifferentialPairManager';
 import { PinListTabs } from '@/components/common/PinListTabs';
 import PackageCanvas from '@/components/common/PackageCanvas';
 import SaveLoadControls from '@/components/common/SaveLoadControls';
@@ -16,7 +15,6 @@ import { useAppHotkeys } from '@/hooks/useHotkeys';
 import { useValidation } from '@/hooks/useValidation';
 import { ValidationIssue } from '@/services/validation-service';
 import { loadSampleData } from '@/utils/sample-data';
-import { DifferentialPairUtils } from '@/utils/differential-pair-utils';
 
 interface AppProps {}
 
@@ -25,7 +23,6 @@ const App: React.FC<AppProps> = () => {
   const [isImporting, setIsImporting] = useState(false);
   const [lastViewerSelectedPin, setLastViewerSelectedPin] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
-  const [showDifferentialPairs, setShowDifferentialPairs] = useState(false);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [rightSidebarTab, setRightSidebarTab] = useState<'validation' | 'batch' | null>('validation');
   const [sidebarWidth, setSidebarWidth] = useState(300);
@@ -116,6 +113,41 @@ const App: React.FC<AppProps> = () => {
             setError(`Failed to load project: ${error}`);
           }
           break;
+        case 'loadSampleData':
+          (async () => {
+            try {
+              console.log('Loading sample data from VS Code command');
+              const sampleFile = loadSampleData();
+              
+              setIsImporting(true);
+              setLoading(true);
+              setError(null);
+              
+              const result = await CSVReader.parseCSVFile(sampleFile);
+              console.log('📊 Sample data parse result:', result);
+              
+              if (result.success) {
+                console.log('✅ Sample data parsed successfully:', result.pins.length, 'pins found');
+                const packageData = CSVReader.createPackageFromPins(result.pins, sampleFile.name);
+                loadPackage(packageData);
+                console.log('✅ Sample data loaded successfully from VS Code command');
+                
+                if (result.warnings.length > 0) {
+                  console.warn('⚠️ Sample data import warnings:', result.warnings);
+                }
+              } else {
+                console.error('❌ Sample data parse failed:', result.errors);
+                setError(`Failed to load sample data: ${result.errors.join(', ')}`);
+              }
+            } catch (error) {
+              console.error('Failed to load sample data from VS Code:', error);
+              setError(`Failed to load sample data: ${error}`);
+            } finally {
+              setIsImporting(false);
+              setLoading(false);
+            }
+          })();
+          break;
       }
     };
 
@@ -187,31 +219,6 @@ const App: React.FC<AppProps> = () => {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
-    }
-  };
-
-  const handleLoadSample = async () => {
-    console.log('🧪 サンプルデータの読み込みを開始します...');
-    try {
-      const sampleFile = loadSampleData();
-      console.log('📄 サンプルファイル作成:', sampleFile.name, sampleFile.size, 'bytes');
-      
-      const result = await CSVReader.parseCSVFile(sampleFile);
-      console.log('📊 サンプルデータ解析結果:', result);
-      
-      if (result.success) {
-        console.log('✅ サンプルデータ解析成功:', result.pins.length, 'pins found');
-        const packageData = CSVReader.createPackageFromPins(result.pins, 'Sample FPGA Package');
-        console.log('📦 サンプルパッケージデータ:', packageData);
-        loadPackage(packageData);
-        console.log('💾 サンプルデータをストアに読み込み完了');
-      } else {
-        console.error('❌ サンプルデータ解析失敗:', result.errors);
-        setError(`Error loading sample data: ${result.errors.join(', ')}`);
-      }
-    } catch (error) {
-      console.error('💥 サンプルデータ読み込みエラー:', error);
-      setError(`Error loading sample data: ${(error as Error).message}`);
     }
   };
 
@@ -477,22 +484,7 @@ const App: React.FC<AppProps> = () => {
       if (aIsLastViewerSelected && !bIsLastViewerSelected) return -1;
       if (!aIsLastViewerSelected && bIsLastViewerSelected) return 1;
       
-      // Second priority: If there's a last viewer-selected pin and it's a differential pair,
-      // put its pair pin as second priority
-      if (lastViewerSelectedPin && !aIsLastViewerSelected && !bIsLastViewerSelected) {
-        const lastSelectedPin = filteredPins.find(p => p.id === lastViewerSelectedPin);
-        if (lastSelectedPin && DifferentialPairUtils.isDifferentialPin(lastSelectedPin)) {
-          const pairPin = DifferentialPairUtils.findPairPin(lastSelectedPin, filteredPins);
-          if (pairPin) {
-            console.log(`差動ペア検出: ${lastSelectedPin.pinName} -> ${pairPin.pinName}`);
-            const aIsPairPin = a.id === pairPin.id;
-            const bIsPairPin = b.id === pairPin.id;
-            
-            if (aIsPairPin && !bIsPairPin) return -1;
-            if (!aIsPairPin && bIsPairPin) return 1;
-          }
-        }
-      }
+      // Second priority: Regular sorting for remaining pins
       
       // Third priority: Regular sorting
       let valueA: string;
@@ -587,21 +579,6 @@ const App: React.FC<AppProps> = () => {
             }}
           >
             {isImporting ? '📂 Loading...' : '📂 Open CSV'}
-          </button>
-          
-          <button 
-            onClick={handleLoadSample}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#666',
-              border: 'none',
-              borderRadius: '4px',
-              color: 'white',
-              cursor: 'pointer',
-              fontSize: '14px',
-            }}
-          >
-            🧪 Sample Data
           </button>
           
           {/* Export dropdown menu */}
@@ -703,23 +680,6 @@ const App: React.FC<AppProps> = () => {
               </div>
             )}
           </div>
-          
-          <button 
-            onClick={() => setShowDifferentialPairs(true)}
-            disabled={pins.length === 0}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: pins.length > 0 ? '#9333ea' : '#666',
-              border: 'none',
-              borderRadius: '4px',
-              color: 'white',
-              cursor: pins.length > 0 ? 'pointer' : 'not-allowed',
-              fontSize: '14px',
-            }}
-            title="Differential Pair Management"
-          >
-            ⚡ Diff Pairs
-          </button>
           
           <button 
             onClick={() => setShowSettings(true)}
@@ -897,17 +857,7 @@ const App: React.FC<AppProps> = () => {
                   <span>Showing {filteredPins.length} of {pins.length}</span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  {sortedPinsForList.map((pin, index) => {
-                    // 差動ペアの対応ピンかどうかを判定
-                    let isPairPin = false;
-                    if (lastViewerSelectedPin && index > 0) {
-                      const lastSelectedPin = filteredPins.find(p => p.id === lastViewerSelectedPin);
-                      if (lastSelectedPin && DifferentialPairUtils.isDifferentialPin(lastSelectedPin)) {
-                        const pairPin = DifferentialPairUtils.findPairPin(lastSelectedPin, filteredPins);
-                        isPairPin = pairPin?.id === pin.id;
-                      }
-                    }
-
+                  {sortedPinsForList.map((pin) => {
                     return (
                       <PinItem
                         key={pin.id}
@@ -915,7 +865,7 @@ const App: React.FC<AppProps> = () => {
                         isSelected={selectedPins.has(pin.id)}
                         onSelect={handleListPinSelect}
                         onAssignSignal={assignSignal}
-                        isPairPin={isPairPin}
+                        isPairPin={false}
                       />
                     );
                   })}
@@ -1290,41 +1240,6 @@ const App: React.FC<AppProps> = () => {
         isOpen={showSettings} 
         onClose={() => setShowSettings(false)} 
       />
-
-      {/* Differential Pair Management Panel */}
-      {showDifferentialPairs && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg w-11/12 max-w-4xl h-5/6 overflow-hidden">
-            <div className="flex justify-between items-center p-4 border-b">
-              <h2 className="text-xl font-semibold text-gray-800">Differential Pair Management</h2>
-              <button
-                onClick={() => setShowDifferentialPairs(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="p-4 overflow-y-auto h-full">
-              <DifferentialPairManager
-                pins={pins}
-                onPairCreated={(pair) => {
-                  console.log('Differential pair created:', pair);
-                  // 必要に応じて状態更新やコールバック処理を追加
-                }}
-                onPairDeleted={(pairId) => {
-                  console.log('Differential pair deleted:', pairId);
-                  // 必要に応じて状態更新やコールバック処理を追加
-                }}
-                onPairUpdated={(pair) => {
-                  console.log('Differential pair updated:', pair);
-                  // 必要に応じて状態更新やコールバック処理を追加
-                }}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Keyboard Shortcuts Help Dialog */}
       <KeyboardShortcutsHelp 
         isOpen={showKeyboardHelp} 
