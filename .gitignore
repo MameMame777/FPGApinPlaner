@@ -35,9 +35,12 @@ coverage/
 # Temporary files
 *.tmp
 *.temp
+bundle-report.txt
 
 # OS generated files
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+
+# Documentation
 qiita-article.md
