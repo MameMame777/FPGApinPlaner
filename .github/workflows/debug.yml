@@ -1,0 +1,207 @@
+name: Debug CI/CD
+
+on:
+  workflow_dispatch:
+    inputs:
+      debug_level:
+        description: 'Debug level'
+        required: true
+        default: 'info'
+        type: choice
+        options:
+        - 'info'
+        - 'debug'
+        - 'verbose'
+      test_component:
+        description: 'Test specific component'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+        - 'all'
+        - 'build'
+        - 'pages'
+        - 'tests'
+        - 'security'
+
+env:
+  DEBUG: ${{ github.event.inputs.debug_level }}
+
+jobs:
+  debug-info:
+    name: Debug Information
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: 🔍 Environment Debug
+      run: |
+        echo "## 🔍 デバッグ情報" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📋 基本情報" >> $GITHUB_STEP_SUMMARY
+        echo "- **Repository**: ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Branch**: ${{ github.ref }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Event**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Actor**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Debug Level**: ${{ github.event.inputs.debug_level }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Test Component**: ${{ github.event.inputs.test_component }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+    - name: 📁 Repository Structure
+      run: |
+        echo "### 📁 リポジトリ構造" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        find . -type f -name "*.json" -o -name "*.yml" -o -name "*.yaml" -o -name "*.md" | head -20 >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+    - name: 📦 Package.json Check
+      run: |
+        echo "### 📦 package.json の内容" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`json" >> $GITHUB_STEP_SUMMARY
+        cat package.json | jq '.scripts' >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+    - name: 🔧 Node.js Setup
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+        
+    - name: 📊 Dependencies Check
+      run: |
+        echo "### 📊 依存関係の状態" >> $GITHUB_STEP_SUMMARY
+        npm list --depth=0 >> $GITHUB_STEP_SUMMARY 2>&1 || true
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+  test-build:
+    name: Test Build Process
+    runs-on: ubuntu-latest
+    if: github.event.inputs.test_component == 'all' || github.event.inputs.test_component == 'build'
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 🔧 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+        
+    - name: 📦 Install dependencies
+      run: |
+        echo "Installing dependencies..."
+        npm ci --verbose
+        
+    - name: 🔍 Type check
+      run: |
+        echo "Running type check..."
+        npm run type-check
+        
+    - name: 🏗️ Build
+      run: |
+        echo "Building application..."
+        npm run build
+        
+    - name: 📁 Build Output Check
+      run: |
+        echo "## 🏗️ ビルド結果" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📁 生成されたファイル" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        ls -la dist/ >> $GITHUB_STEP_SUMMARY 2>&1 || echo "dist ディレクトリが見つかりません" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+  test-pages:
+    name: Test Pages Deployment
+    runs-on: ubuntu-latest
+    if: github.event.inputs.test_component == 'all' || github.event.inputs.test_component == 'pages'
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 🔧 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+        
+    - name: 📦 Install and Build
+      run: |
+        npm ci
+        npm run build
+        
+    - name: 📝 Test Pages Setup
+      run: |
+        echo "Testing Pages configuration..."
+        
+        # Test if Pages can be configured
+        echo "## 📄 Pages テスト結果" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        # Check if dist directory exists
+        if [ -d "dist" ]; then
+          echo "✅ dist ディレクトリが存在します" >> $GITHUB_STEP_SUMMARY
+          echo "📁 ファイル一覧:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          ls -la dist/ >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ dist ディレクトリが見つかりません" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        # Check for article file
+        if [ -f "qiita-article.md" ]; then
+          echo "✅ qiita-article.md が存在します" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ qiita-article.md が見つかりません" >> $GITHUB_STEP_SUMMARY
+        fi
+
+  test-permissions:
+    name: Test Repository Permissions
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 🔍 Check Permissions
+      run: |
+        echo "## 🔐 権限チェック結果" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📋 GitHub Token 権限" >> $GITHUB_STEP_SUMMARY
+        echo "- **contents**: ${{ github.token && 'read' || 'none' }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **pages**: checking..." >> $GITHUB_STEP_SUMMARY
+        echo "- **id-token**: checking..." >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🔗 参考リンク" >> $GITHUB_STEP_SUMMARY
+        echo "- [Repository Settings](https://github.com/${{ github.repository }}/settings)" >> $GITHUB_STEP_SUMMARY
+        echo "- [Pages Settings](https://github.com/${{ github.repository }}/settings/pages)" >> $GITHUB_STEP_SUMMARY
+        echo "- [Actions Settings](https://github.com/${{ github.repository }}/settings/actions)" >> $GITHUB_STEP_SUMMARY
+
+  debug-summary:
+    name: Debug Summary
+    runs-on: ubuntu-latest
+    needs: [debug-info, test-build, test-pages, test-permissions]
+    if: always()
+    
+    steps:
+    - name: 📋 Create Debug Report
+      run: |
+        echo "## 🎯 デバッグサマリー" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### ✅ 完了したテスト" >> $GITHUB_STEP_SUMMARY
+        echo "- Debug Info: ${{ needs.debug-info.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Build Test: ${{ needs.test-build.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Pages Test: ${{ needs.test-pages.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Permissions: ${{ needs.test-permissions.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🔧 次のステップ" >> $GITHUB_STEP_SUMMARY
+        echo "1. 失敗したジョブのログを確認" >> $GITHUB_STEP_SUMMARY
+        echo "2. Repository の Pages 設定を確認" >> $GITHUB_STEP_SUMMARY
+        echo "3. 必要に応じて Secrets を設定" >> $GITHUB_STEP_SUMMARY
