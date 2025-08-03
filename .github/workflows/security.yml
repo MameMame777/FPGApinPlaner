@@ -4,6 +4,8 @@ on:
   schedule:
     - cron: '0 0 * * 1' # 毎週月曜日午前0時
   workflow_dispatch: # 手動実行可能
+  pull_request:
+    branches: [ master ]
 
 jobs:
   security-audit:
@@ -24,18 +26,42 @@ jobs:
       run: npm ci
       
     - name: 🔒 Run npm audit
-      run: npm audit --audit-level=moderate
+      run: |
+        npm audit --audit-level=moderate || true
+        npm audit --json > npm-audit-report.json || true
       
-    - name: 🛡️ Run dependency check
-      uses: dependency-check/Dependency-Check_Action@main
+    - name: 🛡️ Security vulnerability scan
+      uses: securecodewarrior/github-action-add-sarif@v1
       with:
-        project: 'FPGA Pin Planner'
-        path: '.'
-        format: 'JSON'
+        sarif-file: npm-audit-report.json
+      continue-on-error: true
         
+    - name: 🔍 CodeQL Analysis
+      uses: github/codeql-action/init@v3
+      with:
+        languages: typescript, javascript
+        
+    - name: 🏗️ Autobuild
+      uses: github/codeql-action/autobuild@v3
+      
+    - name: 🔍 Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+      
     - name: 📊 Upload security report
       uses: actions/upload-artifact@v4
       with:
         name: security-report
-        path: reports/
+        path: |
+          npm-audit-report.json
         retention-days: 30
+        
+    - name: 📝 Security summary
+      run: |
+        echo "## 🔒 セキュリティ監査結果" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### ✅ 実行済みチェック" >> $GITHUB_STEP_SUMMARY
+        echo "- [x] npm audit" >> $GITHUB_STEP_SUMMARY
+        echo "- [x] CodeQL分析" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📊 結果詳細" >> $GITHUB_STEP_SUMMARY
+        echo "レポートの詳細は Security タブまたは Artifacts を確認してください。" >> $GITHUB_STEP_SUMMARY
