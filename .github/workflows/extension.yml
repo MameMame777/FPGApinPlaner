@@ -1,0 +1,104 @@
+name: VS Code Extension
+
+on:
+  push:
+    branches: [ master ]
+    paths: 
+      - 'vscode-extension/**'
+  pull_request:
+    branches: [ master ]
+    paths:
+      - 'vscode-extension/**'
+  workflow_dispatch:
+
+jobs:
+  build-extension:
+    name: Build VS Code Extension
+    runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        working-directory: vscode-extension
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 🔧 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+        cache-dependency-path: vscode-extension/package-lock.json
+        
+    - name: 📦 Install dependencies
+      run: npm ci
+      
+    - name: 🔍 Type check
+      run: npm run compile
+      
+    - name: 🧪 Run tests
+      run: npm run test
+      continue-on-error: true
+      
+    - name: 📦 Package extension
+      run: |
+        npm install -g @vscode/vsce
+        vsce package
+        
+    - name: 📤 Upload VSIX
+      uses: actions/upload-artifact@v4
+      with:
+        name: vscode-extension
+        path: vscode-extension/*.vsix
+        retention-days: 7
+        
+    - name: 📝 Extension info
+      run: |
+        echo "## 🧩 VS Code拡張機能ビルド完了" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📦 生成されたファイル" >> $GITHUB_STEP_SUMMARY
+        ls -la *.vsix >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📥 インストール方法" >> $GITHUB_STEP_SUMMARY
+        echo "1. Artifactsから \`.vsix\` ファイルをダウンロード" >> $GITHUB_STEP_SUMMARY
+        echo "2. VS Codeで \`Extensions: Install from VSIX...\` を実行" >> $GITHUB_STEP_SUMMARY
+        echo "3. ダウンロードしたファイルを選択" >> $GITHUB_STEP_SUMMARY
+
+  publish-extension:
+    name: Publish to Marketplace
+    runs-on: ubuntu-latest
+    needs: build-extension
+    if: github.ref == 'refs/heads/master' && contains(github.event.head_commit.message, 'release:')
+    
+    defaults:
+      run:
+        working-directory: vscode-extension
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 🔧 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+        cache-dependency-path: vscode-extension/package-lock.json
+        
+    - name: 📦 Install dependencies
+      run: npm ci
+      
+    - name: 🚀 Publish to Marketplace
+      run: |
+        npm install -g @vscode/vsce
+        vsce publish
+      env:
+        VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        
+    - name: 📝 Publish summary
+      run: |
+        echo "## 🎉 VS Code拡張機能を公開しました！" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- **Marketplace**: [FPGA Pin Planner](https://marketplace.visualstudio.com/items?itemName=MameMame777.fpga-pin-planner)" >> $GITHUB_STEP_SUMMARY
+        echo "- **公開時刻**: $(date)" >> $GITHUB_STEP_SUMMARY

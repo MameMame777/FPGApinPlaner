@@ -2,9 +2,14 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ master, develop ]
+    branches: [ master, develop, work ]
   pull_request:
     branches: [ master ]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '20.x'
+  CACHE_KEY: node-modules
 
 jobs:
   # 🧪 テストジョブ
@@ -105,6 +110,8 @@ jobs:
       
     - name: 🔧 Setup Pages
       uses: actions/configure-pages@v4
+      with:
+        enablement: true
       
     - name: 📤 Upload to Pages
       uses: actions/upload-pages-artifact@v3
@@ -154,12 +161,13 @@ jobs:
       run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
       
     - name: 🏷️ Create Release
-      uses: actions/create-release@v1
+      id: create_release
+      uses: softprops/action-gh-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: v${{ steps.version.outputs.version }}
-        release_name: FPGA Pin Planner v${{ steps.version.outputs.version }}
+        name: FPGA Pin Planner v${{ steps.version.outputs.version }}
         body: |
           ## 🎉 FPGA Pin Planner v${{ steps.version.outputs.version }}
           
@@ -171,22 +179,15 @@ jobs:
           - ✅ リアルタイム検証
           
           ### 📥 ダウンロード
-          - **Webアプリ**: [GitHub Pages でアクセス](https://your-username.github.io/FPGApinPlaner/)
+          - **Webアプリ**: [GitHub Pages でアクセス](https://MameMame777.github.io/FPGApinPlaner/)
           - **ソースコード**: 下記のアセットからダウンロード
           
           ### 🛠️ 技術スタック
           - React 18 + TypeScript 5.0
           - Vite 4.5 + Vitest
           - Zustand + Immer
+        files: |
+          fpga-pin-planner-release.tar.gz
+          fpga-pin-planner-release.zip
         draft: false
         prerelease: false
-        
-    - name: 📤 Upload Release Assets
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./fpga-pin-planner-release.tar.gz
-        asset_name: fpga-pin-planner-v${{ steps.version.outputs.version }}.tar.gz
-        asset_content_type: application/gzip
