@@ -27,14 +27,19 @@ jobs:
       
     - name: 🔒 Run npm audit
       run: |
-        npm audit --audit-level=moderate || true
-        npm audit --json > npm-audit-report.json || true
+        npm audit --audit-level=moderate --json > npm-audit-report.json || true
+        npm audit --audit-level=moderate || echo "Security vulnerabilities found, check the report"
       
-    - name: 🛡️ Security vulnerability scan
-      uses: securecodewarrior/github-action-add-sarif@v1
-      with:
-        sarif-file: npm-audit-report.json
-      continue-on-error: true
+    - name: � Process audit results
+      run: |
+        echo "## 🔒 セキュリティ監査結果" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        if [ -f npm-audit-report.json ]; then
+          echo "### 📋 監査レポート生成完了" >> $GITHUB_STEP_SUMMARY
+          echo "- レポートファイル: npm-audit-report.json" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "### ❌ 監査レポート生成失敗" >> $GITHUB_STEP_SUMMARY
+        fi
         
     - name: 🔍 CodeQL Analysis
       uses: github/codeql-action/init@v3

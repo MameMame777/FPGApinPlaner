@@ -71,7 +71,8 @@ describe('BatchOperationPanel', () => {
     render(<BatchOperationPanel isVisible={true} />)
     
     expect(screen.getByLabelText(/Array Pattern/)).toBeInTheDocument()
-    expect(screen.getByLabelText(/Differential Pairs/)).toBeInTheDocument()
+    expect(screen.getByLabelText(/Voltage & I\/O Standards/)).toBeInTheDocument()
+    expect(screen.getByLabelText(/Pin Directions/)).toBeInTheDocument()
     expect(screen.getByLabelText(/Clear Signals/)).toBeInTheDocument()
   })
 
@@ -98,11 +99,12 @@ describe('BatchOperationPanel', () => {
   it('should change operation type when radio button is clicked', () => {
     render(<BatchOperationPanel isVisible={true} />)
     
-    const differentialOption = screen.getByLabelText(/Differential Pairs/)
-    fireEvent.click(differentialOption)
+    const voltageOption = screen.getByLabelText(/Voltage & I\/O Standards/)
+    fireEvent.click(voltageOption)
     
-    expect(differentialOption).toBeChecked()
-    expect(screen.getByText('Differential Pair Configuration')).toBeInTheDocument()
+    expect(voltageOption).toBeChecked()
+    // Check if the voltage configuration section appears
+    expect(screen.getByText(/Voltage & I\/O Standard Configuration/)).toBeInTheDocument()
   })
 
   it('should show array configuration when array operation is selected', () => {
