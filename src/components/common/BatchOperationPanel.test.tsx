@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { BatchOperationPanel } from '@/components/common/BatchOperationPanel'
 
@@ -31,7 +31,14 @@ vi.mock('@/services/batch-operation-service', () => ({
       assignments: [],
       errors: []
     })),
-    assignDifferentialPattern: vi.fn(() => ({
+    setVoltageAndIO: vi.fn(() => ({
+      success: true,
+      processedPins: 0,
+      skippedPins: 0,
+      assignments: [],
+      errors: []
+    })),
+    setPinDirections: vi.fn(() => ({
       success: true,
       processedPins: 0,
       skippedPins: 0,
@@ -99,12 +106,11 @@ describe('BatchOperationPanel', () => {
   it('should change operation type when radio button is clicked', () => {
     render(<BatchOperationPanel isVisible={true} />)
     
-    const voltageOption = screen.getByLabelText(/Voltage & I\/O Standards/)
-    fireEvent.click(voltageOption)
+    const voltageIOOption = screen.getByLabelText(/Voltage & I\/O Standards/)
+    fireEvent.click(voltageIOOption)
     
-    expect(voltageOption).toBeChecked()
-    // Check if the voltage configuration section appears
-    expect(screen.getByText(/Voltage & I\/O Standard Configuration/)).toBeInTheDocument()
+    expect(voltageIOOption).toBeChecked()
+    expect(screen.getByText('Voltage & I/O Standard Configuration')).toBeInTheDocument()
   })
 
   it('should show array configuration when array operation is selected', () => {
@@ -124,5 +130,15 @@ describe('BatchOperationPanel', () => {
     
     expect(screen.getByText('Pin Types')).toBeInTheDocument()
     expect(screen.getByText('Assignment Status')).toBeInTheDocument()
+  })
+
+  it('should show pin direction configuration when direction operation is selected', () => {
+    render(<BatchOperationPanel isVisible={true} />)
+    
+    const directionOption = screen.getByLabelText(/Pin Directions/)
+    fireEvent.click(directionOption)
+    
+    expect(directionOption).toBeChecked()
+    expect(screen.getByText('Pin Direction Configuration')).toBeInTheDocument()
   })
 })
