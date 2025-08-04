@@ -474,17 +474,8 @@ const App: React.FC<AppProps> = () => {
   const stats = getPinStats();
 
   // Create sorted pins for the sidebar list (without affecting the canvas)
-  const { sortedPinsForList, differentialPartner } = React.useMemo(() => {
+  const { sortedPinsForList } = React.useMemo(() => {
     const sorted = [...filteredPins];
-    
-    // Find the differential pair partner of the last viewer-selected pin
-    let differentialPartner: Pin | null = null;
-    if (lastViewerSelectedPin) {
-      const selectedPin = pins.find(p => p.id === lastViewerSelectedPin);
-      if (selectedPin) {
-        differentialPartner = DifferentialPairUtils.findPairPin(selectedPin, pins);
-      }
-    }
     
     sorted.sort((a, b) => {
       // First priority: Last viewer-selected pin comes first (only if selected from viewer)
@@ -547,7 +538,7 @@ const App: React.FC<AppProps> = () => {
       return filters.sortOrder === 'asc' ? result : -result;
     });
     
-    return { sortedPinsForList: sorted, differentialPartner };
+    return { sortedPinsForList: sorted };
   }, [filteredPins, filters.sortField, filters.sortOrder, lastViewerSelectedPin, pins]);
 
   return (

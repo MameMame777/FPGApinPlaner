@@ -1,9 +1,10 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { Stage, Layer, Rect, Text, Group, Line, Circle } from 'react-konva';
 import { KonvaEventObject } from 'konva/lib/Node';
 import { Pin, Package } from '@/types';
 import { DifferentialPairUtils } from '@/utils/differential-pair-utils';
 import { LODSystem } from '@/utils/LODSystem';
+import { PerformanceService } from '@/services/performance-service';
 import { useAppStore } from '@/stores/app-store';
 
 interface PackageCanvasProps {
@@ -53,6 +54,189 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
   
   // LOD System integration
   const currentLOD = LODSystem.getLODLevel(viewport.scale);
+  
+  // Performance-optimized pin indexing and culling
+  const pinIndexes = useMemo(() => {
+    PerformanceService.startRenderMeasurement('pin-indexing');
+    const indexes = PerformanceService.createPinIndexes(pins);
+    const duration = PerformanceService.endRenderMeasurement('pin-indexing');
+    console.log(`📊 Pin indexing took ${duration.toFixed(2)}ms`);
+    return indexes;
+  }, [pins]);
+  
+  // Smart viewport culling based on user use cases
+  const visiblePins = useMemo(() => {
+    PerformanceService.startRenderMeasurement('viewport-culling');
+    
+    // Calculate current viewport bounds
+    const canvasWidth = stageSize.width - 40;
+    const canvasHeight = stageSize.height - 30;
+    const viewportBounds = {
+      x: -viewport.x / viewport.scale - canvasWidth / (2 * viewport.scale),
+      y: -viewport.y / viewport.scale - canvasHeight / (2 * viewport.scale),
+      width: canvasWidth / viewport.scale,
+      height: canvasHeight / viewport.scale,
+      scale: viewport.scale
+    };
+    
+    // Use case 1: Detail view (high zoom) - show all pins in focused area + selected pins
+    if (viewport.scale > 0.6) {
+      const margin = 200 / viewport.scale; // Adaptive margin based on zoom
+      const extendedBounds = {
+        ...viewportBounds,
+        x: viewportBounds.x - margin,
+        y: viewportBounds.y - margin,
+        width: viewportBounds.width + margin * 2,
+        height: viewportBounds.height + margin * 2
+      };
+      
+      // Always include selected pins regardless of viewport
+      const selectedPinObjects = Array.from(selectedPins)
+        .map(id => pinIndexes.findById(id))
+        .filter(Boolean) as Pin[];
+      
+      const culledPins = PerformanceService.optimizeCanvasRendering().cullPins(pins, extendedBounds);
+      
+      // Combine culled pins with selected pins (remove duplicates)
+      const allVisiblePins = new Map<string, Pin>();
+      culledPins.forEach(pin => allVisiblePins.set(pin.id, pin));
+      selectedPinObjects.forEach(pin => allVisiblePins.set(pin.id, pin));
+      
+      const result = Array.from(allVisiblePins.values());
+      const duration = PerformanceService.endRenderMeasurement('viewport-culling');
+      console.log(`🎯 Detail view: ${result.length}/${pins.length} pins visible (${duration.toFixed(2)}ms)`);
+      return result;
+    }
+    
+    // Use case 2: Overview mode (low zoom) - show all pins for complete overview
+    else {
+      // Ultra-low zoom: show ALL pins for complete overview
+      if (viewport.scale <= 0.2) {
+        const duration = PerformanceService.endRenderMeasurement('viewport-culling');
+        console.log(`🌍 Ultra-wide overview: ${pins.length}/${pins.length} pins visible (${duration.toFixed(2)}ms)`);
+        return pins; // Show all pins for complete overview
+      }
+      
+      // Low to medium zoom: show most pins with some optimization
+      else if (viewport.scale <= 0.4) {
+        // Show 85% of pins - still good overview but with slight optimization
+        const sampleRate = 0.85;
+        const bankGroups = new Map<string, Pin[]>();
+        pins.forEach(pin => {
+          const bank = pin.bank || 'NA';
+          if (!bankGroups.has(bank)) {
+            bankGroups.set(bank, []);
+          }
+          bankGroups.get(bank)!.push(pin);
+        });
+        
+        const overviewPins: Pin[] = [];
+        
+        // Always include all selected pins
+        const selectedPinObjects = Array.from(selectedPins)
+          .map(id => pinIndexes.findById(id))
+          .filter(Boolean) as Pin[];
+        overviewPins.push(...selectedPinObjects);
+        
+        // Sample from each bank proportionally
+        bankGroups.forEach((bankPins) => {
+          const targetCount = Math.max(1, Math.floor(bankPins.length * sampleRate));
+          const step = Math.max(1, Math.floor(bankPins.length / targetCount));
+          
+          for (let i = 0; i < bankPins.length; i += step) {
+            const pin = bankPins[i];
+            if (!selectedPins.has(pin.id)) { // Avoid duplicates
+              overviewPins.push(pin);
+            }
+          }
+        });
+        
+        const duration = PerformanceService.endRenderMeasurement('viewport-culling');
+        console.log(`🌎 Wide overview: ${overviewPins.length}/${pins.length} pins visible (${duration.toFixed(2)}ms)`);
+        return overviewPins;
+      }
+      
+      // Medium zoom: hybrid approach - viewport-aware sampling for focus areas
+      else if (viewport.scale <= 0.6) {
+        // Calculate visible area with generous margins for context
+        const margin = 300 / viewport.scale;
+        const focusArea = {
+          x: viewportBounds.x - margin,
+          y: viewportBounds.y - margin,
+          width: viewportBounds.width + margin * 2,
+          height: viewportBounds.height + margin * 2
+        };
+        
+        // Always include all selected pins
+        const selectedPinObjects = Array.from(selectedPins)
+          .map(id => pinIndexes.findById(id))
+          .filter(Boolean) as Pin[];
+        
+        // Include all pins in the focus area
+        const focusPins = pins.filter(pin => 
+          pin.position.x >= focusArea.x && pin.position.x <= focusArea.x + focusArea.width &&
+          pin.position.y >= focusArea.y && pin.position.y <= focusArea.y + focusArea.height
+        );
+        
+        // Sample from remaining pins for context
+        const remainingPins = pins.filter(pin => 
+          !focusPins.some(fp => fp.id === pin.id) && 
+          !selectedPins.has(pin.id)
+        );
+        const sampleStep = Math.max(1, Math.floor(remainingPins.length / 200)); // Show ~200 context pins
+        const contextPins = remainingPins.filter((_, index) => index % sampleStep === 0);
+        
+        // Combine all pin sets
+        const mediumZoomPins = new Map<string, Pin>();
+        selectedPinObjects.forEach(pin => mediumZoomPins.set(pin.id, pin));
+        focusPins.forEach(pin => mediumZoomPins.set(pin.id, pin));
+        contextPins.forEach(pin => mediumZoomPins.set(pin.id, pin));
+        
+        const result = Array.from(mediumZoomPins.values());
+        const duration = PerformanceService.endRenderMeasurement('viewport-culling');
+        console.log(`🎯 Medium zoom focus: ${result.length}/${pins.length} pins visible (focus: ${focusPins.length}, context: ${contextPins.length}, selected: ${selectedPinObjects.length}) (${duration.toFixed(2)}ms)`);
+        return result;
+      }
+      
+      // High-medium zoom: balanced view with more optimization
+      else {
+        // Show representative sample from each bank (original logic)
+        const bankGroups = new Map<string, Pin[]>();
+        pins.forEach(pin => {
+          const bank = pin.bank || 'NA';
+          if (!bankGroups.has(bank)) {
+            bankGroups.set(bank, []);
+          }
+          bankGroups.get(bank)!.push(pin);
+        });
+        
+        // Sample pins from each bank to maintain overview clarity
+        const maxPinsPerBank = Math.max(10, Math.floor(800 / bankGroups.size)); // Increased from 500
+        const overviewPins: Pin[] = [];
+        
+        bankGroups.forEach((bankPins) => {
+          // Always include selected pins from this bank
+          const selectedFromBank = bankPins.filter(pin => selectedPins.has(pin.id));
+          overviewPins.push(...selectedFromBank);
+          
+          // Sample remaining pins from this bank
+          const remainingSlots = maxPinsPerBank - selectedFromBank.length;
+          if (remainingSlots > 0) {
+            const nonSelectedPins = bankPins.filter(pin => !selectedPins.has(pin.id));
+            const step = Math.max(1, Math.floor(nonSelectedPins.length / remainingSlots));
+            
+            for (let i = 0; i < nonSelectedPins.length && overviewPins.length - selectedFromBank.length < remainingSlots; i += step) {
+              overviewPins.push(nonSelectedPins[i]);
+            }
+          }
+        });
+        
+        const duration = PerformanceService.endRenderMeasurement('viewport-culling');
+        console.log(`📊 Balanced overview: ${overviewPins.length}/${pins.length} pins visible (${duration.toFixed(2)}ms)`);
+        return overviewPins;
+      }
+    }
+  }, [pins, viewport, selectedPins, stageSize, pinIndexes]);
   
   // Constants for mouse interaction
   const DRAG_THRESHOLD_TIME = 200; // ms - time before starting drag (slightly longer for better UX)
@@ -193,19 +377,6 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
     }
 
     return null;
-  };
-
-  // Group pins by bank for boundary highlighting
-  const getPinsByBank = () => {
-    const bankGroups = new Map<string, Pin[]>();
-    pins.forEach(pin => {
-      const bankKey = pin.bank || 'NA';
-      if (!bankGroups.has(bankKey)) {
-        bankGroups.set(bankKey, []);
-      }
-      bankGroups.get(bankKey)!.push(pin);
-    });
-    return bankGroups;
   };
 
   // Calculate package dimensions based on actual grid layout
@@ -1023,25 +1194,25 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
             );
           })()}
 
-          {/* Pin rendering with LOD optimization */}
+          {/* Pin rendering with smart viewport culling and LOD optimization */}
           {(() => {
+            PerformanceService.startRenderMeasurement('pin-rendering');
+            
             // Use viewport-based sizing for stable scaling
             const baseTileSize = 88; // Base tile size
             const tileSize = Math.max(20, baseTileSize * viewport.scale);
             
             // LOD system for performance
-            const lodLevel = LODSystem.getLODLevel(viewport.scale);
-            const maxVisiblePins = LODSystem.getMaxElements(currentLOD);
             const shouldRenderDetails = LODSystem.shouldRenderPinDetails(viewport.scale);
             const shouldRenderPinNames = LODSystem.shouldRenderText(viewport.scale, 'pin');
             const shouldRenderSignalNames = LODSystem.shouldRenderText(viewport.scale, 'signal');
             const fontMultiplier = LODSystem.getAdaptiveTextSize(viewport.scale, 12) / 12;
             
-            // Limit pins based on LOD for very low zoom levels
-            const pinsToRender = maxVisiblePins < pins.length ? 
-              pins.slice(0, maxVisiblePins) : pins;
+            // Use smart viewport culling instead of simple pin limit
+            const pinsToRender = visiblePins;
             
-            console.log(`🎯 LOD Level: ${lodLevel}, Rendering: ${pinsToRender.length}/${pins.length} pins`);
+            const renderDuration = PerformanceService.endRenderMeasurement('pin-rendering');
+            console.log(`🎯 Smart culling: Rendering ${pinsToRender.length}/${pins.length} pins (${renderDuration.toFixed(2)}ms)`);
             
             return pinsToRender.map(pin => {
               const pos = transformPosition(pin);
@@ -1052,7 +1223,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
               const smallFontSize = Math.max(5, Math.min(12, viewport.scale * 8 * fontMultiplier));
               
               // 差動ペアのハイライト色を取得
-              const differentialHighlightColor = getDifferentialHighlightColor(pin, pins, selectedPins);
+              const differentialHighlightColor = getDifferentialHighlightColor(pin, visiblePins, selectedPins);
               
               // Use LOD-based detail rendering
               const showDetails = shouldRenderDetails || isSelected;
@@ -1200,19 +1371,26 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
             });
           })()}
           
-          {/* Differential pair connection lines with LOD */}
+          {/* Differential pair connection lines with viewport optimization */}
           {LODSystem.shouldRenderDifferentialPairs(viewport.scale) && (() => {
+            PerformanceService.startRenderMeasurement('diff-pair-lines');
+            
             const connectionLines: JSX.Element[] = [];
             const processedPairs = new Set();
             
-            pins.forEach(pin => {
+            // Only process visible pins for differential pairs
+            visiblePins.forEach(pin => {
               if (processedPairs.has(pin.id)) return;
               
               // Check if this pin is part of a differential pair
               if (DifferentialPairUtils.isDifferentialPin(pin)) {
                 const pairPin = DifferentialPairUtils.findPairPin(pin, pins);
                 
-                if (pairPin && !processedPairs.has(pairPin.id)) {
+                // Only draw line if both pins are visible or if either is selected
+                const isPairVisible = pairPin && visiblePins.includes(pairPin);
+                const isEitherSelected = selectedPins.has(pin.id) || (pairPin && selectedPins.has(pairPin.id));
+                
+                if (pairPin && !processedPairs.has(pairPin.id) && (isPairVisible || isEitherSelected)) {
                   // Mark both pins as processed to avoid duplicate lines
                   processedPairs.add(pin.id);
                   processedPairs.add(pairPin.id);
@@ -1221,8 +1399,8 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                   const pos2 = transformPosition(pairPin);
                   
                   // Get colors for the differential pair
-                  const color1 = getDifferentialHighlightColor(pin, pins, selectedPins);
-                  const color2 = getDifferentialHighlightColor(pairPin, pins, selectedPins);
+                  const color1 = getDifferentialHighlightColor(pin, visiblePins, selectedPins);
+                  const color2 = getDifferentialHighlightColor(pairPin, visiblePins, selectedPins);
                   
                   // Use the first color found, or default to a neutral color
                   const lineColor = color1 || color2 || '#FF6600';
@@ -1247,12 +1425,26 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
               }
             });
             
+            const diffRenderDuration = PerformanceService.endRenderMeasurement('diff-pair-lines');
+            console.log(`🔗 Differential pairs: ${connectionLines.length} lines (${diffRenderDuration.toFixed(2)}ms)`);
+            
             return connectionLines;
           })()}
           
-          {/* Bank group boundaries with LOD - drawn below selection highlights */}
+          {/* Bank group boundaries with viewport optimization */}
           {LODSystem.shouldRenderAtLOD(currentLOD, 2) && (() => {
-            const bankGroups = getPinsByBank();
+            PerformanceService.startRenderMeasurement('bank-boundaries');
+            
+            // Only calculate boundaries for banks that have visible pins
+            const visibleBankGroups = new Map<string, Pin[]>();
+            visiblePins.forEach(pin => {
+              const bank = pin.bank || 'NA';
+              if (!visibleBankGroups.has(bank)) {
+                visibleBankGroups.set(bank, []);
+              }
+              visibleBankGroups.get(bank)!.push(pin);
+            });
+            
             const baseTileSize = 88;
             const tileSize = Math.max(20, baseTileSize * viewport.scale);
             const padding = 6; // Reduced padding to minimize overlap
@@ -1270,7 +1462,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
             
             // Calculate boundaries first to detect overlaps
             const bankBoundaries = new Map();
-            Array.from(bankGroups.entries()).forEach(([bankKey, bankPins]) => {
+            Array.from(visibleBankGroups.entries()).forEach(([bankKey, bankPins]) => {
               if (bankKey === 'NA' || bankPins.length < 2) return;
               
               const positions = bankPins.map(pin => transformPosition(pin));
@@ -1286,7 +1478,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
               bankBoundaries.set(bankKey, boundary);
             });
             
-            return Array.from(bankBoundaries.entries()).map(([bankKey, boundary]) => {
+            const renderedBoundaries = Array.from(bankBoundaries.entries()).map(([bankKey, boundary]) => {
               // Get bank color for the boundary
               const bankColor = getBankColor(boundary.pins[0]);
               const dashPattern = dashPatterns[bankKey as keyof typeof dashPatterns] || [10, 5];
@@ -1323,6 +1515,11 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                 />
               );
             });
+            
+            const bankRenderDuration = PerformanceService.endRenderMeasurement('bank-boundaries');
+            console.log(`🏦 Bank boundaries: ${bankBoundaries.size} boundaries (${bankRenderDuration.toFixed(2)}ms)`);
+            
+            return renderedBoundaries;
           })()}
           
           {/* Selection highlights - drawn on top of everything */}
@@ -1500,3 +1697,4 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
 };
 
 export default PackageCanvas;
+
