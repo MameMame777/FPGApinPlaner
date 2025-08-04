@@ -15,6 +15,7 @@ import { useAppHotkeys } from '@/hooks/useHotkeys';
 import { useValidation } from '@/hooks/useValidation';
 import { ValidationIssue } from '@/services/validation-service';
 import { loadSampleData } from '@/utils/sample-data';
+import { DifferentialPairUtils } from '@/utils/differential-pair-utils';
 
 interface AppProps {}
 
@@ -484,9 +485,21 @@ const App: React.FC<AppProps> = () => {
       if (aIsLastViewerSelected && !bIsLastViewerSelected) return -1;
       if (!aIsLastViewerSelected && bIsLastViewerSelected) return 1;
       
-      // Second priority: Regular sorting for remaining pins
+      // Second priority: Differential pair partner comes second (only if a pin is selected from viewer)
+      if (lastViewerSelectedPin && !aIsLastViewerSelected && !bIsLastViewerSelected) {
+        const selectedPin = filteredPins.find(p => p.id === lastViewerSelectedPin);
+        if (selectedPin) {
+          const selectedPairPin = DifferentialPairUtils.findPairPin(selectedPin, filteredPins);
+          
+          const aIsPairOfSelected = selectedPairPin?.id === a.id;
+          const bIsPairOfSelected = selectedPairPin?.id === b.id;
+          
+          if (aIsPairOfSelected && !bIsPairOfSelected) return -1;
+          if (!aIsPairOfSelected && bIsPairOfSelected) return 1;
+        }
+      }
       
-      // Third priority: Regular sorting
+      // Third priority: Regular sorting for remaining pins
       let valueA: string;
       let valueB: string;
 
@@ -858,6 +871,11 @@ const App: React.FC<AppProps> = () => {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                   {sortedPinsForList.map((pin) => {
+                    // 選択されたピンの差動ペアパートナーかどうかを判定
+                    const selectedPin = lastViewerSelectedPin ? pins.find(p => p.id === lastViewerSelectedPin) : null;
+                    const selectedPairPin = selectedPin ? DifferentialPairUtils.findPairPin(selectedPin, pins) : null;
+                    const isDifferentialPairPartner = selectedPairPin?.id === pin.id;
+                    
                     return (
                       <PinItem
                         key={pin.id}
@@ -866,6 +884,7 @@ const App: React.FC<AppProps> = () => {
                         onSelect={handleListPinSelect}
                         onAssignSignal={assignSignal}
                         isPairPin={false}
+                        isDifferentialPairPartner={isDifferentialPairPartner}
                       />
                     );
                   })}
