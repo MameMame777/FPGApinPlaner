@@ -15,6 +15,8 @@ import { useAppHotkeys } from '@/hooks/useHotkeys';
 import { useValidation } from '@/hooks/useValidation';
 import { ValidationIssue } from '@/services/validation-service';
 import { loadSampleData } from '@/utils/sample-data';
+import { Pin } from '@/types/core';
+import { DifferentialPairUtils } from '@/utils/differential-pair-utils';
 
 interface AppProps {}
 
@@ -473,8 +475,17 @@ const App: React.FC<AppProps> = () => {
   const stats = getPinStats();
 
   // Create sorted pins for the sidebar list (without affecting the canvas)
-  const sortedPinsForList = React.useMemo(() => {
+  const { sortedPinsForList, differentialPartner } = React.useMemo(() => {
     const sorted = [...filteredPins];
+    
+    // Find the differential pair partner of the last viewer-selected pin
+    let differentialPartner: Pin | null = null;
+    if (lastViewerSelectedPin) {
+      const selectedPin = pins.find(p => p.id === lastViewerSelectedPin);
+      if (selectedPin) {
+        differentialPartner = DifferentialPairUtils.findPairPin(selectedPin, pins);
+      }
+    }
     
     sorted.sort((a, b) => {
       // First priority: Last viewer-selected pin comes first (only if selected from viewer)
@@ -484,9 +495,14 @@ const App: React.FC<AppProps> = () => {
       if (aIsLastViewerSelected && !bIsLastViewerSelected) return -1;
       if (!aIsLastViewerSelected && bIsLastViewerSelected) return 1;
       
-      // Second priority: Regular sorting for remaining pins
+      // Second priority: Differential pair partner comes second
+      const aIsDifferentialPartner = differentialPartner && a.id === differentialPartner.id;
+      const bIsDifferentialPartner = differentialPartner && b.id === differentialPartner.id;
       
-      // Third priority: Regular sorting
+      if (aIsDifferentialPartner && !bIsDifferentialPartner) return -1;
+      if (!aIsDifferentialPartner && bIsDifferentialPartner) return 1;
+      
+      // Third priority: Regular sorting for remaining pins
       let valueA: string;
       let valueB: string;
 
@@ -525,8 +541,8 @@ const App: React.FC<AppProps> = () => {
       return filters.sortOrder === 'asc' ? result : -result;
     });
     
-    return sorted;
-  }, [filteredPins, filters.sortField, filters.sortOrder, lastViewerSelectedPin]);
+    return { sortedPinsForList: sorted, differentialPartner };
+  }, [filteredPins, filters.sortField, filters.sortOrder, lastViewerSelectedPin, pins]);
 
   return (
     <div style={{
@@ -858,6 +874,9 @@ const App: React.FC<AppProps> = () => {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                   {sortedPinsForList.map((pin) => {
+                    // Check if this pin is the differential partner of the selected pin
+                    const isPairPin = differentialPartner && pin.id === differentialPartner.id;
+                    
                     return (
                       <PinItem
                         key={pin.id}
@@ -865,7 +884,7 @@ const App: React.FC<AppProps> = () => {
                         isSelected={selectedPins.has(pin.id)}
                         onSelect={handleListPinSelect}
                         onAssignSignal={assignSignal}
-                        isPairPin={false}
+                        isPairPin={isPairPin || false}
                       />
                     );
                   })}
