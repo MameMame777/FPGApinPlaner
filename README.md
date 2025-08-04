@@ -180,6 +180,12 @@ npm test
 - [セキュリティ監査レポート](docs/security-audit.md)
 - [改善ロードマップ](docs/improvement-roadmap-updated.md)
 
+### 🚀 性能最適化
+
+- **[ビューワ性能調査レポート](docs/viewer-performance-investigation.md)** - 詳細な技術分析と解決策
+- **[性能改善クイックスタート](docs/performance-quick-start.md)** - 即座に適用可能な最適化手法
+- **[性能改善サマリー](docs/performance-summary.md)** - 調査結果の要約
+
 ## 🛡️ セキュリティ
 
 本プロジェクトでは以下のセキュリティ対策を実装済みです：
