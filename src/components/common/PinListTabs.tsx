@@ -2,8 +2,9 @@ import React, { useMemo, useState } from 'react';
 import { useAppStore } from '../../stores/app-store';
 import { TAB_CONFIGS } from '../../constants/tab-configs';
 import { EditableTableCell } from '../common/EditableTableCell';
-import { CommentTemplateSelector } from '../common/CommentTemplateSelector';
 import { CommentManager } from '../../services/comment-service';
+import { VirtualizedPinList } from '../common/VirtualizedPinList';
+import { getBankBackgroundColor } from '../../utils/ui-utils';
 import { 
   VOLTAGE_LEVELS, 
   IO_STANDARDS, 
@@ -228,80 +229,12 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect }) => {
     updateListViewState({ selectedRows: newSelection });
   };
 
-  const handleSelectAll = (selected: boolean) => {
-    const newSelection = selected ? new Set(filteredPins.map(p => p.id)) : new Set<string>();
-    updateListViewState({ selectedRows: newSelection });
-  };
-
-  const handleSort = (columnKey: string) => {
-    const column = activeTabConfig.columns.find(c => c.key === columnKey);
-    if (!column?.sortable) return;
-
-    let newDirection: 'asc' | 'desc' = 'asc';
-    if (listView.sortColumn === columnKey && listView.sortDirection === 'asc') {
-      newDirection = 'desc';
-    }
-
-    updateListViewState({
-      sortColumn: columnKey,
-      sortDirection: newDirection
-    });
-  };
-
   const handleBulkCommentApply = () => {
     if (bulkComment.trim() && listView.selectedRows.size > 0) {
       bulkUpdateComments(Array.from(listView.selectedRows), bulkComment);
       setBulkComment('');
       setShowBulkEditor(false);
     }
-  };
-
-  const getSortIcon = (columnKey: string) => {
-    if (listView.sortColumn !== columnKey) return null;
-    return listView.sortDirection === 'asc' ? ' ↑' : ' ↓';
-  };
-
-  // BANK別の背景色を取得する関数
-  const getBankBackgroundColor = (bank: string | undefined, isSelected: boolean, isHovered: boolean): string => {
-    if (isSelected) return '#2d4f75';
-    
-    if (!bank) {
-      return isHovered ? '#2a2a2a' : '#1a1a1a'; // BANKが未定義の場合はデフォルト色
-    }
-
-    // BANK番号に基づいて色を決定
-    const bankNum = parseInt(bank);
-    const bankColors = [
-      '#1a2332', // Bank 0 - 深い青
-      '#1a3221', // Bank 1 - 深い緑
-      '#321a32', // Bank 2 - 深い紫
-      '#322a1a', // Bank 3 - 深い茶
-      '#1a3232', // Bank 4 - 深いティール
-      '#321a1a', // Bank 5 - 深い赤
-      '#2a1a32', // Bank 6 - 深いマゼンタ
-      '#323221', // Bank 7 - 深いオリーブ
-      '#1a1a32', // Bank 8 - 深いネイビー
-      '#32321a', // Bank 9 - 深いイエロー
-      '#1a3232', // Bank 10+ - ティールの繰り返し
-    ];
-
-    const colorIndex = isNaN(bankNum) ? 0 : bankNum % bankColors.length;
-    const baseColor = bankColors[colorIndex];
-    
-    return isHovered ? lightenColor(baseColor, 0.2) : baseColor;
-  };
-
-  // 色を明るくするヘルパー関数
-  const lightenColor = (hex: string, factor: number): string => {
-    const num = parseInt(hex.replace("#", ""), 16);
-    const amt = Math.round(2.55 * factor * 100);
-    const R = (num >> 16) + amt;
-    const G = (num >> 8 & 0x00FF) + amt;
-    const B = (num & 0x0000FF) + amt;
-    return "#" + (0x1000000 + (R < 255 ? R < 1 ? 0 : R : 255) * 0x10000 +
-      (G < 255 ? G < 1 ? 0 : G : 255) * 0x100 +
-      (B < 255 ? B < 1 ? 0 : B : 255))
-      .toString(16).slice(1);
   };
 
   return (
@@ -518,159 +451,32 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect }) => {
         </div>
       )}
 
-      {/* Table */}
-      <div style={{ overflow: 'auto', maxHeight: '500px' }} className="custom-scrollbar">
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead style={{ position: 'sticky', top: 0, backgroundColor: '#2a2a2a', zIndex: 1 }}>
-            <tr>
-              <th style={{ 
-                width: '40px', 
-                padding: '12px 8px', 
-                borderBottom: '2px solid #444',
-                textAlign: 'center',
-                backgroundColor: '#2a2a2a',
-                color: '#ffffff'
-              }}>
-                <input
-                  type="checkbox"
-                  checked={filteredPins.length > 0 && listView.selectedRows.size === filteredPins.length}
-                  onChange={(e) => handleSelectAll(e.target.checked)}
-                />
-              </th>
-              {activeTabConfig.columns.map(column => (
-                <th
-                  key={column.key}
-                  style={{
-                    width: `${column.width}px`,
-                    padding: '12px 8px',
-                    borderBottom: '2px solid #444',
-                    textAlign: 'left',
-                    cursor: column.sortable ? 'pointer' : 'default',
-                    userSelect: 'none',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    color: '#ffffff',
-                    backgroundColor: '#2a2a2a'
-                  }}
-                  onClick={() => column.sortable && handleSort(column.key)}
-                >
-                  {column.title}{getSortIcon(column.key)}
-                </th>
-              ))}
-              <th style={{
-                width: '100px',
-                padding: '12px 8px',
-                borderBottom: '2px solid #444',
-                textAlign: 'center',
-                fontSize: '14px',
-                fontWeight: '600',
-                color: '#ffffff',
-                backgroundColor: '#2a2a2a'
-              }}>
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredPins.map(pin => {
-              const isHovered = hoveredRowId === pin.id;
-              const backgroundColor = getBankBackgroundColor(pin.bank, listView.selectedRows.has(pin.id), isHovered);
-              
-              return (
-              <tr 
-                key={pin.id}
-                style={{
-                  backgroundColor,
-                  cursor: 'pointer',
-                  borderBottom: '1px solid #333',
-                  color: '#ffffff'
-                }}
-                onClick={() => onPinSelect?.(pin.id)}
-                onMouseEnter={() => setHoveredRowId(pin.id)}
-                onMouseLeave={() => setHoveredRowId(null)}
-              >
-                <td style={{ 
-                  padding: '8px', 
-                  borderBottom: '1px solid #333',
-                  textAlign: 'center'
-                }}>
-                  <input
-                    type="checkbox"
-                    checked={listView.selectedRows.has(pin.id)}
-                    onChange={(e) => handleRowSelection(pin.id, e.target.checked)}
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                </td>
-                {activeTabConfig.columns.map(column => (
-                  <td
-                    key={column.key}
-                    style={{
-                      padding: '8px',
-                      borderBottom: '1px solid #333',
-                      fontSize: '14px',
-                      maxWidth: `${column.width}px`,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
-                    }}
-                    onClick={(e) => column.editable && e.stopPropagation()}
-                  >
-                    {renderCellContent(pin, column)}
-                  </td>
-                ))}
-                <td
-                  style={{
-                    padding: '8px',
-                    borderBottom: '1px solid #333',
-                    textAlign: 'center'
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const autoComment = CommentManager.generateAutoComment(pin);
-                        handleCellEdit(pin.id, 'comment', autoComment);
-                      }}
-                      title="Generate automatic comment"
-                      style={{
-                        padding: '4px 6px',
-                        border: '1px solid #28a745',
-                        borderRadius: '3px',
-                        backgroundColor: '#f8fff9',
-                        cursor: 'pointer',
-                        fontSize: '12px',
-                        color: '#28a745'
-                      }}
-                    >
-                      🤖
-                    </button>
-                    <CommentTemplateSelector
-                      onSelect={(templateId, variables) => 
-                        handleTemplateSelect(pin.id, templateId, variables)
-                      }
-                      pin={pin}
-                    />
-                  </div>
-                </td>
-              </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      {/* Virtualized Pin List */}
+      <div style={{ flex: 1, minHeight: '400px' }}>
+        {filteredPins.length > 0 ? (
+          <VirtualizedPinList
+            pins={filteredPins}
+            columns={activeTabConfig.columns}
+            selectedRows={listView.selectedRows}
+            hoveredRowId={hoveredRowId}
+            onRowSelection={handleRowSelection}
+            onPinSelect={onPinSelect}
+            onCellEdit={handleCellEdit}
+            onTemplateSelect={handleTemplateSelect}
+            onHover={setHoveredRowId}
+            renderCellContent={renderCellContent}
+          />
+        ) : (
+          <div style={{ 
+            padding: '40px', 
+            textAlign: 'center', 
+            color: '#666',
+            fontStyle: 'italic'
+          }}>
+            No pins match the current filters
+          </div>
+        )}
       </div>
-
-      {filteredPins.length === 0 && (
-        <div style={{ 
-          padding: '40px', 
-          textAlign: 'center', 
-          color: '#666',
-          fontStyle: 'italic'
-        }}>
-          No pins match the current filters
-        </div>
-      )}
     </div>
   );
 };

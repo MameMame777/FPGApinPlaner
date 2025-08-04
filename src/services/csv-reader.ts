@@ -26,75 +26,83 @@ export class CSVReader {
   }
 
   static async parseCSVContent(content: string): Promise<ImportResult> {
-    const lines = content.split('\n').map(line => line.trim()).filter(line => line);
+    console.log('🚀 Starting ultra-fast CSV parsing...');
     
-    if (lines.length === 0) {
-      return {
-        success: false,
-        pins: [],
-        warnings: [],
-        errors: ['CSV file is empty'],
-        format: this.getDefaultFormat(),
-      };
+    // Try ultra-fast Versal pattern matching first
+    const versalResult = this.tryVersalPatternMatching(content);
+    if (versalResult) {
+      return versalResult;
     }
+    
+    // Fallback to generic parsing
+    console.log('📋 Versal pattern not found, using generic approach...');
+    return this.parseCSVContentGeneric(content);
+  }
 
-    // Skip comment lines, license headers, and device info lines
-    const dataLines = lines.filter(line => 
-      !line.startsWith('#') && 
-      !line.startsWith('//') &&
-      !line.toLowerCase().includes('copyright') &&
-      !line.toLowerCase().includes('license') &&
-      !line.toLowerCase().startsWith('device/package') &&
-      line.trim() !== '' &&
-      !line.match(/^,+$/) // Skip lines with only commas
-    );
+  static async parseCSVContentGeneric(content: string): Promise<ImportResult> {
+    console.log('🔄 Fallback to generic CSV processing...');
+    
+    const lines = content.split('\n').map(line => line.trim()).filter(Boolean);
+    console.log(`📄 Processing ${lines.length} lines with generic approach`);
 
-    if (dataLines.length === 0) {
-      return {
-        success: false,
-        pins: [],
-        warnings: [],
-        errors: ['No data found in CSV file'],
-        format: this.getDefaultFormat(),
-      };
-    }
-
-    console.log('🔍 Data Lines:', dataLines.slice(0, 5));
-
-    // Find the header line for Xilinx format (usually the line that contains "Pin,Pin Name,...")
-    let headerLineIndex = 0;
-    for (let i = 0; i < Math.min(5, dataLines.length); i++) {
-      const line = dataLines[i];
-      const columns = this.parseCSVLine(line);
-      console.log(`🔍 Line ${i}:`, columns);
+    // Simple header detection - look for lines with Pin columns
+    let headerLineIndex = -1;
+    let dataStartIndex = -1;
+    
+    for (let i = 0; i < Math.min(1000, lines.length); i++) {
+      const line = lines[i];
+      if (!line || !line.includes(',')) continue;
       
-      if (line.toLowerCase().includes('pin,pin name') || 
-          line.toLowerCase().includes('pin,signal') ||
-          columns.some(col => col.toLowerCase().trim() === 'pin')) {
-        headerLineIndex = i;
-        console.log(`✅ Found header at line ${i}:`, line);
-        break;
+      // Skip license content
+      const lowerLine = line.toLowerCase();
+      if (lowerLine.includes('copyright') || lowerLine.includes('license') || 
+          lowerLine.includes('xilinx') || line.startsWith('#')) continue;
+      
+      const columns = this.parseCSVLine(line);
+      if (columns.length >= 3) {
+        const hasPinColumn = columns.some(col => {
+          const trimmed = col.toLowerCase().trim();
+          return trimmed === 'pin' || trimmed === 'ball' || trimmed.includes('pin');
+        });
+        
+        if (hasPinColumn) {
+          headerLineIndex = i;
+          dataStartIndex = i + 1;
+          break;
+        }
       }
     }
 
-    const headerLine = dataLines[headerLineIndex];
+    if (headerLineIndex === -1) {
+      return {
+        success: false,
+        pins: [],
+        warnings: [],
+        errors: ['Pin column not found or empty'],
+        format: this.getDefaultFormat(),
+      };
+    }
+
+    const headerLine = lines[headerLineIndex];
+    console.log(`📋 Found header at line ${headerLineIndex + 1}:`, headerLine);
+
     const format = this.detectFormat(headerLine);
     const mapping = this.getColumnMapping(format, headerLine);
-    
+
     console.log('🔍 Format:', format);
     console.log('🔍 Mapping:', mapping);
-    
+
     const pins: Pin[] = [];
     const warnings: string[] = [];
     const errors: string[] = [];
 
-    // Process data lines (skip header and any lines before it)
-    const startIndex = headerLineIndex + 1;
-    
-    for (let i = startIndex; i < dataLines.length; i++) {
-      const line = dataLines[i];
+    // Process data lines after header
+    let processed = 0;
+    let validPins = 0;
+
+    for (let i = dataStartIndex; i < lines.length; i++) {
+      const line = lines[i];
       
-      // Skip empty lines or lines with only commas
       if (!line || line.replace(/,/g, '').trim() === '') {
         continue;
       }
@@ -105,17 +113,139 @@ export class CSVReader {
         const pin = this.parsePin(columns, mapping, i + 1);
         if (pin) {
           pins.push(pin);
+          validPins++;
         }
       } catch (error) {
-        console.warn(`Line ${i + 1}: ${(error as Error).message}`);
-        // Don't add to errors array, just log as warning
+        if (errors.length < 20) {
+          errors.push(`Line ${i + 1}: ${(error as Error).message}`);
+        }
+      }
+      
+      processed++;
+      
+      if (processed % 1000 === 0) {
+        console.log(`🔄 Generic processing: ${processed} lines, ${validPins} pins`);
       }
     }
 
-    console.log(`✅ Parsed ${pins.length} pins successfully`);
+    console.log(`✅ Generic processing complete: ${validPins} pins found from ${processed} lines`);
 
     return {
-      success: pins.length > 0,  // Success if we found any pins
+      success: pins.length > 0,
+      pins,
+      warnings,
+      errors,
+      format,
+    };
+  }
+
+  static tryVersalPatternMatching(content: string): Promise<ImportResult> | null {
+    console.log('⚡ Trying ultra-fast Versal pattern matching...');
+    const lines = content.split('\n').map(line => line.trim());
+    console.log(`📄 Total lines: ${lines.length}`);
+    
+    let headerLineIndex = -1;
+    let dataStartIndex = -1;
+    
+    // Ultra-fast scan for Versal header pattern
+    for (let i = 0; i < Math.min(7000, lines.length); i++) {
+      const line = lines[i];
+      
+      // Progress indicator every 1000 lines
+      if (i % 1000 === 0) {
+        console.log(`⚡ Pattern matching line ${i + 1}...`);
+      }
+      
+      // Look for exact Versal header pattern
+      if (line && line.toLowerCase().startsWith('pin,pin name,')) {
+        headerLineIndex = i;
+        dataStartIndex = i + 1;
+        console.log(`✅ Found Versal header at line ${i + 1}: ${line.substring(0, 100)}`);
+        break;
+      }
+      
+      // Alternative pattern
+      if (line && line.toLowerCase().startsWith('pin,') && 
+          line.toLowerCase().includes('pin name') && 
+          line.split(',').length >= 3) {
+        headerLineIndex = i;
+        dataStartIndex = i + 1;
+        console.log(`✅ Found Versal header variant at line ${i + 1}: ${line.substring(0, 100)}`);
+        break;
+      }
+    }
+    
+    if (headerLineIndex === -1) {
+      console.log('❌ Versal pattern not found');
+      return null;
+    }
+    
+    // Continue with fast processing
+    return this.parseCSVWithKnownHeader(lines, headerLineIndex, dataStartIndex);
+  }
+
+  static async parseCSVWithKnownHeader(lines: string[], headerLineIndex: number, dataStartIndex: number): Promise<ImportResult> {
+    console.log('⚡ Fast processing with known header...');
+    
+    // Extract data lines efficiently
+    const dataLines = lines.slice(dataStartIndex).filter(line => {
+      if (!line || line.trim() === '') return false;
+      const withoutCommas = line.replace(/,/g, '').trim();
+      return withoutCommas !== '';
+    });
+
+    console.log(`📋 Found ${dataLines.length} data lines after header`);
+    
+    // Parse header and continue with existing logic
+    const headerLine = lines[headerLineIndex];
+    console.log(`📋 Using header line ${headerLineIndex}:`, headerLine);
+    const format = this.detectFormat(headerLine);
+    const mapping = this.getColumnMapping(format, headerLine);
+    
+    console.log('🔍 Format:', format);
+    console.log('🔍 Mapping:', mapping);
+    
+    const pins: Pin[] = [];
+    const warnings: string[] = [];
+    const errors: string[] = [];
+
+    // Optimized processing
+    let processed = 0;
+    let validPins = 0;
+    const processingBatchSize = 1000;
+    
+    for (let i = 0; i < dataLines.length; i++) {
+      const line = dataLines[i];
+      
+      if (!line || line.replace(/,/g, '').trim() === '') {
+        continue;
+      }
+      
+      const columns = this.parseCSVLine(line);
+      
+      try {
+        const pin = this.parsePin(columns, mapping, i + dataStartIndex + 1);
+        if (pin) {
+          pins.push(pin);
+          validPins++;
+        }
+      } catch (error) {
+        if (errors.length < 20) {
+          errors.push(`Line ${i + dataStartIndex + 1}: ${(error as Error).message}`);
+        }
+      }
+      
+      processed++;
+      
+      if (processed % processingBatchSize === 0) {
+        console.log(`⚡ Processed ${processed}/${dataLines.length} lines, found ${validPins} pins`);
+      }
+    }
+
+    console.log(`✅ Ultra-fast processing complete: ${validPins} pins found from ${processed} lines`);
+
+    return {
+      success: pins.length > 0,
       pins,
       warnings,
       errors,
@@ -177,60 +307,62 @@ export class CSVReader {
 
   private static getColumnMapping(_format: CSVFormat, headerLine: string): ColumnMapping {
     const headers = this.parseCSVLine(headerLine).map(h => h.trim().toLowerCase());
+    console.log('🔍 Detected headers:', headers);
     
     const findColumn = (searchTerms: string[]): number => {
       for (const term of searchTerms) {
         const index = headers.findIndex(h => h.includes(term.toLowerCase()));
-        if (index !== -1) return index;
+        if (index !== -1) {
+          console.log(`✅ Found column "${term}" at index ${index}: "${headers[index]}"`);
+          return index;
+        }
       }
       return -1;
     };
 
-    return {
-      pin: findColumn(['pin', 'pin_number', 'pin number']),
-      pinName: findColumn(['pin name', 'pin_name', 'name']),
-      signalName: findColumn(['signal', 'signal_name', 'net']),
-      direction: findColumn(['direction', 'dir', 'type']),
-      voltage: findColumn(['voltage', 'volt', 'io_standard']),
-      bank: findColumn(['bank', 'bank_number']),
-      memoryByteGroup: findColumn(['memory byte group', 'byte_group', 'mbg']),
-      ioType: findColumn(['i/o type', 'io_type', 'type']),
+    const mapping = {
+      pin: findColumn(['pin', 'pin_number', 'pin number', 'package pin', 'package_pin', 'ball', 'ball_id']),
+      pinName: findColumn(['pin name', 'pin_name', 'name', 'ball name', 'ball_name']),
+      signalName: findColumn(['signal', 'signal_name', 'net', 'net name', 'signal name']),
+      direction: findColumn(['direction', 'dir', 'type', 'i/o type', 'io_type']),
+      voltage: findColumn(['voltage', 'volt', 'io_standard', 'io standard', 'vccio']),
+      bank: findColumn(['bank', 'bank_number', 'bank number', 'io bank']),
+      memoryByteGroup: findColumn(['memory byte group', 'byte_group', 'mbg', 'memory_byte_group']),
+      ioType: findColumn(['i/o type', 'io_type', 'type', 'function', 'io_standard']),
     };
+    
+    console.log('📋 Column mapping result:', mapping);
+    return mapping;
   }
 
-  private static parsePin(columns: string[], mapping: ColumnMapping, lineNumber: number): Pin | null {
+  private static parsePin(columns: string[], mapping: ColumnMapping, _lineNumber: number): Pin | null {
     if (columns.length === 0) return null;
 
-    // Check if pin column exists and has valid data
+    // Quick validation without excessive logging
     if (mapping.pin === -1 || !columns[mapping.pin]) {
-      console.warn(`Line ${lineNumber}: Pin column not found or empty`);
-      return null;
+      return null; // Skip logging for performance
     }
 
     const pinNumber = columns[mapping.pin]?.trim();
     if (!pinNumber || pinNumber === 'NA' || pinNumber === '') {
-      console.warn(`Line ${lineNumber}: Invalid pin number "${pinNumber}"`);
-      return null;
+      return null; // Skip logging for performance
     }
 
-    // Validate pin number format - should be alphanumeric (like A1, B12, etc.)
-    // Reject obvious metadata or invalid pin numbers
-    if (pinNumber.toLowerCase().includes('device') ||
-        pinNumber.toLowerCase().includes('package') ||
-        pinNumber.toLowerCase().includes('total') ||
-        pinNumber.toLowerCase().includes('number') ||
-        pinNumber.length > 10 ||  // Pin numbers shouldn't be too long
-        /[^A-Za-z0-9]/.test(pinNumber)) {  // Only allow alphanumeric characters
-      console.warn(`Line ${lineNumber}: Invalid pin number format "${pinNumber}"`);
+    // Optimized validation - fewer regex operations
+    if (pinNumber.length > 10 || pinNumber.toLowerCase().includes('device')) {
+      return null; // Quick rejection of obvious non-pins
+    }
+
+    // Simple alphanumeric check (more efficient than complex regex)
+    if (!/^[A-Za-z0-9]+$/.test(pinNumber)) {
       return null;
     }
 
     const pinName = columns[mapping.pinName]?.trim() || pinNumber;
     const gridPosition = this.parseGridPosition(pinNumber);
     
-    // Skip pins with invalid grid positions
+    // Skip pins with invalid grid positions (no logging for performance)
     if (!gridPosition) {
-      console.warn(`Line ${lineNumber}: Could not parse grid position for pin "${pinNumber}"`);
       return null;
     }
     
@@ -266,45 +398,25 @@ export class CSVReader {
   private static parseGridPosition(pinNumber: string): GridPosition | null {
     const match = pinNumber.match(/^([A-Z]+)(\d+)$/);
     if (match) {
-      const gridPos = {
+      return {
         row: match[1],
         col: parseInt(match[2], 10),
       };
-      
-      // Debug specific pins to understand the parsing issue
-      if (pinNumber === 'J3' || pinNumber === 'J4' || pinNumber === 'A1' || pinNumber === 'B1' || pinNumber === 'D2') {
-        console.log(`🔍 parseGridPosition(${pinNumber}):`, gridPos);
-      }
-      
-      return gridPos;
     }
     
-    // Return null for invalid pin numbers instead of fallback
-    console.warn(`⚠️ Could not parse pin number: ${pinNumber}`);
+    // Return null for invalid pin numbers (no logging for performance)
     return null;
   }
 
   private static gridToPosition(grid: GridPosition): Position {
-    // Convert grid position to pixel coordinates that exactly match grid labels
-    // This ensures perfect alignment with the visual grid system
-    
+    // Optimized grid to position conversion
     const rowOffset = grid.row.charCodeAt(0) - 'A'.charCodeAt(0);
+    const gridSpacing = 88; // Tile size from PackageCanvas
     
-    // Tile spacing parameters - ensure tiles fit properly
-    const tileSize = 88; // Tile size from PackageCanvas
-    const gridSpacing = tileSize; // Exact spacing to prevent overlap
-    
-    // Use exact grid positioning without jitter for perfect alignment
-    // Grid coordinates start from (0,0) for A1
-    const x = (grid.col - 1) * gridSpacing;
-    const y = rowOffset * gridSpacing;
-    
-    const position = { x: Math.round(x), y: Math.round(y) };
-    
-    // Debug output for verification
-    console.log(`� Grid ${grid.row}${grid.col} → Position (${position.x}, ${position.y})`);
-    
-    return position;
+    return {
+      x: Math.round((grid.col - 1) * gridSpacing),
+      y: Math.round(rowOffset * gridSpacing)
+    };
   }
 
   private static parseDirection(directionStr: string | undefined): Pin['direction'] {

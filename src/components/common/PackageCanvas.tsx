@@ -3,6 +3,7 @@ import { Stage, Layer, Rect, Text, Group, Line, Circle } from 'react-konva';
 import { KonvaEventObject } from 'konva/lib/Node';
 import { Pin, Package } from '@/types';
 import { DifferentialPairUtils } from '@/utils/differential-pair-utils';
+import { LODSystem } from '@/utils/LODSystem';
 import { useAppStore } from '@/stores/app-store';
 
 interface PackageCanvasProps {
@@ -49,6 +50,9 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
   const [lastPointerPosition, setLastPointerPosition] = useState({ x: 0, y: 0 });
   const [mouseDownTime, setMouseDownTime] = useState(0);
   const [mouseDownPosition, setMouseDownPosition] = useState({ x: 0, y: 0 });
+  
+  // LOD System integration
+  const currentLOD = LODSystem.getLODLevel(viewport.scale);
   
   // Constants for mouse interaction
   const DRAG_THRESHOLD_TIME = 200; // ms - time before starting drag (slightly longer for better UX)
@@ -854,8 +858,8 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
             );
           })()}
 
-          {/* Grid lines for reference - DISABLED */}
-          {false && viewport.scale > 0.5 && (() => {
+          {/* Grid lines for reference - LOD controlled */}
+          {false && LODSystem.shouldRenderAtLOD(currentLOD, 3) && (() => {
             const { gridSpacing, minRow, maxRow, minCol, maxCol } = packageDims as any;
             
             if (!gridSpacing) return null;
@@ -925,8 +929,8 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
               );
             }
             
-            // Minor grid lines - tile centers (lighter, only when zoomed in)
-            if (viewport.scale > 1.0) {
+            // Minor grid lines - only at highest detail level
+            if (LODSystem.shouldRenderAtLOD(currentLOD, 4)) {
               // Vertical center lines
               for (let col = minCol; col <= maxCol; col++) {
                 const gridX = (col - 1) * gridSpacing; // Tile center
@@ -1019,25 +1023,39 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
             );
           })()}
 
-          {/* Pin rendering */}
+          {/* Pin rendering with LOD optimization */}
           {(() => {
             // Use viewport-based sizing for stable scaling
             const baseTileSize = 88; // Base tile size
             const tileSize = Math.max(20, baseTileSize * viewport.scale);
             
-            return pins.map(pin => {
+            // LOD system for performance
+            const lodLevel = LODSystem.getLODLevel(viewport.scale);
+            const maxVisiblePins = LODSystem.getMaxElements(currentLOD);
+            const shouldRenderDetails = LODSystem.shouldRenderPinDetails(viewport.scale);
+            const shouldRenderPinNames = LODSystem.shouldRenderText(viewport.scale, 'pin');
+            const shouldRenderSignalNames = LODSystem.shouldRenderText(viewport.scale, 'signal');
+            const fontMultiplier = LODSystem.getAdaptiveTextSize(viewport.scale, 12) / 12;
+            
+            // Limit pins based on LOD for very low zoom levels
+            const pinsToRender = maxVisiblePins < pins.length ? 
+              pins.slice(0, maxVisiblePins) : pins;
+            
+            console.log(`🎯 LOD Level: ${lodLevel}, Rendering: ${pinsToRender.length}/${pins.length} pins`);
+            
+            return pinsToRender.map(pin => {
               const pos = transformPosition(pin);
               const isSelected = selectedPins.has(pin.id);
               const bankColor = getBankColor(pin);
               const circleColor = getPinTypeColor(pin);
-              const fontSize = Math.max(6, Math.min(16, viewport.scale * 10));
-              const smallFontSize = Math.max(5, Math.min(12, viewport.scale * 8));
+              const fontSize = Math.max(6, Math.min(16, viewport.scale * 10 * fontMultiplier));
+              const smallFontSize = Math.max(5, Math.min(12, viewport.scale * 8 * fontMultiplier));
               
               // 差動ペアのハイライト色を取得
               const differentialHighlightColor = getDifferentialHighlightColor(pin, pins, selectedPins);
               
-              // Show detailed info when zoom is sufficient or pin is selected
-              const showDetails = viewport.scale > 0.4 || isSelected;
+              // Use LOD-based detail rendering
+              const showDetails = shouldRenderDetails || isSelected;
               
               return (
                 <Group key={pin.id}>
@@ -1121,8 +1139,8 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                     listening={false}
                   />
                   
-                  {/* Pin Name - shown when zoomed in or selected with background */}
-                  {pin.pinName && showDetails && tileSize > 50 && (
+                  {/* Pin Name - shown based on LOD and zoom level */}
+                  {pin.pinName && showDetails && shouldRenderPinNames && tileSize > 50 && (
                     <>
                       <Rect
                         x={pos.x - ((pin.pinName.length > 14 ? 17 : pin.pinName.length) * smallFontSize / 4) - 2}
@@ -1149,8 +1167,8 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                     </>
                   )}
                   
-                  {/* Signal name - shown below pin name when assigned with background */}
-                  {pin.signalName && pin.signalName.trim() !== '' && (
+                  {/* Signal name - shown based on LOD level */}
+                  {pin.signalName && pin.signalName.trim() !== '' && shouldRenderSignalNames && (
                     <>
                       <Rect
                         x={pos.x - ((pin.signalName.length > 12 ? 15 : pin.signalName.length) * smallFontSize * 0.35) - 6}
@@ -1182,8 +1200,8 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
             });
           })()}
           
-          {/* Differential pair connection lines */}
-          {(() => {
+          {/* Differential pair connection lines with LOD */}
+          {LODSystem.shouldRenderDifferentialPairs(viewport.scale) && (() => {
             const connectionLines: JSX.Element[] = [];
             const processedPairs = new Set();
             
@@ -1232,8 +1250,8 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
             return connectionLines;
           })()}
           
-          {/* Bank group boundaries - drawn below selection highlights */}
-          {(() => {
+          {/* Bank group boundaries with LOD - drawn below selection highlights */}
+          {LODSystem.shouldRenderAtLOD(currentLOD, 2) && (() => {
             const bankGroups = getPinsByBank();
             const baseTileSize = 88;
             const tileSize = Math.max(20, baseTileSize * viewport.scale);
