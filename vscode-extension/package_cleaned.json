@@ -317,8 +317,7 @@
         "scopeName": "source.fpga-constraints",
         "path": "./syntaxes/fpga-constraints.tmGrammar.json"
       }
-    ]
-  },
+  ],
   "scripts": {
     "vscode:prepublish": "npm run copy-webview && npm run compile",
     "compile": "tsc -p ./",
