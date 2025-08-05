@@ -943,11 +943,11 @@ const App: React.FC<AppProps> = () => {
           flexDirection: 'column',
           overflow: 'hidden',
         }}>
-          {/* Toolbar */}
+          {/* Toolbar - Optimized height for Issue #14: maximize display area */}
           <div 
             className="toolbar-scrollbar"
             style={{
-              height: '50px',
+              height: '42px', // Reduced from 50px to 42px for Issue #14
               backgroundColor: '#2a2a2a',
               borderBottom: '1px solid #444',
               display: 'flex',
@@ -1253,15 +1253,15 @@ const App: React.FC<AppProps> = () => {
         </main>
       </div>
 
-      {/* Status Bar */}
+      {/* Status Bar - Optimized for Issue #14: maximize display area */}
       <footer style={{
-        height: '24px',
+        height: '20px', // Reduced from 24px to 20px for Issue #14
         backgroundColor: '#2a2a2a',
         borderTop: '1px solid #444',
         display: 'flex',
         alignItems: 'center',
         padding: '0 16px',
-        fontSize: '12px',
+        fontSize: '11px', // Reduced from 12px to 11px
         color: '#999',
       }}>
         <span>Ready</span>
