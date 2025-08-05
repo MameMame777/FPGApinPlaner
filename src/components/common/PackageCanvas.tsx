@@ -454,6 +454,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
   }, [pins.length]);
 
   // Transform coordinates based on view settings with stable scaling
+  // Updated for Issue #14: reduced margins for maximum display area
   const transformPosition = (pin: Pin) => {
     let { x, y } = pin.position;
     
@@ -484,6 +485,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
   };
 
   // Apply viewport boundaries to prevent canvas from disappearing off screen
+  // Updated for Issue #14: maximized display area with reduced margins
   const applyViewportBounds = (pos: { x: number; y: number }, scale: number) => {
     // Get actual content dimensions
     const packageDims = getPackageDimensions();
