@@ -70,9 +70,9 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
   const visiblePins = useMemo(() => {
     PerformanceService.startRenderMeasurement('viewport-culling');
     
-    // Calculate current viewport bounds (ultra-compact margins for Issue #14)
-    const canvasWidth = stageSize.width - 15; // Further reduced from 20px
-    const canvasHeight = stageSize.height - 15; // Further reduced from 20px
+    // Calculate current viewport bounds (zero margins for maximum viewer area - Issue #14)
+    const canvasWidth = stageSize.width; // Use full viewer area - no margins
+    const canvasHeight = stageSize.height; // Use full viewer area - no margins
     const viewportBounds = {
       x: -viewport.x / viewport.scale - canvasWidth / (2 * viewport.scale),
       y: -viewport.y / viewport.scale - canvasHeight / (2 * viewport.scale),
@@ -87,9 +87,9 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
       const extendedBounds = {
         ...viewportBounds,
         x: viewportBounds.x - margin,
-        y: viewportBounds.y - margin,
+        y: viewportBounds.y - margin * 1.5, // Extra margin for upper rows (U, V, W)
         width: viewportBounds.width + margin * 2,
-        height: viewportBounds.height + margin * 2
+        height: viewportBounds.height + margin * 2.5 // Extra height for upper rows
       };
       
       // Always include selected pins regardless of viewport
@@ -160,13 +160,13 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
       
       // Medium zoom: hybrid approach - viewport-aware sampling for focus areas
       else if (viewport.scale <= 0.6) {
-        // Calculate visible area with generous margins for context
+        // Calculate visible area with generous margins for context, extra for upper rows
         const margin = 300 / viewport.scale;
         const focusArea = {
           x: viewportBounds.x - margin,
-          y: viewportBounds.y - margin,
+          y: viewportBounds.y - margin * 1.5, // Extra margin for upper rows (U, V, W)
           width: viewportBounds.width + margin * 2,
-          height: viewportBounds.height + margin * 2
+          height: viewportBounds.height + margin * 2.5 // Extra height for upper rows
         };
         
         // Always include all selected pins
@@ -280,11 +280,10 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
       const container = stageRef.current?.container();
       if (container) {
         const rect = container.getBoundingClientRect();
-        // Dynamic maximization: use full available space with minimal margins
-        const margin = 5; // Minimal margin for Issue #14 dynamic maximization
+        // Maximum viewer area utilization: use full available space to eliminate footer area
         const newSize = {
-          width: Math.max(400, rect.width - margin * 2),
-          height: Math.max(300, rect.height - margin * 2)
+          width: Math.max(400, rect.width), // Use full container width
+          height: Math.max(300, rect.height) // Use full container height to eliminate footer
         };
         
         // Only update if size actually changed to prevent unnecessary re-renders
@@ -335,20 +334,21 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
       if (packageDims) {
         const { width: pkgWidth, height: pkgHeight, centerX, centerY } = packageDims;
         
-        // Calculate zoom to fit package in available space with some padding
-        const padding = 50; // Reduced padding for larger display
-        const availableWidth = stageSize.width - padding * 2;
-        const availableHeight = stageSize.height - padding * 2;
+        // Calculate zoom to fit package in available space - optimized for pin review
+        // Dynamic padding based on screen size for better pin visibility
+        const dynamicPadding = Math.min(20, Math.max(5, stageSize.width * 0.01)); // 1% of width, min 5px, max 20px
+        const availableWidth = stageSize.width - dynamicPadding * 2;
+        const availableHeight = stageSize.height - dynamicPadding * 2;
         
         const scaleX = availableWidth / pkgWidth;
         const scaleY = availableHeight / pkgHeight;
         // Ensure minimum scale of 0.8 for readability, maximum of 2.0
         const optimalScale = Math.max(0.8, Math.min(scaleX, scaleY, 2.0));
         
-        // Center the package in the stage
+        // Center the package in the stage with slight upward bias to show more upper rows
         const stageCenter = {
           x: stageSize.width / 2,
-          y: stageSize.height / 2
+          y: stageSize.height / 2 + 30 // Shift down slightly to show more upper rows (U, V, W)
         };
         
         const initialPosition = {
@@ -529,9 +529,9 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
       x = -x;
     }
     
-    // Apply viewport scaling and offset (ultra-compact margins for Issue #14)
-    const canvasWidth = stageSize.width - 15; // Further reduced from 20px margin
-    const canvasHeight = stageSize.height - 15; // Further reduced from 20px margin
+    // Apply viewport scaling and offset (zero margins for maximum viewer area - Issue #14)
+    const canvasWidth = stageSize.width; // Use full viewer area - no margins
+    const canvasHeight = stageSize.height; // Use full viewer area - no margins
     const transformedX = x * viewport.scale + viewport.x + canvasWidth / 2;
     const transformedY = y * viewport.scale + viewport.y + canvasHeight / 2;
     
@@ -550,14 +550,14 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
     const canvasWidth = stageSize.width;
     const canvasHeight = stageSize.height;
     
-    // Allow panning beyond content boundaries to show all pins
-    const paddingX = canvasWidth * 0.5; // Allow half screen padding
-    const paddingY = canvasHeight * 0.5;
+    // Allow generous panning beyond content boundaries to show all pins, especially for upper rows
+    const paddingX = canvasWidth * 0.5; // Allow half screen padding horizontally
+    const paddingY = canvasHeight * 0.8; // Increased vertical padding for better access to upper rows
     
-    // Calculate bounds that ensure content is accessible
+    // Calculate bounds that ensure content is accessible, with extra allowance for upper rows
     const minX = -(contentWidth / 2 + paddingX);
     const maxX = contentWidth / 2 + paddingX;
-    const minY = -(contentHeight / 2 + paddingY);
+    const minY = -(contentHeight / 2 + paddingY * 1.5); // Extra allowance for upper rows (U, V, W)
     const maxY = contentHeight / 2 + paddingY;
     
     return {
@@ -839,13 +839,13 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
       display: 'flex', // Use flex for consistent layout - Issue #14
       flexDirection: 'column', // Stack children vertically - Issue #14
     }}>
-      {/* Grid Labels - Top (Columns) - Dynamic maximization for Issue #14 */}
+      {/* Grid Labels - Top (Columns) - Enhanced visibility - Issue #14 */}
       <div style={{
         position: 'absolute',
         top: 0,
-        left: 5, // Minimal margin for dynamic maximization
+        left: 0, // No margin for maximum viewer area
         right: 0,
-        height: 12, // Minimal height for dynamic maximization
+        height: 16, // Increased from 10px to 16px for better readability
         backgroundColor: '#2a2a2a',
         borderBottom: '1px solid #444',
         display: 'flex',
@@ -892,7 +892,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
             }
             
             const labelLeft = Math.round(screenX - 6); // Center label on pin with viewport transform
-            const containerWidth = stageSize.width - 5; // Updated for minimal margin
+            const containerWidth = stageSize.width; // Use full viewer area - no margins
             
             // Show labels that are visible in the current viewport with wider buffer
             if (labelLeft >= -50 && labelLeft <= containerWidth + 50) { // Wider buffer for better visibility
@@ -903,12 +903,12 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                     position: 'absolute',
                     left: labelLeft,
                     top: 0,
-                    width: 14, // Slightly larger for better readability
-                    height: 12, // Minimal height for dynamic maximization
+                    width: 20, // Increased from 14px for better readability
+                    height: 16, // Increased from 12px for better readability
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: 8, // Readable font size
+                    fontSize: 11, // Increased from 8px for better readability
                     fontWeight: 'bold',
                     color: '#e0e0e0',
                     textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
@@ -926,12 +926,12 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
         })()}
       </div>
       
-      {/* Grid Labels - Left (Rows) - Dynamic maximization for Issue #14 */}
+      {/* Grid Labels - Left (Rows) - Enhanced visibility - Issue #14 */}
       <div style={{
         position: 'absolute',
-        top: 12, // Minimal margin for dynamic maximization
+        top: 16, // Match top label height
         left: 0,
-        width: 12, // Minimal width for dynamic maximization
+        width: 16, // Increased from 10px for better readability
         bottom: 0,
         backgroundColor: '#2a2a2a',
         borderRight: '1px solid #444',
@@ -983,8 +983,8 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                 displayText = rowLetter;
             }
             
-            const labelTop = Math.round(screenY - 6); // Center label on pin with viewport transform
-            const containerHeight = stageSize.height - 5; // Updated for minimal margin
+            const labelTop = Math.round(screenY - 6 - 16); // Center label on pin with viewport transform, shifted up by one character height
+            const containerHeight = stageSize.height; // Use full viewer area - no margins
             
             // Show labels that are visible in the current viewport with wider buffer
             if (labelTop >= -50 && labelTop <= containerHeight + 50) { // Wider buffer for better visibility
@@ -995,12 +995,12 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                     position: 'absolute',
                     left: 0,
                     top: labelTop,
-                    width: 14, // Slightly larger for better readability
-                    height: 12, // Minimal height for dynamic maximization
+                    width: 20, // Increased from 14px for better readability
+                    height: 16, // Increased from 12px for better readability
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: 8, // Readable font size
+                    fontSize: 11, // Increased from 8px for better readability
                     fontWeight: 'bold',
                     color: '#e0e0e0',
                     textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
@@ -1018,13 +1018,13 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
         })()}
       </div>
       
-      {/* Main Canvas - Dynamic maximization with proper viewport transform for Issue #14 */}
+      {/* Main Canvas - Maximum viewer area utilization for Issue #14 */}
       <Stage
         ref={stageRef}
-        width={Math.max(100, stageSize.width - 5)} // Minimal margin of 5px for dynamic maximization
-        height={Math.max(100, stageSize.height - 5)} // Minimal margin of 5px for dynamic maximization
-        x={2.5} // Minimal offset for dynamic maximization
-        y={2.5} // Minimal offset for dynamic maximization
+        width={Math.max(100, stageSize.width)} // Full container width for maximum viewer area
+        height={Math.max(100, stageSize.height)} // Full container height to eliminate footer area
+        x={0} // Use full container area
+        y={0} // Use full container area
         onClick={handleStageClick}
         onWheel={handleWheel}
         onMouseDown={handleMouseDown}
@@ -1224,8 +1224,10 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
               const isSelected = selectedPins.has(pin.id);
               const bankColor = getBankColor(pin);
               const circleColor = getPinTypeColor(pin);
-              const fontSize = Math.max(6, Math.min(16, viewport.scale * 10 * fontMultiplier));
-              const smallFontSize = Math.max(5, Math.min(12, viewport.scale * 8 * fontMultiplier));
+              // Enhanced font sizing for better pin review on large screens
+              const baseFontSize = viewport.scale * 10 * fontMultiplier;
+              const fontSize = Math.max(8, Math.min(20, baseFontSize)); // Increased min/max for better readability
+              const smallFontSize = Math.max(6, Math.min(16, viewport.scale * 8 * fontMultiplier));
               
               // 差動ペアのハイライト色を取得
               const differentialHighlightColor = getDifferentialHighlightColor(pin, visiblePins, selectedPins);
@@ -1268,11 +1270,11 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                     />
                   )}
                   
-                  {/* Inner circle with pin type color */}
+                  {/* Inner circle with pin type color - optimized for large screen review */}
                   <Circle
                     x={pos.x}
                     y={pos.y}
-                    radius={Math.max(6, tileSize * 0.25)}
+                    radius={Math.max(8, tileSize * 0.3)} // Increased min radius and ratio for better visibility
                     fill={circleColor}
                     stroke="#000"
                     strokeWidth={1}
@@ -1292,12 +1294,12 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                     />
                   )}
                   
-                  {/* Differential pair highlight ring */}
+                  {/* Differential pair highlight ring - enhanced for large screen review */}
                   {differentialHighlightColor && (
                     <Circle
                       x={pos.x}
                       y={pos.y}
-                      radius={Math.max(8, tileSize * 0.35)}
+                      radius={Math.max(10, tileSize * 0.4)} // Increased for better visibility
                       fill="transparent"
                       stroke={differentialHighlightColor}
                       strokeWidth={3}
