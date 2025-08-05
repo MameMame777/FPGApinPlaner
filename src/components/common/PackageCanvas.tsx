@@ -35,6 +35,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
 }) => {
   const { togglePinSelection, selectPins } = useAppStore();
   const stageRef = useRef<any>(null);
+  const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null); // For debouncing resize - Issue #14
   const [stageSize, setStageSize] = useState({ width: 800, height: 600 });
   
   // Last selected pin for shift-click range selection
@@ -273,20 +274,55 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
     }
   };
 
-  // Canvas size management - Completely disable ResizeObserver to prevent infinite loops
+  // Canvas size management - Enhanced for Issue #14: responsive to container changes
   useEffect(() => {
-    // Set initial size once on mount
-    const container = stageRef.current?.container();
+    const updateCanvasSize = () => {
+      const container = stageRef.current?.container();
+      if (container) {
+        const rect = container.getBoundingClientRect();
+        const newSize = {
+          width: Math.max(400, rect.width),
+          height: Math.max(300, rect.height)
+        };
+        
+        // Only update if size actually changed to prevent unnecessary re-renders
+        setStageSize(prevSize => {
+          if (prevSize.width !== newSize.width || prevSize.height !== newSize.height) {
+            console.log('📏 Canvas size updated:', newSize, 'from container:', rect);
+            return newSize;
+          }
+          return prevSize;
+        });
+      }
+    };
+
+    // Set initial size
+    updateCanvasSize();
+
+    // Use ResizeObserver for responsive layout - Issue #14
+    const container = stageRef.current?.container()?.parentElement;
     if (container) {
-      const rect = container.getBoundingClientRect();
-      const initialSize = {
-        width: Math.max(400, rect.width),
-        height: Math.max(300, rect.height)
-      };
+      const resizeObserver = new ResizeObserver(() => {
+        // Debounce resize events
+        if (resizeTimeoutRef.current) {
+          clearTimeout(resizeTimeoutRef.current);
+        }
+        resizeTimeoutRef.current = setTimeout(() => {
+          updateCanvasSize();
+        }, 16); // ~60fps
+      });
+
+      resizeObserver.observe(container);
       
-      console.log('📏 Setting initial canvas size:', initialSize);
-      setStageSize(initialSize);
+      return () => {
+        if (resizeTimeoutRef.current) {
+          clearTimeout(resizeTimeoutRef.current);
+        }
+        resizeObserver.disconnect();
+      };
     }
+    
+    return undefined; // Explicit return for TypeScript
   }, []);
 
   // Set initial viewport position when package is loaded
@@ -778,7 +814,10 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
       position: 'relative',
       margin: 0, // Ensure no margins - Issue #14
       padding: 0, // Ensure no padding - Issue #14
-      overflow: 'hidden' // Prevent any overflow creating scrollbars - Issue #14
+      overflow: 'hidden', // Prevent any overflow creating scrollbars - Issue #14
+      minWidth: 0, // Allow shrinking below content size - Issue #14
+      minHeight: 0, // Allow shrinking below content size - Issue #14
+      boxSizing: 'border-box' // Include borders in size calculations - Issue #14
     }}>
       {/* Grid Labels - Top (Columns) - Ultra-compact for Issue #14 */}
       <div style={{

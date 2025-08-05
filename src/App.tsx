@@ -429,7 +429,7 @@ const App: React.FC<AppProps> = () => {
     }
   };
 
-  // Sidebar resize handlers
+  // Sidebar resize handlers - Enhanced for Issue #14: dynamic sizing
   const handleMouseDown = (e: React.MouseEvent) => {
     setIsResizing(true);
     e.preventDefault();
@@ -440,11 +440,12 @@ const App: React.FC<AppProps> = () => {
     
     requestAnimationFrame(() => {
       const newWidth = e.clientX;
-      // Dynamic max width: 60% of window width, min 200px
-      const maxWidth = Math.max(400, window.innerWidth * 0.6);
+      // Dynamic max width: 50% of window width for large displays, min 200px - Issue #14
+      const maxWidth = Math.max(400, window.innerWidth * 0.5);
+      const minWidth = Math.min(250, window.innerWidth * 0.15); // Responsive min width
       
-      // Constrain width between 200px and dynamic max width
-      if (newWidth >= 200 && newWidth <= maxWidth) {
+      // Constrain width between dynamic min and max width
+      if (newWidth >= minWidth && newWidth <= maxWidth) {
         setSidebarWidth(newWidth);
       }
     });
@@ -936,12 +937,14 @@ const App: React.FC<AppProps> = () => {
           />
         </aside>
 
-        {/* Main View */}
+        {/* Main View - Enhanced flex layout for Issue #14 */}
         <main style={{
           flex: 1,
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
+          minWidth: 0, // Allow flex shrinking - Issue #14
+          minHeight: 0, // Allow flex shrinking - Issue #14
         }}>
           {/* Toolbar - Optimized height for Issue #14: maximize display area */}
           <div 
@@ -1189,7 +1192,9 @@ const App: React.FC<AppProps> = () => {
               flex: 1, 
               overflow: 'hidden',
               display: 'flex',
-              flexDirection: 'column'
+              flexDirection: 'column',
+              minWidth: 0, // Important: allow flex item to shrink below content size - Issue #14
+              width: '100%' // Force full width utilization when sidebar is closed - Issue #14
             }}>
               {listView.viewMode === 'grid' ? (
                 <PackageCanvas
@@ -1208,18 +1213,20 @@ const App: React.FC<AppProps> = () => {
                 <div style={{
                   height: '100%',
                   backgroundColor: '#1a1a1a',
-                  overflow: 'hidden'
+                  overflow: 'hidden',
+                  width: '100%' // Ensure full width - Issue #14
                 }} className="custom-scrollbar">
                   <PinListTabs onPinSelect={handleListPinSelect} />
                 </div>
               )}
             </div>
 
-            {/* Right Sidebar */}
+            {/* Right Sidebar - Dynamic width for large displays - Issue #14 */}
             {rightSidebarTab && (
               <div 
                 style={{ 
-                  width: '300px',
+                  width: `${Math.min(300, window.innerWidth * 0.2)}px`, // Responsive width: max 300px or 20% of screen
+                  minWidth: '250px', // Minimum width for usability
                   borderLeft: '1px solid #555',
                   backgroundColor: '#1e1e1e',
                   display: 'flex',
