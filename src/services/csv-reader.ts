@@ -1,4 +1,5 @@
-import { Pin, Package, CSVFormat, ImportResult, ColumnMapping, Position, GridPosition } from '@/types';
+import { Pin, Package, GridPosition, Position, ImportResult, CSVFormat, ColumnMapping } from '@/types';
+import { rowToIndex } from '@/utils/grid-utils';
 
 export class CSVReader {
   private static readonly XILINX_HEADERS = [
@@ -409,8 +410,8 @@ export class CSVReader {
   }
 
   private static gridToPosition(grid: GridPosition): Position {
-    // Optimized grid to position conversion
-    const rowOffset = grid.row.charCodeAt(0) - 'A'.charCodeAt(0);
+    // Use proper grid to position conversion with support for double letter rows
+    const rowOffset = rowToIndex(grid.row);
     const gridSpacing = 88; // Tile size from PackageCanvas
     
     return {
@@ -497,8 +498,8 @@ export class CSVReader {
       };
     }
 
-    // Calculate dimensions from pin positions
-    const maxRow = Math.max(...pins.map(p => p.gridPosition.row.charCodeAt(0) - 'A'.charCodeAt(0))) + 1;
+    // Calculate dimensions from pin positions using proper row indexing
+    const maxRow = Math.max(...pins.map(p => rowToIndex(p.gridPosition.row))) + 1;
     const maxCol = Math.max(...pins.map(p => p.gridPosition.col));
 
     return {
