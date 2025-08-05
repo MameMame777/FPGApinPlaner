@@ -297,8 +297,11 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
       }
     };
 
-    // Set initial size
-    updateCanvasSize();
+    // Delay initial size calculation to ensure Stage is mounted
+    // VS Code webview environment may need longer initialization time
+    const timeoutId = setTimeout(() => {
+      updateCanvasSize();
+    }, 200); // Extended delay for webview environment
 
     // Use ResizeObserver for responsive layout - Issue #14
     const container = stageRef.current?.container()?.parentElement;
@@ -316,6 +319,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
       resizeObserver.observe(container);
       
       return () => {
+        clearTimeout(timeoutId);
         if (resizeTimeoutRef.current) {
           clearTimeout(resizeTimeoutRef.current);
         }
@@ -323,7 +327,9 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
       };
     }
     
-    return undefined; // Explicit return for TypeScript
+    return () => {
+      clearTimeout(timeoutId);
+    };
   }, []);
 
   // Set initial viewport position when package is loaded with auto-fit for Issue #14
@@ -334,11 +340,11 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
       if (packageDims) {
         const { width: pkgWidth, height: pkgHeight, centerX, centerY } = packageDims;
         
-        // Calculate zoom to fit package in available space - optimized for pin review
-        // Dynamic padding based on screen size for better pin visibility
-        const dynamicPadding = Math.min(20, Math.max(5, stageSize.width * 0.01)); // 1% of width, min 5px, max 20px
-        const availableWidth = stageSize.width - dynamicPadding * 2;
-        const availableHeight = stageSize.height - dynamicPadding * 2;
+        // Calculate zoom to fit package in available space - zero margins for maximum viewer area (Issue #14)
+        // Use full viewer area without any padding for complete margin elimination
+        const dynamicPadding = 0; // Zero padding for maximum viewer area - Issue #14
+        const availableWidth = stageSize.width - dynamicPadding * 2; // Full width
+        const availableHeight = stageSize.height - dynamicPadding * 2; // Full height
         
         const scaleX = availableWidth / pkgWidth;
         const scaleY = availableHeight / pkgHeight;
@@ -472,10 +478,10 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
     const gridWidth = (maxCol - minCol + 1) * gridSpacing;
     const gridHeight = (maxRow - minRow + 1) * gridSpacing;
     
-    // Add minimal padding for dynamic maximization - Issue #14
-    const padding = 10; // Reduced from tileSize (88) to 10 for maximum space utilization
-    const width = gridWidth + padding * 2;
-    const height = gridHeight + padding * 2;
+    // Add zero padding for maximum viewer area - Issue #14
+    const padding = 0; // Zero padding for complete margin elimination - Issue #14
+    const width = gridWidth + padding * 2; // Use exact grid dimensions
+    const height = gridHeight + padding * 2; // Use exact grid dimensions
     
     // Calculate grid center position
     const gridCenterX = (minCol + maxCol - 1) * gridSpacing / 2;
@@ -1020,7 +1026,29 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
       
       {/* Main Canvas - Maximum viewer area utilization for Issue #14 */}
       <Stage
-        ref={stageRef}
+        ref={(ref) => {
+          stageRef.current = ref;
+          // Force size update when Stage is mounted (especially for VS Code webview)
+          if (ref) {
+            setTimeout(() => {
+              const container = ref.container();
+              if (container) {
+                const rect = container.getBoundingClientRect();
+                const newSize = {
+                  width: Math.max(400, rect.width),
+                  height: Math.max(300, rect.height)
+                };
+                setStageSize(prevSize => {
+                  if (prevSize.width !== newSize.width || prevSize.height !== newSize.height) {
+                    console.log('📐 Stage mounted - Canvas size updated:', newSize);
+                    return newSize;
+                  }
+                  return prevSize;
+                });
+              }
+            }, 50); // Quick update on mount
+          }
+        }}
         width={Math.max(100, stageSize.width)} // Full container width for maximum viewer area
         height={Math.max(100, stageSize.height)} // Full container height to eliminate footer area
         x={0} // Use full container area
@@ -1048,8 +1076,8 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
               return transformPosition(tempPin); // transformPosition already includes all transforms
             };
             
-            // Calculate package outline corners based on grid boundaries
-            const padding = gridSpacing * 0.8; // Add some padding around the grid
+            // Calculate package outline corners based on grid boundaries (zero padding for maximum area)
+            const padding = 0; // Zero padding for maximum viewer area - Issue #14
             const topLeft = transformGridCoord((minCol - 1.5) * gridSpacing - padding, (minRow - 0.5) * gridSpacing - padding);
             const topRight = transformGridCoord((maxCol + 0.5) * gridSpacing + padding, (minRow - 0.5) * gridSpacing - padding);
             const bottomLeft = transformGridCoord((minCol - 1.5) * gridSpacing - padding, (maxRow + 0.5) * gridSpacing + padding);
