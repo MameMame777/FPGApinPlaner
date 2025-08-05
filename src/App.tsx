@@ -31,8 +31,29 @@ const App: React.FC<AppProps> = () => {
   const [isResizing, setIsResizing] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   
+  // Dynamic maximization states for Issue #14
+  const [isMaximized, setIsMaximized] = useState(false);
+  const [autoHideSidebars, setAutoHideSidebars] = useState(false);
+  const [hideFooter, setHideFooter] = useState(false);
+  
   // Initialize hotkeys
   useAppHotkeys();
+
+  // Dynamic maximization keyboard shortcuts for Issue #14
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // F11 for full maximization toggle
+      if (e.key === 'F11') {
+        e.preventDefault();
+        toggleMaximizedMode();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isMaximized, autoHideSidebars, hideFooter]);
 
   // Handle keyboard help event
   useEffect(() => {
@@ -86,6 +107,24 @@ const App: React.FC<AppProps> = () => {
     setSortOrder,
     setViewMode,
   } = useAppStore();
+
+  // Dynamic maximization function for Issue #14
+  const toggleMaximizedMode = () => {
+    setIsMaximized(!isMaximized);
+    if (!isMaximized) {
+      // Enter maximized mode: hide sidebars and footer, fit to screen
+      setAutoHideSidebars(true);
+      setHideFooter(true);
+      // Trigger zoom reset to fit the screen after maximization
+      setTimeout(() => {
+        resetZoom();
+      }, 100); // Small delay to ensure UI updates first
+    } else {
+      // Exit maximized mode: restore sidebars and footer
+      setAutoHideSidebars(false);
+      setHideFooter(false);
+    }
+  };
 
   // Handle VS Code messages
   useEffect(() => {
@@ -429,7 +468,7 @@ const App: React.FC<AppProps> = () => {
     }
   };
 
-  // Sidebar resize handlers
+  // Sidebar resize handlers - Enhanced for Issue #14: dynamic sizing
   const handleMouseDown = (e: React.MouseEvent) => {
     setIsResizing(true);
     e.preventDefault();
@@ -440,11 +479,12 @@ const App: React.FC<AppProps> = () => {
     
     requestAnimationFrame(() => {
       const newWidth = e.clientX;
-      // Dynamic max width: 60% of window width, min 200px
-      const maxWidth = Math.max(400, window.innerWidth * 0.6);
+      // Dynamic max width: 50% of window width for large displays, min 200px - Issue #14
+      const maxWidth = Math.max(400, window.innerWidth * 0.5);
+      const minWidth = Math.min(250, window.innerWidth * 0.15); // Responsive min width
       
-      // Constrain width between 200px and dynamic max width
-      if (newWidth >= 200 && newWidth <= maxWidth) {
+      // Constrain width between dynamic min and max width
+      if (newWidth >= minWidth && newWidth <= maxWidth) {
         setSidebarWidth(newWidth);
       }
     });
@@ -566,25 +606,47 @@ const App: React.FC<AppProps> = () => {
       display: 'flex',
       flexDirection: 'column',
     }}>
-      {/* Header */}
+      {/* Header - Ultra-compact for Issue #14: maximize vertical display area */}
       <header style={{
-        height: '60px',
+        height: '36px', // Reduced from 60px to 36px for Issue #14 vertical optimization
         backgroundColor: '#2a2a2a',
         borderBottom: '1px solid #444',
         display: 'flex',
         alignItems: 'center',
-        padding: '0 20px',
+        padding: '0 16px', // Reduced from 20px to 16px
         boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+        flexShrink: 0, // Prevent header from shrinking - Issue #14
+        minHeight: '36px', // Ensure minimum height for Issue #14
       }}>
         <h1 style={{
           margin: 0,
-          fontSize: '18px',
+          fontSize: '14px', // Reduced from 18px to 14px for Issue #14 vertical optimization
           fontWeight: 600,
           color: '#4A90E2',
         }}>
           FPGA Pin Planner
         </h1>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: '12px', alignItems: 'center' }}>
+          {/* Single Maximization Toggle for Issue #14 */}
+          <button
+            onClick={toggleMaximizedMode}
+            style={{
+              padding: '6px 12px',
+              backgroundColor: isMaximized ? '#007acc' : '#333',
+              border: '1px solid #555',
+              borderRadius: '4px',
+              color: isMaximized ? '#fff' : '#ccc',
+              cursor: 'pointer',
+              fontSize: '11px',
+              whiteSpace: 'nowrap',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
+            title={isMaximized ? "Restore Normal View (F11)" : "Maximize Viewer (F11)"}
+          >
+            {isMaximized ? '� Restore' : '� Maximize'}
+          </button>
           <BGMControls />
           <input
             ref={fileInputRef}
@@ -727,13 +789,16 @@ const App: React.FC<AppProps> = () => {
         </div>
       </header>
 
-      {/* Main Content */}
+      {/* Main Content - Optimized vertical layout for Issue #14 */}
       <div style={{ 
         flex: 1, 
         display: 'flex',
         overflow: 'hidden',
+        minHeight: 0, // Allow vertical shrinking - Issue #14
+        height: '100%', // Force full height utilization - Issue #14
       }}>
-        {/* Sidebar */}
+        {/* Sidebar - Dynamic visibility for Issue #14 */}
+        {!autoHideSidebars && (
         <aside style={{
           width: `${sidebarWidth}px`,
           backgroundColor: '#252525',
@@ -742,6 +807,8 @@ const App: React.FC<AppProps> = () => {
           flexDirection: 'column',
           overflow: 'hidden',
           position: 'relative',
+          minHeight: 0, // Allow vertical shrinking - Issue #14
+          height: '100%', // Force full height utilization - Issue #14
         }}>
           {/* Search and Filters */}
           <div style={{
@@ -935,40 +1002,45 @@ const App: React.FC<AppProps> = () => {
             }}
           />
         </aside>
+        )}
 
-        {/* Main View */}
+        {/* Main View - Enhanced flex layout for Issue #14 */}
         <main style={{
           flex: 1,
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
+          minWidth: 0, // Allow flex shrinking - Issue #14
+          minHeight: 0, // Allow flex shrinking - Issue #14
         }}>
-          {/* Toolbar */}
+          {/* Toolbar - Ultra-compact for Issue #14: maximize vertical display area */}
           <div 
             className="toolbar-scrollbar"
             style={{
-              height: '50px',
+              height: '32px', // Further reduced from 42px to 32px for Issue #14 vertical optimization
               backgroundColor: '#2a2a2a',
               borderBottom: '1px solid #444',
               display: 'flex',
               alignItems: 'center',
-              padding: '0 16px',
-              gap: '12px',
+              padding: '0 12px', // Reduced from 16px to 12px
+              gap: '8px', // Reduced from 12px to 8px
               overflowX: 'auto',
               overflowY: 'hidden',
+              flexShrink: 0, // Prevent toolbar from shrinking - Issue #14
+              minHeight: '32px', // Ensure minimum height for Issue #14
             }}>
             {/* View Mode Toggle */}
             <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
               <button 
                 onClick={() => setViewMode('grid')}
                 style={{
-                  padding: '6px 12px',
+                  padding: '4px 8px', // Reduced from 6px 12px for Issue #14 vertical optimization
                   backgroundColor: listView.viewMode === 'grid' ? '#007acc' : '#333',
                   border: '1px solid #555',
                   borderRadius: '4px 0 0 4px',
                   color: listView.viewMode === 'grid' ? '#fff' : '#ccc',
                   cursor: 'pointer',
-                  fontSize: '12px',
+                  fontSize: '11px', // Reduced from 12px to 11px
                   whiteSpace: 'nowrap',
                 }}
                 title="Grid View"
@@ -978,13 +1050,13 @@ const App: React.FC<AppProps> = () => {
               <button 
                 onClick={() => setViewMode('list')}
                 style={{
-                  padding: '6px 12px',
+                  padding: '4px 8px', // Reduced from 6px 12px for Issue #14 vertical optimization
                   backgroundColor: listView.viewMode === 'list' ? '#007acc' : '#333',
                   border: '1px solid #555',
                   borderRadius: '0 4px 4px 0',
                   color: listView.viewMode === 'list' ? '#fff' : '#ccc',
                   cursor: 'pointer',
-                  fontSize: '12px',
+                  fontSize: '11px', // Reduced from 12px to 11px
                   whiteSpace: 'nowrap',
                 }}
                 title="List View"
@@ -1175,7 +1247,7 @@ const App: React.FC<AppProps> = () => {
             </div>
           </div>
 
-          {/* Main View Area */}
+          {/* Main View Area - Optimized vertical layout for Issue #14 */}
           <div style={{
             flex: 1,
             minWidth: '400px', // Ensure minimum width to prevent complete collapse
@@ -1183,12 +1255,19 @@ const App: React.FC<AppProps> = () => {
             overflow: 'hidden',
             display: 'flex',
             flexShrink: 1, // Allow shrinking but respect minWidth
+            width: '100%', // Force full width utilization - Issue #14
+            minHeight: 0, // Allow vertical shrinking - Issue #14
+            height: '100%', // Force full height utilization - Issue #14
           }}>
             <div style={{ 
               flex: 1, 
               overflow: 'hidden',
               display: 'flex',
-              flexDirection: 'column'
+              flexDirection: 'column',
+              minWidth: 0, // Important: allow flex item to shrink below content size - Issue #14
+              width: '100%', // Force full width utilization when sidebar is closed - Issue #14
+              minHeight: 0, // Allow vertical shrinking below content size - Issue #14
+              height: '100%', // Force full height utilization - Issue #14
             }}>
               {listView.viewMode === 'grid' ? (
                 <PackageCanvas
@@ -1207,24 +1286,28 @@ const App: React.FC<AppProps> = () => {
                 <div style={{
                   height: '100%',
                   backgroundColor: '#1a1a1a',
-                  overflow: 'hidden'
+                  overflow: 'hidden',
+                  width: '100%', // Ensure full width - Issue #14
+                  minHeight: 0, // Allow vertical shrinking - Issue #14
                 }} className="custom-scrollbar">
                   <PinListTabs onPinSelect={handleListPinSelect} />
                 </div>
               )}
             </div>
 
-            {/* Right Sidebar */}
-            {rightSidebarTab && (
+            {/* Right Sidebar - Dynamic visibility for Issue #14 */}
+            {!autoHideSidebars && rightSidebarTab && (
               <div 
                 style={{ 
-                  width: '300px',
+                  width: `${Math.min(300, window.innerWidth * 0.2)}px`, // Responsive width: max 300px or 20% of screen
+                  minWidth: '250px', // Minimum width for usability
                   borderLeft: '1px solid #555',
                   backgroundColor: '#1e1e1e',
                   display: 'flex',
                   flexDirection: 'column',
                   height: '100%',
-                  overflow: 'hidden'
+                  overflow: 'hidden',
+                  minHeight: 0, // Allow vertical shrinking - Issue #14
                 }}
               >
                 {rightSidebarTab === 'validation' && (
@@ -1253,22 +1336,25 @@ const App: React.FC<AppProps> = () => {
         </main>
       </div>
 
-      {/* Status Bar */}
+      {/* Status Bar - Dynamic visibility for Issue #14 */}
+      {!hideFooter && (
       <footer style={{
-        height: '24px',
+        height: '16px', // Further reduced from 20px to 16px for Issue #14 vertical optimization
         backgroundColor: '#2a2a2a',
         borderTop: '1px solid #444',
         display: 'flex',
         alignItems: 'center',
         padding: '0 16px',
-        fontSize: '12px',
+        fontSize: '10px', // Further reduced from 11px to 10px
         color: '#999',
+        flexShrink: 0, // Prevent footer from shrinking - Issue #14
       }}>
         <span>Ready</span>
         <div style={{ marginLeft: 'auto' }}>
           <span>Pins: {stats.total} | Assigned: {stats.assigned} | Unassigned: {stats.unassigned}</span>
         </div>
       </footer>
+      )}
       
       {/* Settings Panel */}
       <SettingsPanel 

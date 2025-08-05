@@ -35,6 +35,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
 }) => {
   const { togglePinSelection, selectPins } = useAppStore();
   const stageRef = useRef<any>(null);
+  const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null); // For debouncing resize - Issue #14
   const [stageSize, setStageSize] = useState({ width: 800, height: 600 });
   
   // Last selected pin for shift-click range selection
@@ -69,9 +70,9 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
   const visiblePins = useMemo(() => {
     PerformanceService.startRenderMeasurement('viewport-culling');
     
-    // Calculate current viewport bounds
-    const canvasWidth = stageSize.width - 40;
-    const canvasHeight = stageSize.height - 30;
+    // Calculate current viewport bounds (zero margins for maximum viewer area - Issue #14)
+    const canvasWidth = stageSize.width; // Use full viewer area - no margins
+    const canvasHeight = stageSize.height; // Use full viewer area - no margins
     const viewportBounds = {
       x: -viewport.x / viewport.scale - canvasWidth / (2 * viewport.scale),
       y: -viewport.y / viewport.scale - canvasHeight / (2 * viewport.scale),
@@ -86,9 +87,9 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
       const extendedBounds = {
         ...viewportBounds,
         x: viewportBounds.x - margin,
-        y: viewportBounds.y - margin,
+        y: viewportBounds.y - margin * 1.5, // Extra margin for upper rows (U, V, W)
         width: viewportBounds.width + margin * 2,
-        height: viewportBounds.height + margin * 2
+        height: viewportBounds.height + margin * 2.5 // Extra height for upper rows
       };
       
       // Always include selected pins regardless of viewport
@@ -159,13 +160,13 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
       
       // Medium zoom: hybrid approach - viewport-aware sampling for focus areas
       else if (viewport.scale <= 0.6) {
-        // Calculate visible area with generous margins for context
+        // Calculate visible area with generous margins for context, extra for upper rows
         const margin = 300 / viewport.scale;
         const focusArea = {
           x: viewportBounds.x - margin,
-          y: viewportBounds.y - margin,
+          y: viewportBounds.y - margin * 1.5, // Extra margin for upper rows (U, V, W)
           width: viewportBounds.width + margin * 2,
-          height: viewportBounds.height + margin * 2
+          height: viewportBounds.height + margin * 2.5 // Extra height for upper rows
         };
         
         // Always include all selected pins
@@ -273,41 +274,94 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
     }
   };
 
-  // Canvas size management - Completely disable ResizeObserver to prevent infinite loops
+  // Canvas size management - Enhanced for Issue #14: dynamic maximization support
   useEffect(() => {
-    // Set initial size once on mount
-    const container = stageRef.current?.container();
+    const updateCanvasSize = () => {
+      const container = stageRef.current?.container();
+      if (container) {
+        const rect = container.getBoundingClientRect();
+        // Maximum viewer area utilization: use full available space to eliminate footer area
+        const newSize = {
+          width: Math.max(400, rect.width), // Use full container width
+          height: Math.max(300, rect.height) // Use full container height to eliminate footer
+        };
+        
+        // Only update if size actually changed to prevent unnecessary re-renders
+        setStageSize(prevSize => {
+          if (prevSize.width !== newSize.width || prevSize.height !== newSize.height) {
+            console.log('📐 Canvas size updated for dynamic maximization:', newSize);
+            return newSize;
+          }
+          return prevSize;
+        });
+      }
+    };
+
+    // Set initial size
+    updateCanvasSize();
+
+    // Use ResizeObserver for responsive layout - Issue #14
+    const container = stageRef.current?.container()?.parentElement;
     if (container) {
-      const rect = container.getBoundingClientRect();
-      const initialSize = {
-        width: Math.max(400, rect.width),
-        height: Math.max(300, rect.height)
-      };
+      const resizeObserver = new ResizeObserver(() => {
+        // Debounce resize events
+        if (resizeTimeoutRef.current) {
+          clearTimeout(resizeTimeoutRef.current);
+        }
+        resizeTimeoutRef.current = setTimeout(() => {
+          updateCanvasSize();
+        }, 16); // ~60fps
+      });
+
+      resizeObserver.observe(container);
       
-      console.log('📏 Setting initial canvas size:', initialSize);
-      setStageSize(initialSize);
+      return () => {
+        if (resizeTimeoutRef.current) {
+          clearTimeout(resizeTimeoutRef.current);
+        }
+        resizeObserver.disconnect();
+      };
     }
+    
+    return undefined; // Explicit return for TypeScript
   }, []);
 
-  // Set initial viewport position when package is loaded
+  // Set initial viewport position when package is loaded with auto-fit for Issue #14
   useEffect(() => {
     if (pkg && pins.length > 0 && stageSize.width > 0 && stageSize.height > 0) {
-      // console.log('📍 Setting initial viewport position to screen center'); // ログ無効化
-      
-      // Set initial position to center of drawing area (screen center)
-      // This is independent of package dimensions and ensures consistent behavior
-      const initialPosition = {
-        x: 0, // Screen center as origin
-        y: 0, // Screen center as origin
-        scale: 1
-      };
-      
-      // console.log('📐 Initial position set to screen center (0, 0)'); // ログ無効化
-      // console.log('📐 Stage size:', stageSize.width, 'x', stageSize.height); // ログ無効化
-      
-      setViewport(initialPosition);
+      // Calculate optimal zoom and position to fit package in available space
+      const packageDims = getPackageDimensions();
+      if (packageDims) {
+        const { width: pkgWidth, height: pkgHeight, centerX, centerY } = packageDims;
+        
+        // Calculate zoom to fit package in available space - optimized for pin review
+        // Dynamic padding based on screen size for better pin visibility
+        const dynamicPadding = Math.min(20, Math.max(5, stageSize.width * 0.01)); // 1% of width, min 5px, max 20px
+        const availableWidth = stageSize.width - dynamicPadding * 2;
+        const availableHeight = stageSize.height - dynamicPadding * 2;
+        
+        const scaleX = availableWidth / pkgWidth;
+        const scaleY = availableHeight / pkgHeight;
+        // Ensure minimum scale of 0.8 for readability, maximum of 2.0
+        const optimalScale = Math.max(0.8, Math.min(scaleX, scaleY, 2.0));
+        
+        // Center the package in the stage with slight upward bias to show more upper rows
+        const stageCenter = {
+          x: stageSize.width / 2,
+          y: stageSize.height / 2 + 30 // Shift down slightly to show more upper rows (U, V, W)
+        };
+        
+        const initialPosition = {
+          x: stageCenter.x - centerX * optimalScale,
+          y: stageCenter.y - centerY * optimalScale,
+          scale: optimalScale
+        };
+        
+        console.log('📐 Auto-fit viewport:', initialPosition, 'for package:', pkgWidth, 'x', pkgHeight, 'scale:', optimalScale);
+        setViewport(initialPosition);
+      }
     }
-  }, [pkg, pins.length]);
+  }, [pkg, pins.length, stageSize]);
 
   // Bank-based color logic for tiles
   const getBankColor = (pin: Pin) => {
@@ -418,8 +472,8 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
     const gridWidth = (maxCol - minCol + 1) * gridSpacing;
     const gridHeight = (maxRow - minRow + 1) * gridSpacing;
     
-    // Add padding for labels and margins
-    const padding = tileSize;
+    // Add minimal padding for dynamic maximization - Issue #14
+    const padding = 10; // Reduced from tileSize (88) to 10 for maximum space utilization
     const width = gridWidth + padding * 2;
     const height = gridHeight + padding * 2;
     
@@ -454,6 +508,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
   }, [pins.length]);
 
   // Transform coordinates based on view settings with stable scaling
+  // Updated for Issue #14: reduced margins for maximum display area
   const transformPosition = (pin: Pin) => {
     let { x, y } = pin.position;
     
@@ -474,9 +529,9 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
       x = -x;
     }
     
-    // Apply viewport scaling and offset (account for label margins)
-    const canvasWidth = stageSize.width - 40; // Account for left margin
-    const canvasHeight = stageSize.height - 30; // Account for top margin
+    // Apply viewport scaling and offset (zero margins for maximum viewer area - Issue #14)
+    const canvasWidth = stageSize.width; // Use full viewer area - no margins
+    const canvasHeight = stageSize.height; // Use full viewer area - no margins
     const transformedX = x * viewport.scale + viewport.x + canvasWidth / 2;
     const transformedY = y * viewport.scale + viewport.y + canvasHeight / 2;
     
@@ -484,6 +539,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
   };
 
   // Apply viewport boundaries to prevent canvas from disappearing off screen
+  // Updated for Issue #14: maximized display area with reduced margins
   const applyViewportBounds = (pos: { x: number; y: number }, scale: number) => {
     // Get actual content dimensions
     const packageDims = getPackageDimensions();
@@ -494,14 +550,14 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
     const canvasWidth = stageSize.width;
     const canvasHeight = stageSize.height;
     
-    // Allow panning beyond content boundaries to show all pins
-    const paddingX = canvasWidth * 0.5; // Allow half screen padding
-    const paddingY = canvasHeight * 0.5;
+    // Allow generous panning beyond content boundaries to show all pins, especially for upper rows
+    const paddingX = canvasWidth * 0.5; // Allow half screen padding horizontally
+    const paddingY = canvasHeight * 0.8; // Increased vertical padding for better access to upper rows
     
-    // Calculate bounds that ensure content is accessible
+    // Calculate bounds that ensure content is accessible, with extra allowance for upper rows
     const minX = -(contentWidth / 2 + paddingX);
     const maxX = contentWidth / 2 + paddingX;
-    const minY = -(contentHeight / 2 + paddingY);
+    const minY = -(contentHeight / 2 + paddingY * 1.5); // Extra allowance for upper rows (U, V, W)
     const maxY = contentHeight / 2 + paddingY;
     
     return {
@@ -769,14 +825,27 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
   }
 
   return (
-    <div style={{ width: '100%', height: '100%', backgroundColor: '#1a1a1a', position: 'relative' }}>
-      {/* Grid Labels - Top (Columns) */}
+    <div style={{ 
+      width: '100%', 
+      height: '100%', 
+      backgroundColor: '#1a1a1a', 
+      position: 'relative',
+      margin: 0, // Ensure no margins - Issue #14
+      padding: 0, // Ensure no padding - Issue #14
+      overflow: 'hidden', // Prevent any overflow creating scrollbars - Issue #14
+      minWidth: 0, // Allow shrinking below content size - Issue #14
+      minHeight: 0, // Allow shrinking below content size - Issue #14
+      boxSizing: 'border-box', // Include borders in size calculations - Issue #14
+      display: 'flex', // Use flex for consistent layout - Issue #14
+      flexDirection: 'column', // Stack children vertically - Issue #14
+    }}>
+      {/* Grid Labels - Top (Columns) - Enhanced visibility - Issue #14 */}
       <div style={{
         position: 'absolute',
         top: 0,
-        left: 40,
+        left: 0, // No margin for maximum viewer area
         right: 0,
-        height: 30,
+        height: 16, // Increased from 10px to 16px for better readability
         backgroundColor: '#2a2a2a',
         borderBottom: '1px solid #444',
         display: 'flex',
@@ -798,15 +867,12 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
             );
             
             if (!representativePin) continue;
+            // Find a representative pin for this column to get exact position
+            if (!representativePin) continue;
             
-            // Calculate position using the same formula as gridToPosition in csv-reader.ts
-            // x: (col - 1) * gridSpacing, y: rowOffset * gridSpacing
-            const pinX = (colIndex - 1) * gridSpacing;
-            const pinY = 0; // Use first row for column headers
-            
-            // Apply the same transformation as actual pins
-            let transformedPin = { position: { x: pinX, y: pinY } } as Pin;
-            const pinTransformed = transformPosition(transformedPin);
+            // Use the actual pin's transformed position (already includes viewport transform)
+            const pinTransformed = transformPosition(representativePin);
+            const screenX = pinTransformed.x; // No additional viewport transform needed
             
             // Use appropriate grid coordinate based on rotation for the label
             let displayText: string;
@@ -825,11 +891,11 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                 displayText = colIndex.toString();
             }
             
-            const labelLeft = Math.round(pinTransformed.x - 10);
-            const containerWidth = stageSize.width - 40;
+            const labelLeft = Math.round(screenX - 6); // Center label on pin with viewport transform
+            const containerWidth = stageSize.width; // Use full viewer area - no margins
             
-            // Show labels that are visible in the current viewport
-            if (labelLeft >= -50 && labelLeft <= containerWidth + 50) {
+            // Show labels that are visible in the current viewport with wider buffer
+            if (labelLeft >= -50 && labelLeft <= containerWidth + 50) { // Wider buffer for better visibility
               columnLabels.push(
                 <div
                   key={`col-${colIndex}`}
@@ -837,12 +903,12 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                     position: 'absolute',
                     left: labelLeft,
                     top: 0,
-                    width: 20,
-                    height: 30,
+                    width: 20, // Increased from 14px for better readability
+                    height: 16, // Increased from 12px for better readability
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: 12,
+                    fontSize: 11, // Increased from 8px for better readability
                     fontWeight: 'bold',
                     color: '#e0e0e0',
                     textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
@@ -860,12 +926,12 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
         })()}
       </div>
       
-      {/* Grid Labels - Left (Rows) */}
+      {/* Grid Labels - Left (Rows) - Enhanced visibility - Issue #14 */}
       <div style={{
         position: 'absolute',
-        top: 30,
+        top: 16, // Match top label height
         left: 0,
-        width: 40,
+        width: 16, // Increased from 10px for better readability
         bottom: 0,
         backgroundColor: '#2a2a2a',
         borderRight: '1px solid #444',
@@ -893,16 +959,12 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
               pin.gridPosition && pin.gridPosition.row === rowLetter
             );
             
+            // Find a representative pin for this row to get exact position
             if (!representativePin) continue;
             
-            // Calculate position using the same formula as gridToPosition in csv-reader.ts
-            // x: (col - 1) * gridSpacing, y: rowOffset * gridSpacing
-            const pinX = 0; // Use first column for row headers
-            const pinY = rowIndex * gridSpacing;
-            
-            // Apply the same transformation as actual pins
-            let transformedPin = { position: { x: pinX, y: pinY } } as Pin;
-            const pinTransformed = transformPosition(transformedPin);
+            // Use the actual pin's transformed position (already includes viewport transform)
+            const pinTransformed = transformPosition(representativePin);
+            const screenY = pinTransformed.y; // No additional viewport transform needed
             
             // Use appropriate grid coordinate based on rotation for the label
             let displayText: string;
@@ -921,11 +983,11 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                 displayText = rowLetter;
             }
             
-            const labelTop = Math.round(pinTransformed.y - 10);
-            const containerHeight = stageSize.height - 30;
+            const labelTop = Math.round(screenY - 6 - 16); // Center label on pin with viewport transform, shifted up by one character height
+            const containerHeight = stageSize.height; // Use full viewer area - no margins
             
-            // Show labels that are visible in the current viewport
-            if (labelTop >= -50 && labelTop <= containerHeight + 50) {
+            // Show labels that are visible in the current viewport with wider buffer
+            if (labelTop >= -50 && labelTop <= containerHeight + 50) { // Wider buffer for better visibility
               rowLabels.push(
                 <div
                   key={`row-${rowIndex}`}
@@ -933,12 +995,12 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                     position: 'absolute',
                     left: 0,
                     top: labelTop,
-                    width: 40,
-                    height: 20,
+                    width: 20, // Increased from 14px for better readability
+                    height: 16, // Increased from 12px for better readability
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: 12,
+                    fontSize: 11, // Increased from 8px for better readability
                     fontWeight: 'bold',
                     color: '#e0e0e0',
                     textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
@@ -956,13 +1018,13 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
         })()}
       </div>
       
-      {/* Main Canvas */}
+      {/* Main Canvas - Maximum viewer area utilization for Issue #14 */}
       <Stage
         ref={stageRef}
-        width={Math.max(100, stageSize.width - 40)} // Account for left margin with minimum
-        height={Math.max(100, stageSize.height - 30)} // Account for top margin with minimum
-        x={40} // Offset for left label area
-        y={30} // Offset for top label area
+        width={Math.max(100, stageSize.width)} // Full container width for maximum viewer area
+        height={Math.max(100, stageSize.height)} // Full container height to eliminate footer area
+        x={0} // Use full container area
+        y={0} // Use full container area
         onClick={handleStageClick}
         onWheel={handleWheel}
         onMouseDown={handleMouseDown}
@@ -972,38 +1034,18 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
         style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
       >
         <Layer>
+          {/* Package outline and pins - with individual viewport transform */}
           {/* Package outline */}
           {(() => {
             const { gridSpacing, minRow, maxRow, minCol, maxCol } = packageDims as any;
             
             if (!gridSpacing) return null;
             
-            // Helper function to transform grid coordinates (same as transformPosition)
+            // Helper function to transform grid coordinates with viewport
             const transformGridCoord = (gridX: number, gridY: number) => {
-              let x = gridX;
-              let y = gridY;
-              
-              // Apply rotation first (at original scale)
-              if (rotation !== 0) {
-                const rad = (rotation * Math.PI) / 180;
-                const cos = Math.cos(rad);
-                const sin = Math.sin(rad);
-                const newX = x * cos - y * sin;
-                const newY = x * sin + y * cos;
-                x = newX;
-                y = newY;
-              }
-              
-              // Apply mirroring for bottom view
-              if (!isTopView) {
-                x = -x;
-              }
-              
-              // Apply viewport scaling and offset
-              const transformedX = x * viewport.scale + viewport.x + stageSize.width / 2;
-              const transformedY = y * viewport.scale + viewport.y + stageSize.height / 2;
-              
-              return { x: transformedX, y: transformedY };
+              // Create temporary pin object for position transformation
+              const tempPin = { position: { x: gridX, y: gridY } } as Pin;
+              return transformPosition(tempPin); // transformPosition already includes all transforms
             };
             
             // Calculate package outline corners based on grid boundaries
@@ -1040,35 +1082,14 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
             
             if (!gridSpacing) return null;
             
-            const lines = [];
-            
-            // Helper function to transform grid coordinates (same as transformPosition)
+            // Helper function to transform grid coordinates (already includes viewport transform)
             const transformGridCoord = (gridX: number, gridY: number) => {
-              let x = gridX;
-              let y = gridY;
-              
-              // Apply rotation first (at original scale)
-              if (rotation !== 0) {
-                const rad = (rotation * Math.PI) / 180;
-                const cos = Math.cos(rad);
-                const sin = Math.sin(rad);
-                const newX = x * cos - y * sin;
-                const newY = x * sin + y * cos;
-                x = newX;
-                y = newY;
-              }
-              
-              // Apply mirroring for bottom view
-              if (!isTopView) {
-                x = -x;
-              }
-              
-              // Apply viewport scaling and offset
-              const transformedX = x * viewport.scale + viewport.x + stageSize.width / 2;
-              const transformedY = y * viewport.scale + viewport.y + stageSize.height / 2;
-              
-              return { x: transformedX, y: transformedY };
+              // Create temporary pin object for position transformation
+              const tempPin = { position: { x: gridX, y: gridY } } as Pin;
+              return transformPosition(tempPin); // transformPosition already includes all transforms
             };
+            
+            const lines = [];
             
             // Major grid lines - tile boundaries (darker)
             // Vertical grid lines - align with column boundaries
@@ -1153,37 +1174,16 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
             
             if (!gridSpacing) return null;
             
-            // Helper function to transform grid coordinates (same as transformPosition)
+            // Helper function to transform grid coordinates (already includes viewport transform)
             const transformGridCoord = (gridX: number, gridY: number) => {
-              let x = gridX;
-              let y = gridY;
-              
-              // Apply rotation first (at original scale)
-              if (rotation !== 0) {
-                const rad = (rotation * Math.PI) / 180;
-                const cos = Math.cos(rad);
-                const sin = Math.sin(rad);
-                const newX = x * cos - y * sin;
-                const newY = x * sin + y * cos;
-                x = newX;
-                y = newY;
-              }
-              
-              // Apply mirroring for bottom view
-              if (!isTopView) {
-                x = -x;
-              }
-              
-              // Apply viewport scaling and offset
-              const transformedX = x * viewport.scale + viewport.x + stageSize.width / 2;
-              const transformedY = y * viewport.scale + viewport.y + stageSize.height / 2;
-              
-              return { x: transformedX, y: transformedY };
+              // Create temporary pin object for position transformation
+              const tempPin = { position: { x: gridX, y: gridY } } as Pin;
+              return transformPosition(tempPin); // transformPosition already includes all transforms
             };
             
-            // Position label at the top center of the package outline
+            // Position label at the top center of the tile matrix (above first row)
             const centerX = (minCol + maxCol - 1) * gridSpacing / 2;
-            const topY = (minRow - 0.5) * gridSpacing - gridSpacing * 0.8 - 20; // Above the package outline
+            const topY = (minRow - 1) * gridSpacing - 40; // Position above the first row of tiles
             const labelPos = transformGridCoord(centerX, topY);
             
             return (
@@ -1224,8 +1224,10 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
               const isSelected = selectedPins.has(pin.id);
               const bankColor = getBankColor(pin);
               const circleColor = getPinTypeColor(pin);
-              const fontSize = Math.max(6, Math.min(16, viewport.scale * 10 * fontMultiplier));
-              const smallFontSize = Math.max(5, Math.min(12, viewport.scale * 8 * fontMultiplier));
+              // Enhanced font sizing for better pin review on large screens
+              const baseFontSize = viewport.scale * 10 * fontMultiplier;
+              const fontSize = Math.max(8, Math.min(20, baseFontSize)); // Increased min/max for better readability
+              const smallFontSize = Math.max(6, Math.min(16, viewport.scale * 8 * fontMultiplier));
               
               // 差動ペアのハイライト色を取得
               const differentialHighlightColor = getDifferentialHighlightColor(pin, visiblePins, selectedPins);
@@ -1268,11 +1270,11 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                     />
                   )}
                   
-                  {/* Inner circle with pin type color */}
+                  {/* Inner circle with pin type color - optimized for large screen review */}
                   <Circle
                     x={pos.x}
                     y={pos.y}
-                    radius={Math.max(6, tileSize * 0.25)}
+                    radius={Math.max(8, tileSize * 0.3)} // Increased min radius and ratio for better visibility
                     fill={circleColor}
                     stroke="#000"
                     strokeWidth={1}
@@ -1292,12 +1294,12 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                     />
                   )}
                   
-                  {/* Differential pair highlight ring */}
+                  {/* Differential pair highlight ring - enhanced for large screen review */}
                   {differentialHighlightColor && (
                     <Circle
                       x={pos.x}
                       y={pos.y}
-                      radius={Math.max(8, tileSize * 0.35)}
+                      radius={Math.max(10, tileSize * 0.4)} // Increased for better visibility
                       fill="transparent"
                       stroke={differentialHighlightColor}
                       strokeWidth={3}
