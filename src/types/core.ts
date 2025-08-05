@@ -148,7 +148,7 @@ export interface ViewConfig {
   resetTrigger: number;         // Counter to force viewport reset
 }
 
-export type SortField = 'pinNumber' | 'pinName' | 'signalName' | 'pinType' | 'bank';
+export type SortField = 'pinNumber' | 'pinName' | 'signalName' | 'pinType' | 'bank' | 'grid';
 export type SortOrder = 'asc' | 'desc';
 
 export interface FilterState {

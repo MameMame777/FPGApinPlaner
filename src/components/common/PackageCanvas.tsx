@@ -3,6 +3,7 @@ import { Stage, Layer, Rect, Text, Group, Line, Circle } from 'react-konva';
 import { KonvaEventObject } from 'konva/lib/Node';
 import { Pin, Package } from '@/types';
 import { DifferentialPairUtils } from '@/utils/differential-pair-utils';
+import { rowToIndex, indexToRow } from '@/utils/grid-utils';
 import { LODSystem } from '@/utils/LODSystem';
 import { PerformanceService } from '@/services/performance-service';
 import { useAppStore } from '@/stores/app-store';
@@ -372,11 +373,21 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
       const pinType = DifferentialPairUtils.getDifferentialPairType(pin.pinName) || 
                      (pin.signalName ? DifferentialPairUtils.getDifferentialPairType(pin.signalName) : null);
       
-      // Positive: 赤、Negative: 黄色
-      return pinType === 'positive' ? '#FF0000' : '#FFFF00';
+      // Enhanced colors for better visibility
+      // Positive: bright red, Negative: bright orange
+      return pinType === 'positive' ? '#FF3333' : '#FF9933';
     }
 
     return null;
+  };
+
+  // Check if pin has differential pair (for subtle indication)
+  const hasDifferentialPair = (pin: Pin, allPins: Pin[]) => {
+    if (!DifferentialPairUtils.isDifferentialPin(pin)) {
+      return false;
+    }
+    const pairPin = DifferentialPairUtils.findPairPin(pin, allPins);
+    return pairPin !== null;
   };
 
   // Calculate package dimensions based on actual grid layout
@@ -389,10 +400,15 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
     const rows = pins.map(pin => pin.gridPosition?.row).filter(Boolean);
     const cols = pins.map(pin => pin.gridPosition?.col).filter(Boolean);
     
-    const minRow = Math.min(...rows.map(r => r!.charCodeAt(0) - 65));
-    const maxRow = Math.max(...rows.map(r => r!.charCodeAt(0) - 65));
+    console.log(`🔍 Found rows: ${rows.join(', ')}`);
+    
+    const minRow = Math.min(...rows.map(r => rowToIndex(r!)));
+    const maxRow = Math.max(...rows.map(r => rowToIndex(r!)));
     const minCol = Math.min(...cols);
     const maxCol = Math.max(...cols);
+    
+    console.log(`🔍 Row indices - min: ${minRow} (${indexToRow(minRow)}), max: ${maxRow} (${indexToRow(maxRow)})`);
+    console.log(`🔍 Col indices - min: ${minCol}, max: ${maxCol}`);
     
     // Grid spacing matches CSV reader
     const tileSize = 88;
@@ -769,84 +785,76 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
         overflow: 'hidden'
       }}>
         {viewport.scale > 0.1 && (() => {
-          const { gridSpacing } = packageDims as any;
+          const { gridSpacing, minCol, maxCol } = packageDims as any;
           if (!gridSpacing) return null;
-          
-          // Calculate container-relative positions for labels
-          const containerWidth = stageSize.width - 40; // Available width for labels
           
           const columnLabels: JSX.Element[] = [];
           
-          // Generate labels based on actual pin positions to avoid overlap issues
-          const validPins = pins.filter(pin => pin.gridPosition);
-          const processedPositions = new Set();
-          
-          validPins.forEach(pin => {
-            if (!pin.gridPosition) return;
+          // Generate labels in correct column order (1, 2, 3, ...)
+          for (let colIndex = minCol; colIndex <= maxCol; colIndex++) {
+            // Find a representative pin for this column to get grid coordinate
+            const representativePin = pins.find(pin => 
+              pin.gridPosition && pin.gridPosition.col === colIndex
+            );
             
-            // Transform pin position to screen coordinates
-            const pinTransformed = transformPosition(pin);
+            if (!representativePin) continue;
             
-            // Check if this pin contributes to column labels (within header area)
-            // Use extended tolerance range to ensure labels remain visible during viewport panning
-            const headerY = 15; // Center of header area
-            const extendedYTolerance = Math.max(300, stageSize.height * 0.8); // Dynamic tolerance based on screen size
+            // Calculate position using the same formula as gridToPosition in csv-reader.ts
+            // x: (col - 1) * gridSpacing, y: rowOffset * gridSpacing
+            const pinX = (colIndex - 1) * gridSpacing;
+            const pinY = 0; // Use first row for column headers
             
-            // Round position to avoid duplicate labels for nearby pins
-            const roundedX = Math.round(pinTransformed.x / 25) * 25;
-            const positionKey = `col-${roundedX}`;
+            // Apply the same transformation as actual pins
+            let transformedPin = { position: { x: pinX, y: pinY } } as Pin;
+            const pinTransformed = transformPosition(transformedPin);
             
-            if (Math.abs(pinTransformed.y - headerY) < extendedYTolerance && !processedPositions.has(positionKey)) {
-              processedPositions.add(positionKey);
-              
-              // Use appropriate grid coordinate based on rotation for the label
-              let displayText: string;
-              switch (rotation) {
-                case 0:
-                case 180:
-                  // Normal orientation: column labels show column numbers
-                  displayText = pin.gridPosition.col.toString();
-                  break;
-                case 90:
-                case 270:
-                  // 90/270 degree rotation: column labels show row letters
-                  displayText = pin.gridPosition.row;
-                  break;
-                default:
-                  displayText = pin.gridPosition.col.toString();
-              }
-              const labelLeft = Math.round(pinTransformed.x - 10);
-              
-              // Check if position is within extended container bounds to provide smooth panning experience
-              const extendedWidth = containerWidth + 200; // Extended bounds prevent label flickering during pan
-              const isVisible = labelLeft >= -100 && labelLeft <= extendedWidth;
-              
-              if (isVisible) {
-                columnLabels.push(
-                  <div
-                    key={positionKey}
-                    style={{
-                      position: 'absolute',
-                      left: labelLeft,
-                      top: 0,
-                      width: 20,
-                      height: 30,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: 12,
-                      fontWeight: 'bold',
-                      color: '#e0e0e0',
-                      textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
-                      pointerEvents: 'none'
-                    }}
-                  >
-                    {displayText}
-                  </div>
-                );
-              }
+            // Use appropriate grid coordinate based on rotation for the label
+            let displayText: string;
+            switch (rotation) {
+              case 0:
+              case 180:
+                // Normal orientation: column labels show column numbers
+                displayText = colIndex.toString();
+                break;
+              case 90:
+              case 270:
+                // 90/270 degree rotation: column labels show row letters
+                displayText = representativePin.gridPosition!.row;
+                break;
+              default:
+                displayText = colIndex.toString();
             }
-          });
+            
+            const labelLeft = Math.round(pinTransformed.x - 10);
+            const containerWidth = stageSize.width - 40;
+            
+            // Show labels that are visible in the current viewport
+            if (labelLeft >= -50 && labelLeft <= containerWidth + 50) {
+              columnLabels.push(
+                <div
+                  key={`col-${colIndex}`}
+                  style={{
+                    position: 'absolute',
+                    left: labelLeft,
+                    top: 0,
+                    width: 20,
+                    height: 30,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 12,
+                    fontWeight: 'bold',
+                    color: '#e0e0e0',
+                    textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
+                    pointerEvents: 'none',
+                    overflow: 'hidden'
+                  }}
+                >
+                  {displayText}
+                </div>
+              );
+            }
+          }
           
           return columnLabels;
         })()}
@@ -868,84 +876,81 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
         overflow: 'hidden'
       }}>
         {viewport.scale > 0.1 && (() => {
-          const { gridSpacing } = packageDims as any;
+          const { gridSpacing, minRow, maxRow } = packageDims as any;
           if (!gridSpacing) return null;
-          
-          // Calculate container-relative positions for labels
-          const containerHeight = stageSize.height - 30; // Available height for labels
           
           const rowLabels: JSX.Element[] = [];
           
-          // Generate labels based on actual pin positions to avoid overlap issues
-          const validPins = pins.filter(pin => pin.gridPosition);
-          const processedPositions = new Set();
+          // Generate labels in correct row order (A, B, C, ..., Z, AA, AB, ...)
+          console.log(`🔍 Grid dimensions - minRow: ${minRow}, maxRow: ${maxRow}`);
           
-          validPins.forEach(pin => {
-            if (!pin.gridPosition) return;
+          for (let rowIndex = minRow; rowIndex <= maxRow; rowIndex++) {
+            const rowLetter = indexToRow(rowIndex);
+            console.log(`🔍 Processing row ${rowIndex} -> ${rowLetter}`);
             
-            // Transform pin position to screen coordinates
-            const pinTransformed = transformPosition(pin);
+            // Find a representative pin for this row to get grid coordinate
+            const representativePin = pins.find(pin => 
+              pin.gridPosition && pin.gridPosition.row === rowLetter
+            );
             
-            // Check if this pin contributes to row labels (within sidebar area)
-            // Use extended tolerance range to ensure labels remain visible during viewport panning
-            const sidebarX = 20; // Center of sidebar area
-            const extendedXTolerance = Math.max(300, stageSize.width * 0.8); // Dynamic tolerance based on screen size
+            if (!representativePin) continue;
             
-            // Round position to avoid duplicate labels for nearby pins
-            const roundedY = Math.round(pinTransformed.y / 25) * 25;
-            const positionKey = `row-${roundedY}`;
+            // Calculate position using the same formula as gridToPosition in csv-reader.ts
+            // x: (col - 1) * gridSpacing, y: rowOffset * gridSpacing
+            const pinX = 0; // Use first column for row headers
+            const pinY = rowIndex * gridSpacing;
             
-            if (Math.abs(pinTransformed.x - sidebarX) < extendedXTolerance && !processedPositions.has(positionKey)) {
-              processedPositions.add(positionKey);
-              
-              // Use appropriate grid coordinate based on rotation for the label
-              let displayText: string;
-              switch (rotation) {
-                case 0:
-                case 180:
-                  // Normal orientation: row labels show row letters
-                  displayText = pin.gridPosition.row;
-                  break;
-                case 90:
-                case 270:
-                  // 90/270 degree rotation: row labels show column numbers
-                  displayText = pin.gridPosition.col.toString();
-                  break;
-                default:
-                  displayText = pin.gridPosition.row;
-              }
-              const labelTop = Math.round(pinTransformed.y - 10);
-              
-              // Check if position is within extended container bounds to provide smooth panning experience
-              const extendedHeight = containerHeight + 200; // Extended bounds prevent label flickering during pan
-              const isVisible = labelTop >= -100 && labelTop <= extendedHeight;
-              
-              if (isVisible) {
-                rowLabels.push(
-                  <div
-                    key={positionKey}
-                    style={{
-                      position: 'absolute',
-                      left: 0,
-                      top: labelTop,
-                      width: 40,
-                      height: 20,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: 12,
-                      fontWeight: 'bold',
-                      color: '#e0e0e0',
-                      textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
-                      pointerEvents: 'none'
-                    }}
-                  >
-                    {displayText}
-                  </div>
-                );
-              }
+            // Apply the same transformation as actual pins
+            let transformedPin = { position: { x: pinX, y: pinY } } as Pin;
+            const pinTransformed = transformPosition(transformedPin);
+            
+            // Use appropriate grid coordinate based on rotation for the label
+            let displayText: string;
+            switch (rotation) {
+              case 0:
+              case 180:
+                // Normal orientation: row labels show row letters
+                displayText = rowLetter;
+                break;
+              case 90:
+              case 270:
+                // 90/270 degree rotation: row labels show column numbers
+                displayText = representativePin.gridPosition!.col.toString();
+                break;
+              default:
+                displayText = rowLetter;
             }
-          });
+            
+            const labelTop = Math.round(pinTransformed.y - 10);
+            const containerHeight = stageSize.height - 30;
+            
+            // Show labels that are visible in the current viewport
+            if (labelTop >= -50 && labelTop <= containerHeight + 50) {
+              rowLabels.push(
+                <div
+                  key={`row-${rowIndex}`}
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    top: labelTop,
+                    width: 40,
+                    height: 20,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 12,
+                    fontWeight: 'bold',
+                    color: '#e0e0e0',
+                    textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
+                    pointerEvents: 'none',
+                    overflow: 'hidden'
+                  }}
+                >
+                  {displayText}
+                </div>
+              );
+            }
+          }
           
           return rowLabels;
         })()}
@@ -1225,6 +1230,9 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
               // 差動ペアのハイライト色を取得
               const differentialHighlightColor = getDifferentialHighlightColor(pin, visiblePins, selectedPins);
               
+              // Check if this pin has a differential pair (for subtle indication)
+              const hasDP = hasDifferentialPair(pin, pins);
+              
               // Use LOD-based detail rendering
               const showDetails = shouldRenderDetails || isSelected;
               
@@ -1270,6 +1278,19 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                     strokeWidth={1}
                     listening={false} // Disable mouse events on circle to allow tile selection
                   />
+                  
+                  {/* Subtle differential pair indicator (small dot) */}
+                  {hasDP && !differentialHighlightColor && tileSize > 40 && (
+                    <Circle
+                      x={pos.x + tileSize * 0.3}
+                      y={pos.y - tileSize * 0.3}
+                      radius={3}
+                      fill="#FF6600"
+                      stroke="#FFF"
+                      strokeWidth={1}
+                      listening={false}
+                    />
+                  )}
                   
                   {/* Differential pair highlight ring */}
                   {differentialHighlightColor && (
@@ -1419,6 +1440,38 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                         dash={[8, 4]}
                         listening={false}
                       />
+                    );
+                  }
+                  
+                  // Add differential pair label at midpoint
+                  if (distance > 100 && viewport.scale > 0.4) {
+                    const midX = (pos1.x + pos2.x) / 2;
+                    const midY = (pos1.y + pos2.y) / 2;
+                    const pairType = DifferentialPairUtils.getDifferentialPairType(pin.pinName);
+                    const labelText = pairType === 'positive' ? '+/-' : '-/+';
+                    
+                    connectionLines.push(
+                      <Group key={`diff-label-${pin.id}-${pairPin.id}`}>
+                        <Rect
+                          x={midX - 10}
+                          y={midY - 8}
+                          width={20}
+                          height={16}
+                          fill="rgba(0, 0, 0, 0.8)"
+                          cornerRadius={2}
+                          listening={false}
+                        />
+                        <Text
+                          x={midX}
+                          y={midY - 6}
+                          text={labelText}
+                          fontSize={10}
+                          fill={lineColor}
+                          align="center"
+                          offsetX={10}
+                          listening={false}
+                        />
+                      </Group>
                     );
                   }
                 }

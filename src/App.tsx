@@ -16,6 +16,7 @@ import { useValidation } from '@/hooks/useValidation';
 import { ValidationIssue } from '@/services/validation-service';
 import { loadSampleData } from '@/utils/sample-data';
 import { DifferentialPairUtils } from '@/utils/differential-pair-utils';
+import { compareRows } from '@/utils/grid-utils';
 
 interface AppProps {}
 
@@ -524,6 +525,20 @@ const App: React.FC<AppProps> = () => {
           valueA = a.bank || '';
           valueB = b.bank || '';
           break;
+        case 'grid':
+          // Grid position sorting: compare rows first, then columns
+          if (a.gridPosition && b.gridPosition) {
+            const rowComparison = compareRows(a.gridPosition.row, b.gridPosition.row);
+            if (rowComparison !== 0) {
+              return filters.sortOrder === 'asc' ? rowComparison : -rowComparison;
+            }
+            // If rows are equal, compare columns
+            const colComparison = a.gridPosition.col - b.gridPosition.col;
+            return filters.sortOrder === 'asc' ? colComparison : -colComparison;
+          }
+          valueA = a.gridPosition?.row || '';
+          valueB = b.gridPosition?.row || '';
+          break;
         default:
           valueA = a.pinNumber;
           valueB = b.pinNumber;
@@ -770,6 +785,7 @@ const App: React.FC<AppProps> = () => {
                 <option value="signalName">Signal Name</option>
                 <option value="pinType">Pin Type</option>
                 <option value="bank">Bank</option>
+                <option value="grid">Grid Position</option>
               </select>
               <button
                 onClick={() => setSortOrder(filters.sortOrder === 'asc' ? 'desc' : 'asc')}

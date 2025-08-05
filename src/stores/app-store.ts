@@ -3,6 +3,7 @@ import { immer } from 'zustand/middleware/immer';
 import { enableMapSet } from 'immer';
 import { Pin, Package, ViewConfig, FilterState, FPGAProject, SortField, SortOrder, ListViewState, ViewMode } from '@/types';
 import { UndoRedoService, Action } from '@/services/undo-redo-service';
+import { compareRows } from '@/utils/grid-utils';
 
 // Enable Immer MapSet plugin
 enableMapSet();
@@ -119,7 +120,7 @@ const initialFilters: FilterState = {
   voltageFilter: [],
   assignmentStatus: 'all',
   showOnlyDifferentialPairs: false,
-  sortField: 'pinNumber',
+  sortField: 'grid',
   sortOrder: 'asc',
 };
 
@@ -435,6 +436,23 @@ export const useAppStore = create<AppState & AppActions>()(
               valueA = a.bank || '';
               valueB = b.bank || '';
               break;
+            case 'grid':
+              // Grid position sorting: compare rows first, then columns
+              if (a.gridPosition && b.gridPosition) {
+                const rowComparison = compareRows(a.gridPosition.row, b.gridPosition.row);
+                if (process.env.NODE_ENV === 'development') {
+                  console.log(`🔄 Store grid sort: ${a.gridPosition.row} vs ${b.gridPosition.row} = ${rowComparison}`);
+                }
+                if (rowComparison !== 0) {
+                  return state.filters.sortOrder === 'asc' ? rowComparison : -rowComparison;
+                }
+                // If rows are equal, compare columns
+                const colComparison = a.gridPosition.col - b.gridPosition.col;
+                return state.filters.sortOrder === 'asc' ? colComparison : -colComparison;
+              }
+              valueA = a.gridPosition?.row || '';
+              valueB = b.gridPosition?.row || '';
+              break;
             default:
               valueA = a.pinNumber;
               valueB = b.pinNumber;
@@ -550,6 +568,9 @@ export const useAppStore = create<AppState & AppActions>()(
 
     setSortField: (field) =>
       set((state) => {
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`🎯 Changing sort field from ${state.filters.sortField} to ${field}`);
+        }
         state.filters.sortField = field;
         // Re-apply sorting immediately
         get().applyFilters();
