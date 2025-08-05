@@ -274,21 +274,23 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
     }
   };
 
-  // Canvas size management - Enhanced for Issue #14: responsive to container changes
+  // Canvas size management - Enhanced for Issue #14: dynamic maximization support
   useEffect(() => {
     const updateCanvasSize = () => {
       const container = stageRef.current?.container();
       if (container) {
         const rect = container.getBoundingClientRect();
+        // Dynamic maximization: use full available space with minimal margins
+        const margin = 5; // Minimal margin for Issue #14 dynamic maximization
         const newSize = {
-          width: Math.max(400, rect.width),
-          height: Math.max(300, rect.height)
+          width: Math.max(400, rect.width - margin * 2),
+          height: Math.max(300, rect.height - margin * 2)
         };
         
         // Only update if size actually changed to prevent unnecessary re-renders
         setStageSize(prevSize => {
           if (prevSize.width !== newSize.width || prevSize.height !== newSize.height) {
-            console.log('📏 Canvas size updated:', newSize, 'from container:', rect);
+            console.log('📐 Canvas size updated for dynamic maximization:', newSize);
             return newSize;
           }
           return prevSize;
@@ -325,25 +327,41 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
     return undefined; // Explicit return for TypeScript
   }, []);
 
-  // Set initial viewport position when package is loaded
+  // Set initial viewport position when package is loaded with auto-fit for Issue #14
   useEffect(() => {
     if (pkg && pins.length > 0 && stageSize.width > 0 && stageSize.height > 0) {
-      // console.log('📍 Setting initial viewport position to screen center'); // ログ無効化
-      
-      // Set initial position to center of drawing area (screen center)
-      // This is independent of package dimensions and ensures consistent behavior
-      const initialPosition = {
-        x: 0, // Screen center as origin
-        y: 0, // Screen center as origin
-        scale: 1
-      };
-      
-      // console.log('📐 Initial position set to screen center (0, 0)'); // ログ無効化
-      // console.log('📐 Stage size:', stageSize.width, 'x', stageSize.height); // ログ無効化
-      
-      setViewport(initialPosition);
+      // Calculate optimal zoom and position to fit package in available space
+      const packageDims = getPackageDimensions();
+      if (packageDims) {
+        const { width: pkgWidth, height: pkgHeight, centerX, centerY } = packageDims;
+        
+        // Calculate zoom to fit package in available space with some padding
+        const padding = 50; // Reduced padding for larger display
+        const availableWidth = stageSize.width - padding * 2;
+        const availableHeight = stageSize.height - padding * 2;
+        
+        const scaleX = availableWidth / pkgWidth;
+        const scaleY = availableHeight / pkgHeight;
+        // Ensure minimum scale of 0.8 for readability, maximum of 2.0
+        const optimalScale = Math.max(0.8, Math.min(scaleX, scaleY, 2.0));
+        
+        // Center the package in the stage
+        const stageCenter = {
+          x: stageSize.width / 2,
+          y: stageSize.height / 2
+        };
+        
+        const initialPosition = {
+          x: stageCenter.x - centerX * optimalScale,
+          y: stageCenter.y - centerY * optimalScale,
+          scale: optimalScale
+        };
+        
+        console.log('📐 Auto-fit viewport:', initialPosition, 'for package:', pkgWidth, 'x', pkgHeight, 'scale:', optimalScale);
+        setViewport(initialPosition);
+      }
     }
-  }, [pkg, pins.length]);
+  }, [pkg, pins.length, stageSize]);
 
   // Bank-based color logic for tiles
   const getBankColor = (pin: Pin) => {
@@ -454,8 +472,8 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
     const gridWidth = (maxCol - minCol + 1) * gridSpacing;
     const gridHeight = (maxRow - minRow + 1) * gridSpacing;
     
-    // Add padding for labels and margins
-    const padding = tileSize;
+    // Add minimal padding for dynamic maximization - Issue #14
+    const padding = 10; // Reduced from tileSize (88) to 10 for maximum space utilization
     const width = gridWidth + padding * 2;
     const height = gridHeight + padding * 2;
     
@@ -817,15 +835,17 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
       overflow: 'hidden', // Prevent any overflow creating scrollbars - Issue #14
       minWidth: 0, // Allow shrinking below content size - Issue #14
       minHeight: 0, // Allow shrinking below content size - Issue #14
-      boxSizing: 'border-box' // Include borders in size calculations - Issue #14
+      boxSizing: 'border-box', // Include borders in size calculations - Issue #14
+      display: 'flex', // Use flex for consistent layout - Issue #14
+      flexDirection: 'column', // Stack children vertically - Issue #14
     }}>
-      {/* Grid Labels - Top (Columns) - Ultra-compact for Issue #14 */}
+      {/* Grid Labels - Top (Columns) - Dynamic maximization for Issue #14 */}
       <div style={{
         position: 'absolute',
         top: 0,
-        left: 15, // Further reduced from 20px to 15px - Issue #14
+        left: 5, // Minimal margin for dynamic maximization
         right: 0,
-        height: 15, // Further reduced from 20px to 15px - Issue #14
+        height: 12, // Minimal height for dynamic maximization
         backgroundColor: '#2a2a2a',
         borderBottom: '1px solid #444',
         display: 'flex',
@@ -847,15 +867,12 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
             );
             
             if (!representativePin) continue;
+            // Find a representative pin for this column to get exact position
+            if (!representativePin) continue;
             
-            // Calculate position using the same formula as gridToPosition in csv-reader.ts
-            // x: (col - 1) * gridSpacing, y: rowOffset * gridSpacing
-            const pinX = (colIndex - 1) * gridSpacing;
-            const pinY = 0; // Use first row for column headers
-            
-            // Apply the same transformation as actual pins
-            let transformedPin = { position: { x: pinX, y: pinY } } as Pin;
-            const pinTransformed = transformPosition(transformedPin);
+            // Use the actual pin's transformed position (already includes viewport transform)
+            const pinTransformed = transformPosition(representativePin);
+            const screenX = pinTransformed.x; // No additional viewport transform needed
             
             // Use appropriate grid coordinate based on rotation for the label
             let displayText: string;
@@ -874,11 +891,11 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                 displayText = colIndex.toString();
             }
             
-            const labelLeft = Math.round(pinTransformed.x - 8); // Reduced offset for compact layout
-            const containerWidth = stageSize.width - 15; // Updated for reduced margin
+            const labelLeft = Math.round(screenX - 6); // Center label on pin with viewport transform
+            const containerWidth = stageSize.width - 5; // Updated for minimal margin
             
-            // Show labels that are visible in the current viewport
-            if (labelLeft >= -30 && labelLeft <= containerWidth + 30) { // Reduced buffer
+            // Show labels that are visible in the current viewport with wider buffer
+            if (labelLeft >= -50 && labelLeft <= containerWidth + 50) { // Wider buffer for better visibility
               columnLabels.push(
                 <div
                   key={`col-${colIndex}`}
@@ -886,12 +903,12 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                     position: 'absolute',
                     left: labelLeft,
                     top: 0,
-                    width: 15, // Reduced from 20px to 15px
-                    height: 15, // Reduced from 20px to 15px
+                    width: 14, // Slightly larger for better readability
+                    height: 12, // Minimal height for dynamic maximization
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: 8, // Further reduced from 10px to 8px for ultra-compact
+                    fontSize: 8, // Readable font size
                     fontWeight: 'bold',
                     color: '#e0e0e0',
                     textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
@@ -909,12 +926,12 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
         })()}
       </div>
       
-      {/* Grid Labels - Left (Rows) - Ultra-compact for Issue #14 */}
+      {/* Grid Labels - Left (Rows) - Dynamic maximization for Issue #14 */}
       <div style={{
         position: 'absolute',
-        top: 15, // Further reduced from 20px to 15px - Issue #14
+        top: 12, // Minimal margin for dynamic maximization
         left: 0,
-        width: 15, // Further reduced from 20px to 15px - Issue #14
+        width: 12, // Minimal width for dynamic maximization
         bottom: 0,
         backgroundColor: '#2a2a2a',
         borderRight: '1px solid #444',
@@ -942,16 +959,12 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
               pin.gridPosition && pin.gridPosition.row === rowLetter
             );
             
+            // Find a representative pin for this row to get exact position
             if (!representativePin) continue;
             
-            // Calculate position using the same formula as gridToPosition in csv-reader.ts
-            // x: (col - 1) * gridSpacing, y: rowOffset * gridSpacing
-            const pinX = 0; // Use first column for row headers
-            const pinY = rowIndex * gridSpacing;
-            
-            // Apply the same transformation as actual pins
-            let transformedPin = { position: { x: pinX, y: pinY } } as Pin;
-            const pinTransformed = transformPosition(transformedPin);
+            // Use the actual pin's transformed position (already includes viewport transform)
+            const pinTransformed = transformPosition(representativePin);
+            const screenY = pinTransformed.y; // No additional viewport transform needed
             
             // Use appropriate grid coordinate based on rotation for the label
             let displayText: string;
@@ -970,11 +983,11 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                 displayText = rowLetter;
             }
             
-            const labelTop = Math.round(pinTransformed.y - 8); // Reduced offset for compact layout
-            const containerHeight = stageSize.height - 15; // Updated for reduced margin
+            const labelTop = Math.round(screenY - 6); // Center label on pin with viewport transform
+            const containerHeight = stageSize.height - 5; // Updated for minimal margin
             
-            // Show labels that are visible in the current viewport
-            if (labelTop >= -30 && labelTop <= containerHeight + 30) { // Reduced buffer
+            // Show labels that are visible in the current viewport with wider buffer
+            if (labelTop >= -50 && labelTop <= containerHeight + 50) { // Wider buffer for better visibility
               rowLabels.push(
                 <div
                   key={`row-${rowIndex}`}
@@ -982,12 +995,12 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                     position: 'absolute',
                     left: 0,
                     top: labelTop,
-                    width: 15, // Reduced from 20px to 15px
-                    height: 15, // Reduced from 20px to 15px
+                    width: 14, // Slightly larger for better readability
+                    height: 12, // Minimal height for dynamic maximization
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: 8, // Further reduced from 10px to 8px for ultra-compact
+                    fontSize: 8, // Readable font size
                     fontWeight: 'bold',
                     color: '#e0e0e0',
                     textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
@@ -1005,13 +1018,13 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
         })()}
       </div>
       
-      {/* Main Canvas - Ultra-maximized display area for Issue #14 */}
+      {/* Main Canvas - Dynamic maximization with proper viewport transform for Issue #14 */}
       <Stage
         ref={stageRef}
-        width={Math.max(100, stageSize.width - 15)} // Further reduced margin from 20px to 15px
-        height={Math.max(100, stageSize.height - 15)} // Further reduced margin from 20px to 15px
-        x={15} // Further reduced offset from 20px to 15px for left label area
-        y={15} // Further reduced offset from 20px to 15px for top label area
+        width={Math.max(100, stageSize.width - 5)} // Minimal margin of 5px for dynamic maximization
+        height={Math.max(100, stageSize.height - 5)} // Minimal margin of 5px for dynamic maximization
+        x={2.5} // Minimal offset for dynamic maximization
+        y={2.5} // Minimal offset for dynamic maximization
         onClick={handleStageClick}
         onWheel={handleWheel}
         onMouseDown={handleMouseDown}
@@ -1021,38 +1034,18 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
         style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
       >
         <Layer>
+          {/* Package outline and pins - with individual viewport transform */}
           {/* Package outline */}
           {(() => {
             const { gridSpacing, minRow, maxRow, minCol, maxCol } = packageDims as any;
             
             if (!gridSpacing) return null;
             
-            // Helper function to transform grid coordinates (same as transformPosition)
+            // Helper function to transform grid coordinates with viewport
             const transformGridCoord = (gridX: number, gridY: number) => {
-              let x = gridX;
-              let y = gridY;
-              
-              // Apply rotation first (at original scale)
-              if (rotation !== 0) {
-                const rad = (rotation * Math.PI) / 180;
-                const cos = Math.cos(rad);
-                const sin = Math.sin(rad);
-                const newX = x * cos - y * sin;
-                const newY = x * sin + y * cos;
-                x = newX;
-                y = newY;
-              }
-              
-              // Apply mirroring for bottom view
-              if (!isTopView) {
-                x = -x;
-              }
-              
-              // Apply viewport scaling and offset
-              const transformedX = x * viewport.scale + viewport.x + stageSize.width / 2;
-              const transformedY = y * viewport.scale + viewport.y + stageSize.height / 2;
-              
-              return { x: transformedX, y: transformedY };
+              // Create temporary pin object for position transformation
+              const tempPin = { position: { x: gridX, y: gridY } } as Pin;
+              return transformPosition(tempPin); // transformPosition already includes all transforms
             };
             
             // Calculate package outline corners based on grid boundaries
@@ -1089,35 +1082,14 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
             
             if (!gridSpacing) return null;
             
-            const lines = [];
-            
-            // Helper function to transform grid coordinates (same as transformPosition)
+            // Helper function to transform grid coordinates (already includes viewport transform)
             const transformGridCoord = (gridX: number, gridY: number) => {
-              let x = gridX;
-              let y = gridY;
-              
-              // Apply rotation first (at original scale)
-              if (rotation !== 0) {
-                const rad = (rotation * Math.PI) / 180;
-                const cos = Math.cos(rad);
-                const sin = Math.sin(rad);
-                const newX = x * cos - y * sin;
-                const newY = x * sin + y * cos;
-                x = newX;
-                y = newY;
-              }
-              
-              // Apply mirroring for bottom view
-              if (!isTopView) {
-                x = -x;
-              }
-              
-              // Apply viewport scaling and offset
-              const transformedX = x * viewport.scale + viewport.x + stageSize.width / 2;
-              const transformedY = y * viewport.scale + viewport.y + stageSize.height / 2;
-              
-              return { x: transformedX, y: transformedY };
+              // Create temporary pin object for position transformation
+              const tempPin = { position: { x: gridX, y: gridY } } as Pin;
+              return transformPosition(tempPin); // transformPosition already includes all transforms
             };
+            
+            const lines = [];
             
             // Major grid lines - tile boundaries (darker)
             // Vertical grid lines - align with column boundaries
@@ -1202,37 +1174,16 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
             
             if (!gridSpacing) return null;
             
-            // Helper function to transform grid coordinates (same as transformPosition)
+            // Helper function to transform grid coordinates (already includes viewport transform)
             const transformGridCoord = (gridX: number, gridY: number) => {
-              let x = gridX;
-              let y = gridY;
-              
-              // Apply rotation first (at original scale)
-              if (rotation !== 0) {
-                const rad = (rotation * Math.PI) / 180;
-                const cos = Math.cos(rad);
-                const sin = Math.sin(rad);
-                const newX = x * cos - y * sin;
-                const newY = x * sin + y * cos;
-                x = newX;
-                y = newY;
-              }
-              
-              // Apply mirroring for bottom view
-              if (!isTopView) {
-                x = -x;
-              }
-              
-              // Apply viewport scaling and offset
-              const transformedX = x * viewport.scale + viewport.x + stageSize.width / 2;
-              const transformedY = y * viewport.scale + viewport.y + stageSize.height / 2;
-              
-              return { x: transformedX, y: transformedY };
+              // Create temporary pin object for position transformation
+              const tempPin = { position: { x: gridX, y: gridY } } as Pin;
+              return transformPosition(tempPin); // transformPosition already includes all transforms
             };
             
-            // Position label at the top center of the package outline
+            // Position label at the top center of the tile matrix (above first row)
             const centerX = (minCol + maxCol - 1) * gridSpacing / 2;
-            const topY = (minRow - 0.5) * gridSpacing - gridSpacing * 0.8 - 20; // Above the package outline
+            const topY = (minRow - 1) * gridSpacing - 40; // Position above the first row of tiles
             const labelPos = transformGridCoord(centerX, topY);
             
             return (
