@@ -452,6 +452,7 @@ export class ProjectSaveService {
   private static gridToPosition(grid: { row: string; col: number }): { x: number; y: number } {
     // Convert grid position to pixel coordinates that exactly match grid labels
     // This ensures perfect alignment with the visual grid system
+    // Fixes Issue #12: Use rowToIndex for proper AA+ row positioning
     
     const rowOffset = rowToIndex(grid.row);
     

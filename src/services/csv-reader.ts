@@ -411,6 +411,7 @@ export class CSVReader {
 
   private static gridToPosition(grid: GridPosition): Position {
     // Use proper grid to position conversion with support for double letter rows
+    // Fixes Issue #12: AA+ rows were not displaying due to charCodeAt(0) limitation
     const rowOffset = rowToIndex(grid.row);
     const gridSpacing = 88; // Tile size from PackageCanvas
     
