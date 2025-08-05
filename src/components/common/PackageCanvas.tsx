@@ -69,9 +69,9 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
   const visiblePins = useMemo(() => {
     PerformanceService.startRenderMeasurement('viewport-culling');
     
-    // Calculate current viewport bounds
-    const canvasWidth = stageSize.width - 40;
-    const canvasHeight = stageSize.height - 30;
+    // Calculate current viewport bounds (updated for reduced margins - Issue #14)
+    const canvasWidth = stageSize.width - 20; // Reduced from 40px
+    const canvasHeight = stageSize.height - 20; // Reduced from 30px
     const viewportBounds = {
       x: -viewport.x / viewport.scale - canvasWidth / (2 * viewport.scale),
       y: -viewport.y / viewport.scale - canvasHeight / (2 * viewport.scale),
@@ -474,9 +474,9 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
       x = -x;
     }
     
-    // Apply viewport scaling and offset (account for label margins)
-    const canvasWidth = stageSize.width - 40; // Account for left margin
-    const canvasHeight = stageSize.height - 30; // Account for top margin
+    // Apply viewport scaling and offset (account for reduced label margins - Issue #14)
+    const canvasWidth = stageSize.width - 20; // Reduced from 40px margin
+    const canvasHeight = stageSize.height - 20; // Reduced from 30px margin
     const transformedX = x * viewport.scale + viewport.x + canvasWidth / 2;
     const transformedY = y * viewport.scale + viewport.y + canvasHeight / 2;
     
@@ -770,13 +770,13 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
 
   return (
     <div style={{ width: '100%', height: '100%', backgroundColor: '#1a1a1a', position: 'relative' }}>
-      {/* Grid Labels - Top (Columns) */}
+      {/* Grid Labels - Top (Columns) - Optimized for maximum display area */}
       <div style={{
         position: 'absolute',
         top: 0,
-        left: 40,
+        left: 20, // Reduced from 40px to 20px
         right: 0,
-        height: 30,
+        height: 20, // Reduced from 30px to 20px - Issue #14: maximize display area
         backgroundColor: '#2a2a2a',
         borderBottom: '1px solid #444',
         display: 'flex',
@@ -826,7 +826,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
             }
             
             const labelLeft = Math.round(pinTransformed.x - 10);
-            const containerWidth = stageSize.width - 40;
+            const containerWidth = stageSize.width - 20; // Updated for reduced margin
             
             // Show labels that are visible in the current viewport
             if (labelLeft >= -50 && labelLeft <= containerWidth + 50) {
@@ -838,11 +838,11 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                     left: labelLeft,
                     top: 0,
                     width: 20,
-                    height: 30,
+                    height: 20, // Reduced from 30px to 20px
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: 12,
+                    fontSize: 10, // Reduced from 12px to 10px for compact display
                     fontWeight: 'bold',
                     color: '#e0e0e0',
                     textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
@@ -860,12 +860,12 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
         })()}
       </div>
       
-      {/* Grid Labels - Left (Rows) */}
+      {/* Grid Labels - Left (Rows) - Optimized for maximum display area */}
       <div style={{
         position: 'absolute',
-        top: 30,
+        top: 20, // Reduced from 30px to 20px
         left: 0,
-        width: 40,
+        width: 20, // Reduced from 40px to 20px - Issue #14: maximize display area
         bottom: 0,
         backgroundColor: '#2a2a2a',
         borderRight: '1px solid #444',
@@ -922,7 +922,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
             }
             
             const labelTop = Math.round(pinTransformed.y - 10);
-            const containerHeight = stageSize.height - 30;
+            const containerHeight = stageSize.height - 20; // Updated for reduced margin
             
             // Show labels that are visible in the current viewport
             if (labelTop >= -50 && labelTop <= containerHeight + 50) {
@@ -933,12 +933,12 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                     position: 'absolute',
                     left: 0,
                     top: labelTop,
-                    width: 40,
+                    width: 20, // Reduced from 40px to 20px
                     height: 20,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: 12,
+                    fontSize: 10, // Reduced from 12px to 10px for compact display
                     fontWeight: 'bold',
                     color: '#e0e0e0',
                     textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
@@ -956,13 +956,13 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
         })()}
       </div>
       
-      {/* Main Canvas */}
+      {/* Main Canvas - Maximized display area for Issue #14 */}
       <Stage
         ref={stageRef}
-        width={Math.max(100, stageSize.width - 40)} // Account for left margin with minimum
-        height={Math.max(100, stageSize.height - 30)} // Account for top margin with minimum
-        x={40} // Offset for left label area
-        y={30} // Offset for top label area
+        width={Math.max(100, stageSize.width - 20)} // Reduced margin from 40px to 20px
+        height={Math.max(100, stageSize.height - 20)} // Reduced margin from 30px to 20px
+        x={20} // Reduced offset from 40px to 20px for left label area
+        y={20} // Reduced offset from 30px to 20px for top label area
         onClick={handleStageClick}
         onWheel={handleWheel}
         onMouseDown={handleMouseDown}
