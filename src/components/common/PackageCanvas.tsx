@@ -513,8 +513,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
     }
   }, [pins.length]);
 
-  // Transform coordinates based on view settings with stable scaling
-  // Updated for Issue #14: reduced margins for maximum display area
+  // Transform coordinates for pins with rotation and mirroring
   const transformPosition = (pin: Pin) => {
     let { x, y } = pin.position;
     
@@ -538,6 +537,25 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
     // Apply viewport scaling and offset (zero margins for maximum viewer area - Issue #14)
     const canvasWidth = stageSize.width; // Use full viewer area - no margins
     const canvasHeight = stageSize.height; // Use full viewer area - no margins
+    const transformedX = x * viewport.scale + viewport.x + canvasWidth / 2;
+    const transformedY = y * viewport.scale + viewport.y + canvasHeight / 2;
+    
+    return { x: transformedX, y: transformedY };
+  };
+
+  // Transform coordinates for grid labels WITHOUT rotation (labels stay in place)
+  const transformGridLabelPosition = (pin: Pin) => {
+    let { x, y } = pin.position;
+    
+    // Don't apply rotation for grid labels - they should stay aligned with the original grid
+    // Only apply mirroring for bottom view
+    if (!isTopView) {
+      x = -x;
+    }
+    
+    // Apply viewport scaling and offset
+    const canvasWidth = stageSize.width;
+    const canvasHeight = stageSize.height;
     const transformedX = x * viewport.scale + viewport.x + canvasWidth / 2;
     const transformedY = y * viewport.scale + viewport.y + canvasHeight / 2;
     
@@ -876,26 +894,12 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
             // Find a representative pin for this column to get exact position
             if (!representativePin) continue;
             
-            // Use the actual pin's transformed position (already includes viewport transform)
-            const pinTransformed = transformPosition(representativePin);
+            // Use the actual pin's transformed position WITHOUT rotation for grid labels
+            const pinTransformed = transformGridLabelPosition(representativePin);
             const screenX = pinTransformed.x; // No additional viewport transform needed
             
-            // Use appropriate grid coordinate based on rotation for the label
-            let displayText: string;
-            switch (rotation) {
-              case 0:
-              case 180:
-                // Normal orientation: column labels show column numbers
-                displayText = colIndex.toString();
-                break;
-              case 90:
-              case 270:
-                // 90/270 degree rotation: column labels show row letters
-                displayText = representativePin.gridPosition!.row;
-                break;
-              default:
-                displayText = colIndex.toString();
-            }
+            // Grid labels should always show the original grid coordinates regardless of rotation
+            const displayText = colIndex.toString();
             
             const labelLeft = Math.round(screenX - 6); // Center label on pin with viewport transform
             const containerWidth = stageSize.width; // Use full viewer area - no margins
@@ -968,26 +972,12 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
             // Find a representative pin for this row to get exact position
             if (!representativePin) continue;
             
-            // Use the actual pin's transformed position (already includes viewport transform)
-            const pinTransformed = transformPosition(representativePin);
+            // Use the actual pin's transformed position WITHOUT rotation for grid labels
+            const pinTransformed = transformGridLabelPosition(representativePin);
             const screenY = pinTransformed.y; // No additional viewport transform needed
             
-            // Use appropriate grid coordinate based on rotation for the label
-            let displayText: string;
-            switch (rotation) {
-              case 0:
-              case 180:
-                // Normal orientation: row labels show row letters
-                displayText = rowLetter;
-                break;
-              case 90:
-              case 270:
-                // 90/270 degree rotation: row labels show column numbers
-                displayText = representativePin.gridPosition!.col.toString();
-                break;
-              default:
-                displayText = rowLetter;
-            }
+            // Grid labels should always show the original grid coordinates regardless of rotation
+            const displayText = rowLetter;
             
             const labelTop = Math.round(screenY - 6 - 16); // Center label on pin with viewport transform, shifted up by one character height
             const containerHeight = stageSize.height; // Use full viewer area - no margins
@@ -1196,28 +1186,14 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
             return <>{lines}</>;
           })()}
 
-          {/* Package label */}
+          {/* Package label - Fixed position at top of canvas */}
           {(() => {
-            const { gridSpacing, minRow, minCol, maxCol } = packageDims as any;
-            
-            if (!gridSpacing) return null;
-            
-            // Helper function to transform grid coordinates (already includes viewport transform)
-            const transformGridCoord = (gridX: number, gridY: number) => {
-              // Create temporary pin object for position transformation
-              const tempPin = { position: { x: gridX, y: gridY } } as Pin;
-              return transformPosition(tempPin); // transformPosition already includes all transforms
-            };
-            
-            // Position label at the top center of the tile matrix (above first row)
-            const centerX = (minCol + maxCol - 1) * gridSpacing / 2;
-            const topY = (minRow - 1) * gridSpacing - 40; // Position above the first row of tiles
-            const labelPos = transformGridCoord(centerX, topY);
+            if (!pkg) return null;
             
             return (
               <Text
-                x={labelPos.x - 100}
-                y={labelPos.y}
+                x={stageSize.width / 2 - 100}
+                y={20}
                 width={200}
                 text={`${pkg.device} (${pkg.packageType})`}
                 fontSize={14}
