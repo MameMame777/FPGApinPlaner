@@ -1175,7 +1175,7 @@ const App: React.FC<AppProps> = () => {
             </div>
           </div>
 
-          {/* Main View Area */}
+          {/* Main View Area - Optimized for Issue #14: eliminate right margin when sidebar closed */}
           <div style={{
             flex: 1,
             minWidth: '400px', // Ensure minimum width to prevent complete collapse
@@ -1183,6 +1183,7 @@ const App: React.FC<AppProps> = () => {
             overflow: 'hidden',
             display: 'flex',
             flexShrink: 1, // Allow shrinking but respect minWidth
+            width: '100%', // Force full width utilization - Issue #14
           }}>
             <div style={{ 
               flex: 1, 
