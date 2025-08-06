@@ -930,7 +930,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
               // Grid labels should always show the original grid coordinates regardless of rotation
               const displayText = colIndex.toString();
               
-              const labelLeft = Math.round(screenX - 6); // Center label on pin with viewport transform
+              const labelLeft = Math.round(screenX - 6 + 11); // Center label on pin with viewport transform, shifted 1 character width (11px) to the right
               const containerWidth = stageSize.width; // Use full viewer area - no margins
               
               // Show labels that are visible in the current viewport with wider buffer
@@ -1006,7 +1006,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
               // Grid labels should always show the original grid coordinates regardless of rotation
               const displayText = rowLetter;
               
-              const labelTop = Math.round(screenY - 6 - 16 - 5); // Center label on pin with viewport transform, shifted up by one character height + 5px
+              const labelTop = Math.round(screenY - 6 - 16 - 5 + 16); // Center label on pin with viewport transform, shifted down by one character height (16px)
               const containerHeight = stageSize.height; // Use full viewer area - no margins
               
               // Show labels that are visible in the current viewport with wider buffer
