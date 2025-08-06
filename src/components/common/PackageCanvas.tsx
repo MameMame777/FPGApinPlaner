@@ -17,7 +17,7 @@ const HeaderBar: React.FC<{ fileName: string; viewInfo: string }> = ({ fileName,
       background: 'rgba(0,0,0,0.85)',
       display: 'flex',
       alignItems: 'center',
-      justifyContent: 'space-between',
+      justifyContent: 'flex-start',
       padding: '0 16px',
       position: 'relative',
       zIndex: 2,
@@ -29,7 +29,7 @@ const HeaderBar: React.FC<{ fileName: string; viewInfo: string }> = ({ fileName,
     }}
   >
     <span style={{ transform: 'translateY(-2px)' }}>{viewInfo}</span>
-    <span style={{ transform: 'translateY(-2px)' }}>{fileName}</span>
+    <span style={{ transform: 'translateY(-2px)', marginLeft: '360px' }}>{fileName}</span>
   </div>
 );
 
