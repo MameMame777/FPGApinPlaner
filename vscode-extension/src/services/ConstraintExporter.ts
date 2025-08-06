@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { Pin } from '../views/PinListProvider';
+import { Pin } from '../types';
 
 export class ConstraintExporter {
     async exportXDC(pins: Pin[], uri: vscode.Uri): Promise<void> {

@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { Pin } from '../views/PinListProvider';
+import { Pin } from '../types';
 
 export class CSVImporter {
     async importFromFile(uri: vscode.Uri): Promise<Pin[]> {
@@ -29,8 +29,10 @@ export class CSVImporter {
             const columns = this.parseCSVLine(line);
             if (columns.length >= 2) {
                 const pin: Pin = {
+                    id: columns[0]?.trim() || '',
                     number: columns[0]?.trim() || '',
                     name: columns[1]?.trim() || '',
+                    location: columns[0]?.trim() || '',
                     direction: this.parseDirection(columns[2]) || 'bidirectional',
                     voltage: columns[3]?.trim() || undefined,
                     ioStandard: columns[4]?.trim() || undefined,

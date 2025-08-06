@@ -5,52 +5,6 @@ import * as path from 'path';
 // Global panel reference
 let currentPanel: vscode.WebviewPanel | undefined;
 
-// File Manager Tree Data Provider
-class FileManagerProvider implements vscode.TreeDataProvider<FileManagerItem> {
-    constructor(private context: vscode.ExtensionContext) {}
-
-    getTreeItem(element: FileManagerItem): vscode.TreeItem {
-        return element;
-    }
-
-    getChildren(element?: FileManagerItem): Thenable<FileManagerItem[]> {
-        if (!element) {
-            // Root items
-            return Promise.resolve([
-                new FileManagerItem('📁 Load CSV File', 'loadCSV', vscode.TreeItemCollapsibleState.None, {
-                    command: 'fpgaPinPlanner.importCSVWithDialog',
-                    title: 'Load CSV File',
-                }),
-                new FileManagerItem('📂 Load Project File', 'loadProject', vscode.TreeItemCollapsibleState.None, {
-                    command: 'fpgaPinPlanner.loadProjectWithDialog',
-                    title: 'Load Project File',
-                }),
-                new FileManagerItem('🧪 Load Sample Data', 'loadSample', vscode.TreeItemCollapsibleState.None, {
-                    command: 'fpgaPinPlanner.loadSampleData',
-                    title: 'Load Sample Data',
-                })
-            ]);
-        }
-        return Promise.resolve([]);
-    }
-}
-
-class FileManagerItem extends vscode.TreeItem {
-    constructor(
-        public readonly label: string,
-        public readonly id: string,
-        public readonly collapsibleState: vscode.TreeItemCollapsibleState,
-        public readonly command?: vscode.Command
-    ) {
-        super(label, collapsibleState);
-        this.id = id;
-        this.tooltip = this.label;
-        if (command) {
-            this.command = command;
-        }
-    }
-}
-
 // Helper function to handle file save requests from webview
 async function handleFileSave(filePath: string, content: string, filename: string): Promise<boolean> {
     try {
@@ -109,10 +63,6 @@ async function handleFileSave(filePath: string, content: string, filename: strin
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('FPGA Pin Planner extension is now active!');
-
-    // Register file manager tree data provider
-    const fileManagerProvider = new FileManagerProvider(context);
-    vscode.window.registerTreeDataProvider('fpgaPinPlanner.fileManager', fileManagerProvider);
 
     // Simple command to open the pin planner
     const openPlannerCommand = vscode.commands.registerCommand(
@@ -468,15 +418,6 @@ export function activate(context: vscode.ExtensionContext) {
         }
     );
 
-    // Register Tree Data Providers
-    const pinListProvider = new PinListProvider();
-    const validationProvider = new ValidationProvider();
-    const batchOperationsProvider = new BatchOperationsProvider();
-
-    vscode.window.registerTreeDataProvider('fpgaPinPlanner.pinList', pinListProvider);
-    vscode.window.registerTreeDataProvider('fpgaPinPlanner.validation', validationProvider);
-    vscode.window.registerTreeDataProvider('fpgaPinPlanner.batchOperations', batchOperationsProvider);
-
     context.subscriptions.push(
         openPlannerCommand,
         openGUICommand,
@@ -491,72 +432,6 @@ export function activate(context: vscode.ExtensionContext) {
         validateConstraintsCommand,
         loadSampleDataCommand
     );
-}
-
-// Tree Data Providers
-class PinListProvider implements vscode.TreeDataProvider<PinItem> {
-    getTreeItem(element: PinItem): vscode.TreeItem {
-        return element;
-    }
-
-    getChildren(element?: PinItem): Thenable<PinItem[]> {
-        if (!element) {
-            return Promise.resolve([
-                new PinItem('Open FPGA GUI', 'fpgaPinPlanner.openGUI', 'circuit-board'),
-                new PinItem('Import CSV Data', 'fpgaPinPlanner.importCSVWithDialog', 'folder-opened'),
-                new PinItem('Refresh Pin List', 'fpgaPinPlanner.openPlanner', 'refresh')
-            ]);
-        }
-        return Promise.resolve([]);
-    }
-}
-
-class ValidationProvider implements vscode.TreeDataProvider<PinItem> {
-    getTreeItem(element: PinItem): vscode.TreeItem {
-        return element;
-    }
-
-    getChildren(element?: PinItem): Thenable<PinItem[]> {
-        if (!element) {
-            return Promise.resolve([
-                new PinItem('Run Validation', 'fpgaPinPlanner.validateConstraints', 'check'),
-                new PinItem('View Results', 'fpgaPinPlanner.openGUI', 'list-unordered')
-            ]);
-        }
-        return Promise.resolve([]);
-    }
-}
-
-class BatchOperationsProvider implements vscode.TreeDataProvider<PinItem> {
-    getTreeItem(element: PinItem): vscode.TreeItem {
-        return element;
-    }
-
-    getChildren(element?: PinItem): Thenable<PinItem[]> {
-        if (!element) {
-            return Promise.resolve([
-                new PinItem('Export XDC', 'fpgaPinPlanner.exportXDCWithDialog', 'export'),
-                new PinItem('Save Project', 'fpgaPinPlanner.saveProjectWithDialog', 'save'),
-                new PinItem('Quick Actions', 'fpgaPinPlanner.openGUI', 'zap')
-            ]);
-        }
-        return Promise.resolve([]);
-    }
-}
-
-class PinItem extends vscode.TreeItem {
-    constructor(
-        public readonly label: string,
-        public readonly commandId: string,
-        public readonly iconName: string
-    ) {
-        super(label, vscode.TreeItemCollapsibleState.None);
-        this.command = {
-            command: commandId,
-            title: label
-        };
-        this.iconPath = new vscode.ThemeIcon(iconName);
-    }
 }
 
 function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): string {

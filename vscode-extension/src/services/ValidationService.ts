@@ -1,5 +1,4 @@
-import { Pin } from '../views/PinListProvider';
-import { ValidationIssue } from '../views/ValidationProvider';
+import { Pin, ValidationIssue } from '../types';
 
 export class ValidationService {
     validateAll(pins: Pin[]): ValidationIssue[] {
@@ -8,10 +7,12 @@ export class ValidationService {
         // Check for duplicate pin numbers
         const pinNumbers = new Map<string, Pin[]>();
         for (const pin of pins) {
-            if (!pinNumbers.has(pin.number)) {
-                pinNumbers.set(pin.number, []);
+            if (pin.number) {
+                if (!pinNumbers.has(pin.number)) {
+                    pinNumbers.set(pin.number, []);
+                }
+                pinNumbers.get(pin.number)!.push(pin);
             }
-            pinNumbers.get(pin.number)!.push(pin);
         }
 
         for (const [number, pinsWithNumber] of pinNumbers) {
