@@ -36,6 +36,8 @@
   "icon": "images/icon.png",
   "activationEvents": [
     "onCommand:fpgaPinPlanner.openPlanner",
+    "onCommand:fpgaPinPlanner.openGUI",
+    "onCommand:fpgaPinPlanner.loadSampleData",
     "onLanguage:csv",
     "workspaceContains:**/*.csv",
     "workspaceContains:**/*.xdc",

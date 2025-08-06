@@ -406,15 +406,86 @@ export function activate(context: vscode.ExtensionContext) {
     const loadSampleDataCommand = vscode.commands.registerCommand(
         'fpgaPinPlanner.loadSampleData',
         () => {
-            // Sample data loading will be handled by the webview
-            if (currentPanel) {
-                currentPanel.webview.postMessage({
-                    command: 'loadSampleData'
-                });
-                vscode.window.showInformationMessage('Loading sample FPGA package data...');
-            } else {
-                vscode.window.showWarningMessage('FPGA Pin Planner is not open. Please open the planner first.');
+            // If panel is not open, create it first
+            if (!currentPanel) {
+                console.log('🚀 Creating new panel for sample data loading');
+                currentPanel = vscode.window.createWebviewPanel(
+                    'fpgaPinPlanner',
+                    'FPGA Pin Planner',
+                    vscode.ViewColumn.One,
+                    {
+                        enableScripts: true,
+                        retainContextWhenHidden: true
+                    }
+                );
+
+                // Set the webview's html content
+                currentPanel.webview.html = getWebviewContent(currentPanel.webview, context.extensionUri);
+
+                // Handle messages from the webview
+                currentPanel.webview.onDidReceiveMessage(
+                    message => {
+                        switch (message.command) {
+                            case 'alert':
+                                vscode.window.showInformationMessage(message.text);
+                                return;
+                            case 'webviewReady':
+                                console.log('✅ Webview is ready, sending loadSampleData command');
+                                currentPanel?.webview.postMessage({
+                                    command: 'loadSampleData'
+                                });
+                                return;
+                            case 'showSaveDialog':
+                                console.log('💾 Received save dialog request:', message);
+                                // Show VS Code save dialog
+                                vscode.window.showSaveDialog({
+                                    saveLabel: message.options?.saveLabel || 'Save',
+                                    filters: message.options?.filters || {
+                                        'All Files': ['*']
+                                    }
+                                }).then(fileUri => {
+                                    if (fileUri) {
+                                        console.log('📂 Selected file path:', fileUri.fsPath);
+                                        currentPanel?.webview.postMessage({
+                                            command: 'saveDialogResult',
+                                            result: fileUri.fsPath
+                                        });
+                                    } else {
+                                        console.log('❌ Save dialog cancelled');
+                                        currentPanel?.webview.postMessage({
+                                            command: 'saveDialogResult',
+                                            result: false
+                                        });
+                                    }
+                                });
+                                return;
+                            case 'saveFile':
+                                console.log('💾 Received save file request:', message);
+                                handleFileSave(message.filePath, message.content, message.filename)
+                                    .then(success => {
+                                        currentPanel?.webview.postMessage({
+                                            command: 'saveFileResult',
+                                            success: success
+                                        });
+                                    });
+                                return;
+                        }
+                    },
+                    undefined,
+                    context.subscriptions
+                );
+
+                // Clean up when the panel is disposed
+                currentPanel.onDidDispose(
+                    () => {
+                        currentPanel = undefined;
+                    },
+                    null,
+                    context.subscriptions
+                );
             }
+
+            vscode.window.showInformationMessage('Loading sample FPGA package data...');
         }
     );
 

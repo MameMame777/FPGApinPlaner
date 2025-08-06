@@ -73,6 +73,7 @@ code --install-extension fpga-pin-planner-1.0.1.vsix --force
 3. **Extension compiles TypeScript** and packages everything into `.vsix` file
 4. **Always follow proper build order**: main app → extension
 5. Test both standalone web version and VS Code extension after changes
+Use the latest webview content to build the extension. Old build artifacts can cause issues.
 
 ### Webview Synchronization
 The extension uses automated scripts to sync webview content:

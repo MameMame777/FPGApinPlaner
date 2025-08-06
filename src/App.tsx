@@ -127,6 +127,7 @@ const App: React.FC<AppProps> = () => {
   // Handle VS Code messages
   useEffect(() => {
     const handleVSCodeMessage = (event: MessageEvent) => {
+      console.log('📥 Received message from VS Code:', event.data);
       const message = event.data;
       switch (message.command) {
         case 'loadProject':
@@ -191,11 +192,30 @@ const App: React.FC<AppProps> = () => {
     };
 
     // Check if we're in VS Code environment
+    console.log('🔍 Checking VS Code environment:', {
+      hasVscode: typeof (window as any).vscode !== 'undefined',
+      windowKeys: Object.keys(window),
+      userAgent: navigator.userAgent
+    });
+    
     if (typeof (window as any).vscode !== 'undefined') {
+      console.log('✅ VS Code environment detected, setting up message listener');
       window.addEventListener('message', handleVSCodeMessage);
+      
+      // Notify extension that webview is ready
+      setTimeout(() => {
+        console.log('📢 Notifying VS Code extension that webview is ready');
+        (window as any).vscode.postMessage({
+          command: 'webviewReady'
+        });
+      }, 500);
+      
       return () => {
+        console.log('🧹 Cleaning up VS Code message listener');
         window.removeEventListener('message', handleVSCodeMessage);
       };
+    } else {
+      console.log('❌ Not in VS Code environment');
     }
     
     // Return cleanup function even if not in VS Code
