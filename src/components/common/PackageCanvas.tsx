@@ -91,7 +91,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
     return indexes;
   }, [pins]);
   
-  // Smart viewport culling based on user use cases
+  // Smart viewport culling based on user use cases - with rotation support
   const visiblePins = useMemo(() => {
     PerformanceService.startRenderMeasurement('viewport-culling');
     
@@ -104,6 +104,34 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
       width: canvasWidth / viewport.scale,
       height: canvasHeight / viewport.scale,
       scale: viewport.scale
+    };
+    
+    // Rotation-aware culling function
+    const isPointInBounds = (pin: Pin, bounds: any) => {
+      // Apply same transformation as transformPosition but without viewport scaling
+      let { x, y } = pin.position;
+      
+      // Apply rotation first (at original scale)
+      if (rotation !== 0) {
+        const rad = (rotation * Math.PI) / 180;
+        const cos = Math.cos(rad);
+        const sin = Math.sin(rad);
+        const newX = x * cos - y * sin;
+        const newY = x * sin + y * cos;
+        x = newX;
+        y = newY;
+      }
+      
+      // Apply mirroring for bottom view
+      if (!isTopView) {
+        x = -x;
+      }
+      
+      // Check if the transformed position is within bounds
+      return x >= bounds.x && 
+             x <= bounds.x + bounds.width &&
+             y >= bounds.y && 
+             y <= bounds.y + bounds.height;
     };
     
     // Use case 1: Detail view (high zoom) - show all pins in focused area + selected pins
@@ -122,7 +150,8 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
         .map(id => pinIndexes.findById(id))
         .filter(Boolean) as Pin[];
       
-      const culledPins = PerformanceService.optimizeCanvasRendering().cullPins(pins, extendedBounds);
+      // Use rotation-aware culling instead of PerformanceService.cullPins
+      const culledPins = pins.filter(pin => isPointInBounds(pin, extendedBounds));
       
       // Combine culled pins with selected pins (remove duplicates)
       const allVisiblePins = new Map<string, Pin>();
@@ -131,7 +160,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
       
       const result = Array.from(allVisiblePins.values());
       const duration = PerformanceService.endRenderMeasurement('viewport-culling');
-      console.log(`🎯 Detail view: ${result.length}/${pins.length} pins visible (${duration.toFixed(2)}ms)`);
+      console.log(`🎯 Detail view (rotation-aware): ${result.length}/${pins.length} pins visible (${duration.toFixed(2)}ms)`);
       return result;
     }
     
@@ -199,30 +228,27 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
           .map(id => pinIndexes.findById(id))
           .filter(Boolean) as Pin[];
         
-        // Include all pins in the focus area
-        const focusPins = pins.filter(pin => 
-          pin.position.x >= focusArea.x && pin.position.x <= focusArea.x + focusArea.width &&
-          pin.position.y >= focusArea.y && pin.position.y <= focusArea.y + focusArea.height
-        );
+        // Use rotation-aware culling for focus area
+        const focusAreaPins = pins.filter(pin => isPointInBounds(pin, focusArea));
         
         // Sample from remaining pins for context
         const remainingPins = pins.filter(pin => 
-          !focusPins.some(fp => fp.id === pin.id) && 
+          !focusAreaPins.some(fp => fp.id === pin.id) && 
           !selectedPins.has(pin.id)
         );
         const sampleStep = Math.max(1, Math.floor(remainingPins.length / 200)); // Show ~200 context pins
         const contextPins = remainingPins.filter((_, index) => index % sampleStep === 0);
         
         // Combine all pin sets
-        const mediumZoomPins = new Map<string, Pin>();
-        selectedPinObjects.forEach(pin => mediumZoomPins.set(pin.id, pin));
-        focusPins.forEach(pin => mediumZoomPins.set(pin.id, pin));
-        contextPins.forEach(pin => mediumZoomPins.set(pin.id, pin));
+        const mediumZoomVisiblePins = new Map<string, Pin>();
+        selectedPinObjects.forEach(pin => mediumZoomVisiblePins.set(pin.id, pin));
+        focusAreaPins.forEach(pin => mediumZoomVisiblePins.set(pin.id, pin));
+        contextPins.forEach(pin => mediumZoomVisiblePins.set(pin.id, pin));
         
-        const result = Array.from(mediumZoomPins.values());
-        const duration = PerformanceService.endRenderMeasurement('viewport-culling');
-        console.log(`🎯 Medium zoom focus: ${result.length}/${pins.length} pins visible (focus: ${focusPins.length}, context: ${contextPins.length}, selected: ${selectedPinObjects.length}) (${duration.toFixed(2)}ms)`);
-        return result;
+        const mediumResult = Array.from(mediumZoomVisiblePins.values());
+        const mediumDuration = PerformanceService.endRenderMeasurement('viewport-culling');
+        console.log(`🎯 Medium zoom (rotation-aware): ${mediumResult.length}/${pins.length} pins visible (focus: ${focusAreaPins.length}, context: ${contextPins.length}, selected: ${selectedPinObjects.length}) (${mediumDuration.toFixed(2)}ms)`);
+        return mediumResult;
       }
       
       // High-medium zoom: balanced view with more optimization
