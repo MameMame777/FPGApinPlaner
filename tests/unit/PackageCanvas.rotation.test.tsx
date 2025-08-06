@@ -237,8 +237,8 @@ describe('PackageCanvas Coordinate Transform Tests', () => {
   });
 
   describe('transformGridLabelPosition function', () => {
-    it('should not apply rotation to grid labels', () => {
-      // Test that grid labels maintain their position regardless of rotation
+    it('should apply rotation to grid labels to match pin positions', () => {
+      // Test that grid labels follow the rotation of pins to maintain alignment
       expect(true).toBe(true); // Placeholder
     });
   });

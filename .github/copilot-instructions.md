@@ -38,6 +38,8 @@ npm run package
 - Mixed build environments
 - Inconsistent packaging results
 - **OLD WEBVIEW CONTENT** - The most common issue!
+- Complex implementation should be avoided. Simpler is better.
+- don't hesitate to ask for help if you encounter issues.
 
 ### Critical Build Order
 1. **ALWAYS build main app first**: `npm run build` (in root directory)

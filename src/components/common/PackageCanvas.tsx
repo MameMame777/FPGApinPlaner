@@ -567,25 +567,6 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
     return { x: transformedX, y: transformedY };
   };
 
-  // Transform coordinates for grid labels WITHOUT rotation (labels stay in place)
-  const transformGridLabelPosition = (pin: Pin) => {
-    let { x, y } = pin.position;
-    
-    // Don't apply rotation for grid labels - they should stay aligned with the original grid
-    // Only apply mirroring for bottom view
-    if (!isTopView) {
-      x = -x;
-    }
-    
-    // Apply viewport scaling and offset
-    const canvasWidth = stageSize.width;
-    const canvasHeight = stageSize.height;
-    const transformedX = x * viewport.scale + viewport.x + canvasWidth / 2;
-    const transformedY = y * viewport.scale + viewport.y + canvasHeight / 2;
-    
-    return { x: transformedX, y: transformedY };
-  };
-
   // Apply viewport boundaries to prevent canvas from disappearing off screen
   // Updated for Issue #14: maximized display area with reduced margins
   const applyViewportBounds = (pos: { x: number; y: number }, scale: number) => {
@@ -894,160 +875,440 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
         position: 'relative',
         overflow: 'hidden',
       }}>
-        {/* Grid Labels - Top (Columns) - Enhanced visibility - Issue #14 */}
+        {/* Grid Labels - Fixed 4-direction layout with rotation-aware content */}
+        
+        {/* Top Labels */}
         <div style={{
           position: 'absolute',
           top: 0,
-          left: 0, // No margin for maximum viewer area
-          right: 0,
-          height: 16, // Increased from 10px to 16px for better readability
+          left: 16,
+          right: 16,
+          height: 16,
           backgroundColor: '#2a2a2a',
-          borderBottom: '1px solid #444',
+          border: '1px solid #444',
           display: 'flex',
           alignItems: 'center',
+          justifyContent: 'flex-start',
+          flexDirection: 'row',
           zIndex: 10,
           overflow: 'hidden'
         }}>
           {viewport.scale > 0.1 && (() => {
-            const { gridSpacing, minCol, maxCol } = packageDims as any;
+            const { gridSpacing, minCol, maxCol, minRow, maxRow } = packageDims as any;
             if (!gridSpacing) return null;
             
-            const columnLabels: JSX.Element[] = [];
+            const topLabels: JSX.Element[] = [];
             
-            // Generate labels in correct column order (1, 2, 3, ...)
-            for (let colIndex = minCol; colIndex <= maxCol; colIndex++) {
-              // Find a representative pin for this column to get grid coordinate
-              const representativePin = pins.find(pin => 
-                pin.gridPosition && pin.gridPosition.col === colIndex
-              );
-              
-              if (!representativePin) continue;
-              
-              // Use the actual pin's transformed position WITHOUT rotation for grid labels
-              const pinTransformed = transformGridLabelPosition(representativePin);
-              const screenX = pinTransformed.x; // No additional viewport transform needed
-              
-              // Grid labels should always show the original grid coordinates regardless of rotation
-              const displayText = colIndex.toString();
-              
-              const labelLeft = Math.round(screenX - 6 + 11); // Center label on pin with viewport transform, shifted 1 character width (11px) to the right
-              const containerWidth = stageSize.width; // Use full viewer area - no margins
-              
-              // Show labels that are visible in the current viewport with wider buffer
-              if (labelLeft >= -50 && labelLeft <= containerWidth + 50) { // Wider buffer for better visibility
-                columnLabels.push(
-                  <div
-                    key={`col-${colIndex}`}
-                    style={{
-                      position: 'absolute',
-                      left: labelLeft,
-                      top: -5, // Shift 5px up from toolbar area
-                      width: 20, // Increased from 14px for better readability
-                      height: 16, // Increased from 12px for better readability
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: 11, // Increased from 8px for better readability
-                      fontWeight: 'bold',
-                      color: '#e0e0e0',
-                      textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
-                      pointerEvents: 'none',
-                      overflow: 'hidden'
-                    }}
-                  >
-                    {displayText}
-                  </div>
+            // Top area content depends on rotation
+            const shouldShowColumns = rotation === 0 || rotation === 180;
+            
+            if (shouldShowColumns) {
+              // Show columns when rotation is 0° or 180°
+              for (let colIndex = minCol; colIndex <= maxCol; colIndex++) {
+                const representativePin = pins.find(pin => 
+                  pin.gridPosition && pin.gridPosition.col === colIndex
                 );
+                
+                if (!representativePin) continue;
+                
+                const pinTransformed = transformPosition(representativePin);
+                const labelPosition = { left: pinTransformed.x - 10, top: -5 };
+                
+                if (labelPosition.left >= -50 && labelPosition.left <= stageSize.width + 50) {
+                  topLabels.push(
+                    <div
+                      key={`top-col-${colIndex}`}
+                      style={{
+                        position: 'absolute',
+                        ...labelPosition,
+                        width: 20,
+                        height: 16,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 11,
+                        fontWeight: 'bold',
+                        color: '#e0e0e0',
+                        textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
+                        pointerEvents: 'none',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      {colIndex}
+                    </div>
+                  );
+                }
+              }
+            } else {
+              // Show rows when rotation is 90° or 270°
+              for (let rowIndex = minRow; rowIndex <= maxRow; rowIndex++) {
+                const rowLetter = indexToRow(rowIndex);
+                const representativePin = pins.find(pin => 
+                  pin.gridPosition && pin.gridPosition.row === rowLetter
+                );
+                
+                if (!representativePin) continue;
+                
+                const pinTransformed = transformPosition(representativePin);
+                const labelPosition = { left: pinTransformed.x - 10, top: -5 };
+                
+                if (labelPosition.left >= -50 && labelPosition.left <= stageSize.width + 50) {
+                  topLabels.push(
+                    <div
+                      key={`top-row-${rowIndex}`}
+                      style={{
+                        position: 'absolute',
+                        ...labelPosition,
+                        width: 20,
+                        height: 16,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 11,
+                        fontWeight: 'bold',
+                        color: '#e0e0e0',
+                        textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
+                        pointerEvents: 'none',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      {rowLetter}
+                    </div>
+                  );
+                }
               }
             }
             
-            return columnLabels;
+            return topLabels;
           })()}
         </div>
-        
-        {/* Grid Labels - Left (Rows) - Enhanced visibility - Issue #14 */}
+
+        {/* Right Labels */}
         <div style={{
           position: 'absolute',
-          top: 16, // Match top label height
-          left: 0,
-          width: 16, // Increased from 10px for better readability
-          bottom: 0,
+          top: 16,
+          right: 0,
+          bottom: 16,
+          width: 16,
           backgroundColor: '#2a2a2a',
-          borderRight: '1px solid #444',
+          border: '1px solid #444',
           display: 'flex',
-          flexDirection: 'column',
           alignItems: 'center',
+          justifyContent: 'center',
+          flexDirection: 'column',
+          zIndex: 10,
+          overflow: 'hidden'
         }}>
           {viewport.scale > 0.1 && (() => {
-            const { gridSpacing, minRow, maxRow } = packageDims as any;
+            const { gridSpacing, minCol, maxCol, minRow, maxRow } = packageDims as any;
             if (!gridSpacing) return null;
             
-            const rowLabels: JSX.Element[] = [];
+            const rightLabels: JSX.Element[] = [];
             
-            // Generate labels in correct row order (A, B, C, ..., Z, AA, AB, ...)
-            console.log(`🔍 Grid dimensions - minRow: ${minRow}, maxRow: ${maxRow}`);
+            // Right area content depends on rotation
+            const shouldShowRows = rotation === 0 || rotation === 180;
             
-            for (let rowIndex = minRow; rowIndex <= maxRow; rowIndex++) {
-              const rowLetter = indexToRow(rowIndex);
-              console.log(`🔍 Processing row ${rowIndex} -> ${rowLetter}`);
-              
-              // Find a representative pin for this row to get grid coordinate
-              const representativePin = pins.find(pin => 
-                pin.gridPosition && pin.gridPosition.row === rowLetter
-              );
-              
-              // Find a representative pin for this row to get exact position
-              if (!representativePin) continue;
-              
-              // Use the actual pin's transformed position WITHOUT rotation for grid labels
-              const pinTransformed = transformGridLabelPosition(representativePin);
-              const screenY = pinTransformed.y; // No additional viewport transform needed
-              
-              // Grid labels should always show the original grid coordinates regardless of rotation
-              const displayText = rowLetter;
-              
-              const labelTop = Math.round(screenY - 6 - 16 - 5 + 16); // Center label on pin with viewport transform, shifted down by one character height (16px)
-              const containerHeight = stageSize.height; // Use full viewer area - no margins
-              
-              // Show labels that are visible in the current viewport with wider buffer
-              if (labelTop >= -50 && labelTop <= containerHeight + 50) { // Wider buffer for better visibility
-                rowLabels.push(
-                  <div
-                    key={`row-${rowIndex}`}
-                    style={{
-                      position: 'absolute',
-                      left: 0,
-                      top: labelTop,
-                      width: 20, // Increased from 14px for better readability
-                      height: 16, // Increased from 12px for better readability
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: 11, // Increased from 8px for better readability
-                      fontWeight: 'bold',
-                      color: '#e0e0e0',
-                      textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
-                      pointerEvents: 'none',
-                      overflow: 'hidden'
-                    }}
-                  >
-                    {displayText}
-                  </div>
+            if (shouldShowRows) {
+              // Show rows when rotation is 0° or 180°
+              for (let rowIndex = minRow; rowIndex <= maxRow; rowIndex++) {
+                const rowLetter = indexToRow(rowIndex);
+                const representativePin = pins.find(pin => 
+                  pin.gridPosition && pin.gridPosition.row === rowLetter
                 );
+                
+                if (!representativePin) continue;
+                
+                const pinTransformed = transformPosition(representativePin);
+                const labelPosition = { left: -5, top: pinTransformed.y - 8 };
+                
+                if (labelPosition.top >= -50 && labelPosition.top <= stageSize.height + 50) {
+                  rightLabels.push(
+                    <div
+                      key={`right-row-${rowIndex}`}
+                      style={{
+                        position: 'absolute',
+                        ...labelPosition,
+                        width: 20,
+                        height: 16,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 11,
+                        fontWeight: 'bold',
+                        color: '#e0e0e0',
+                        textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
+                        pointerEvents: 'none',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      {rowLetter}
+                    </div>
+                  );
+                }
+              }
+            } else {
+              // Show columns when rotation is 90° or 270°
+              for (let colIndex = minCol; colIndex <= maxCol; colIndex++) {
+                const representativePin = pins.find(pin => 
+                  pin.gridPosition && pin.gridPosition.col === colIndex
+                );
+                
+                if (!representativePin) continue;
+                
+                const pinTransformed = transformPosition(representativePin);
+                const labelPosition = { left: -5, top: pinTransformed.y - 8 };
+                
+                if (labelPosition.top >= -50 && labelPosition.top <= stageSize.height + 50) {
+                  rightLabels.push(
+                    <div
+                      key={`right-col-${colIndex}`}
+                      style={{
+                        position: 'absolute',
+                        ...labelPosition,
+                        width: 20,
+                        height: 16,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 11,
+                        fontWeight: 'bold',
+                        color: '#e0e0e0',
+                        textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
+                        pointerEvents: 'none',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      {colIndex}
+                    </div>
+                  );
+                }
               }
             }
             
-            return rowLabels;
+            return rightLabels;
+          })()}
+        </div>
+
+        {/* Bottom Labels */}
+        <div style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 16,
+          right: 16,
+          height: 16,
+          backgroundColor: '#2a2a2a',
+          border: '1px solid #444',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'flex-start',
+          flexDirection: 'row',
+          zIndex: 10,
+          overflow: 'hidden'
+        }}>
+          {viewport.scale > 0.1 && (() => {
+            const { gridSpacing, minCol, maxCol, minRow, maxRow } = packageDims as any;
+            if (!gridSpacing) return null;
+            
+            const bottomLabels: JSX.Element[] = [];
+            
+            // Bottom area content depends on rotation
+            const shouldShowColumns = rotation === 0 || rotation === 180;
+            
+            if (shouldShowColumns) {
+              // Show columns when rotation is 0° or 180°
+              for (let colIndex = minCol; colIndex <= maxCol; colIndex++) {
+                const representativePin = pins.find(pin => 
+                  pin.gridPosition && pin.gridPosition.col === colIndex
+                );
+                
+                if (!representativePin) continue;
+                
+                const pinTransformed = transformPosition(representativePin);
+                const labelPosition = { left: pinTransformed.x - 10, top: -5 };
+                
+                if (labelPosition.left >= -50 && labelPosition.left <= stageSize.width + 50) {
+                  bottomLabels.push(
+                    <div
+                      key={`bottom-col-${colIndex}`}
+                      style={{
+                        position: 'absolute',
+                        ...labelPosition,
+                        width: 20,
+                        height: 16,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 11,
+                        fontWeight: 'bold',
+                        color: '#e0e0e0',
+                        textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
+                        pointerEvents: 'none',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      {colIndex}
+                    </div>
+                  );
+                }
+              }
+            } else {
+              // Show rows when rotation is 90° or 270°
+              for (let rowIndex = minRow; rowIndex <= maxRow; rowIndex++) {
+                const rowLetter = indexToRow(rowIndex);
+                const representativePin = pins.find(pin => 
+                  pin.gridPosition && pin.gridPosition.row === rowLetter
+                );
+                
+                if (!representativePin) continue;
+                
+                const pinTransformed = transformPosition(representativePin);
+                const labelPosition = { left: pinTransformed.x - 10, top: -5 };
+                
+                if (labelPosition.left >= -50 && labelPosition.left <= stageSize.width + 50) {
+                  bottomLabels.push(
+                    <div
+                      key={`bottom-row-${rowIndex}`}
+                      style={{
+                        position: 'absolute',
+                        ...labelPosition,
+                        width: 20,
+                        height: 16,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 11,
+                        fontWeight: 'bold',
+                        color: '#e0e0e0',
+                        textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
+                        pointerEvents: 'none',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      {rowLetter}
+                    </div>
+                  );
+                }
+              }
+            }
+            
+            return bottomLabels;
+          })()}
+        </div>
+
+        {/* Left Labels */}
+        <div style={{
+          position: 'absolute',
+          top: 16,
+          left: 0,
+          bottom: 16,
+          width: 16,
+          backgroundColor: '#2a2a2a',
+          border: '1px solid #444',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexDirection: 'column',
+          zIndex: 10,
+          overflow: 'hidden'
+        }}>
+          {viewport.scale > 0.1 && (() => {
+            const { gridSpacing, minCol, maxCol, minRow, maxRow } = packageDims as any;
+            if (!gridSpacing) return null;
+            
+            const leftLabels: JSX.Element[] = [];
+            
+            // Left area content depends on rotation
+            const shouldShowRows = rotation === 0 || rotation === 180;
+            
+            if (shouldShowRows) {
+              // Show rows when rotation is 0° or 180°
+              for (let rowIndex = minRow; rowIndex <= maxRow; rowIndex++) {
+                const rowLetter = indexToRow(rowIndex);
+                const representativePin = pins.find(pin => 
+                  pin.gridPosition && pin.gridPosition.row === rowLetter
+                );
+                
+                if (!representativePin) continue;
+                
+                const pinTransformed = transformPosition(representativePin);
+                const labelPosition = { left: -5, top: pinTransformed.y - 8 };
+                
+                if (labelPosition.top >= -50 && labelPosition.top <= stageSize.height + 50) {
+                  leftLabels.push(
+                    <div
+                      key={`left-row-${rowIndex}`}
+                      style={{
+                        position: 'absolute',
+                        ...labelPosition,
+                        width: 20,
+                        height: 16,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 11,
+                        fontWeight: 'bold',
+                        color: '#e0e0e0',
+                        textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
+                        pointerEvents: 'none',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      {rowLetter}
+                    </div>
+                  );
+                }
+              }
+            } else {
+              // Show columns when rotation is 90° or 270°
+              for (let colIndex = minCol; colIndex <= maxCol; colIndex++) {
+                const representativePin = pins.find(pin => 
+                  pin.gridPosition && pin.gridPosition.col === colIndex
+                );
+                
+                if (!representativePin) continue;
+                
+                const pinTransformed = transformPosition(representativePin);
+                const labelPosition = { left: -5, top: pinTransformed.y - 8 };
+                
+                if (labelPosition.top >= -50 && labelPosition.top <= stageSize.height + 50) {
+                  leftLabels.push(
+                    <div
+                      key={`left-col-${colIndex}`}
+                      style={{
+                        position: 'absolute',
+                        ...labelPosition,
+                        width: 20,
+                        height: 16,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 11,
+                        fontWeight: 'bold',
+                        color: '#e0e0e0',
+                        textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
+                        pointerEvents: 'none',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      {colIndex}
+                    </div>
+                  );
+                }
+              }
+            }
+            
+            return leftLabels;
           })()}
         </div>
         
-        {/* Main Canvas with Stage */}
+        {/* Main Canvas with Stage - Fixed margins for 4-direction labels */}
         <div style={{
           position: 'absolute',
-          top: 16, // Account for top labels
-          left: 16, // Account for left labels
-          right: 0,
-          bottom: 0,
+          top: 16,    // Top label height
+          left: 16,   // Left label width
+          right: 16,  // Right label width
+          bottom: 16, // Bottom label height
+          overflow: 'hidden'
         }}>
           <Stage
         ref={(ref) => {
