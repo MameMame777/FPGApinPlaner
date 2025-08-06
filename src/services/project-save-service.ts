@@ -282,8 +282,8 @@ export class ProjectSaveService {
         zoom: saveData.viewSettings.zoom,
         showPinNumbers: true,
         showSignalNames: true,
-        showPinTypes: false,
-        resetTrigger: 0
+        showPinTypes: false
+        // resetTrigger removed - was causing unwanted automatic viewport changes
       },
       filters: {
         pinTypes: [],

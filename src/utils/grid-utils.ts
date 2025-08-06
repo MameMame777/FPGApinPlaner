@@ -34,6 +34,12 @@ export function rowToIndex(row: string): number {
  * 0=A, 1=B, ..., 25=Z, 26=AA, 27=AB, ..., 51=AZ, 52=BA, etc.
  */
 export function indexToRow(index: number): string {
+  // Boundary check: handle negative or invalid indices
+  if (index < 0) {
+    console.warn(`⚠️ Invalid index ${index}, defaulting to 'A'`);
+    return 'A';
+  }
+  
   if (index < 26) {
     // Single letter: 0=A, 1=B, ..., 25=Z
     const result = String.fromCharCode(65 + index);

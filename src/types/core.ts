@@ -145,7 +145,7 @@ export interface ViewConfig {
   showPinNumbers: boolean;
   showSignalNames: boolean;
   showPinTypes: boolean;
-  resetTrigger: number;         // Counter to force viewport reset
+  // resetTrigger removed - was causing unwanted automatic viewport changes
 }
 
 export type SortField = 'pinNumber' | 'pinName' | 'signalName' | 'pinType' | 'bank' | 'grid';

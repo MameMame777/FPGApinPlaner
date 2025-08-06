@@ -8,6 +8,31 @@ import { LODSystem } from '@/utils/LODSystem';
 import { PerformanceService } from '@/services/performance-service';
 import { useAppStore } from '@/stores/app-store';
 
+// Header Bar Component for displaying information in the red frame area
+const HeaderBar: React.FC<{ fileName: string; viewInfo: string }> = ({ fileName, viewInfo }) => (
+  <div
+    style={{
+      width: '100%',
+      height: '32px',
+      background: 'rgba(0,0,0,0.85)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: '0 16px',
+      position: 'relative',
+      zIndex: 2,
+      color: '#e0e0e0',
+      fontSize: '12px',
+      fontWeight: 500,
+      boxSizing: 'border-box',
+      borderBottom: '1px solid #333'
+    }}
+  >
+    <span style={{ transform: 'translateY(-2px)' }}>{viewInfo}</span>
+    <span style={{ transform: 'translateY(-2px)' }}>{fileName}</span>
+  </div>
+);
+
 interface PackageCanvasProps {
   package: Package | null;
   pins: Pin[];
@@ -312,8 +337,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
           clearTimeout(resizeTimeoutRef.current);
         }
         resizeTimeoutRef.current = setTimeout(() => {
-          updateCanvasSize();
-        }, 16); // ~60fps
+          updateCanvasSize();      }, 16); // ~60fps
       });
 
       resizeObserver.observe(container);
@@ -848,174 +872,184 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
     );
   }
 
+  // Information for header bar
+  const viewInfo = `View: ${isTopView ? 'TOP' : 'BOTTOM'} | Rotation: ${rotation}° | Zoom: ${Math.round(zoom * 100)}%`;
+  const fileName = pkg ? `${pkg.device}pkg.csv (${pkg.packageType})` : 'No package loaded';
+
   return (
     <div style={{ 
       width: '100%', 
       height: '100%', 
       backgroundColor: '#1a1a1a', 
       position: 'relative',
-      margin: 0, // Ensure no margins - Issue #14
-      padding: 0, // Ensure no padding - Issue #14
-      overflow: 'hidden', // Prevent any overflow creating scrollbars - Issue #14
-      minWidth: 0, // Allow shrinking below content size - Issue #14
-      minHeight: 0, // Allow shrinking below content size - Issue #14
-      boxSizing: 'border-box', // Include borders in size calculations - Issue #14
-      display: 'flex', // Use flex for consistent layout - Issue #14
-      flexDirection: 'column', // Stack children vertically - Issue #14
+      display: 'flex',
+      flexDirection: 'column',
     }}>
-      {/* Grid Labels - Top (Columns) - Enhanced visibility - Issue #14 */}
-      <div style={{
-        position: 'absolute',
-        top: 0,
-        left: 0, // No margin for maximum viewer area
-        right: 0,
-        height: 16, // Increased from 10px to 16px for better readability
-        backgroundColor: '#2a2a2a',
-        borderBottom: '1px solid #444',
-        display: 'flex',
-        alignItems: 'center',
-        zIndex: 10,
-        overflow: 'hidden'
-      }}>
-        {viewport.scale > 0.1 && (() => {
-          const { gridSpacing, minCol, maxCol } = packageDims as any;
-          if (!gridSpacing) return null;
-          
-          const columnLabels: JSX.Element[] = [];
-          
-          // Generate labels in correct column order (1, 2, 3, ...)
-          for (let colIndex = minCol; colIndex <= maxCol; colIndex++) {
-            // Find a representative pin for this column to get grid coordinate
-            const representativePin = pins.find(pin => 
-              pin.gridPosition && pin.gridPosition.col === colIndex
-            );
-            
-            if (!representativePin) continue;
-            // Find a representative pin for this column to get exact position
-            if (!representativePin) continue;
-            
-            // Use the actual pin's transformed position WITHOUT rotation for grid labels
-            const pinTransformed = transformGridLabelPosition(representativePin);
-            const screenX = pinTransformed.x; // No additional viewport transform needed
-            
-            // Grid labels should always show the original grid coordinates regardless of rotation
-            const displayText = colIndex.toString();
-            
-            const labelLeft = Math.round(screenX - 6); // Center label on pin with viewport transform
-            const containerWidth = stageSize.width; // Use full viewer area - no margins
-            
-            // Show labels that are visible in the current viewport with wider buffer
-            if (labelLeft >= -50 && labelLeft <= containerWidth + 50) { // Wider buffer for better visibility
-              columnLabels.push(
-                <div
-                  key={`col-${colIndex}`}
-                  style={{
-                    position: 'absolute',
-                    left: labelLeft,
-                    top: 0,
-                    width: 20, // Increased from 14px for better readability
-                    height: 16, // Increased from 12px for better readability
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 11, // Increased from 8px for better readability
-                    fontWeight: 'bold',
-                    color: '#e0e0e0',
-                    textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
-                    pointerEvents: 'none',
-                    overflow: 'hidden'
-                  }}
-                >
-                  {displayText}
-                </div>
-              );
-            }
-          }
-          
-          return columnLabels;
-        })()}
-      </div>
+      {/* Header Bar in red frame area (tiles-free zone) */}
+      <HeaderBar fileName={fileName} viewInfo={viewInfo} />
       
-      {/* Grid Labels - Left (Rows) - Enhanced visibility - Issue #14 */}
-      <div style={{
-        position: 'absolute',
-        top: 16, // Match top label height
-        left: 0,
-        width: 16, // Increased from 10px for better readability
-        bottom: 0,
-        backgroundColor: '#2a2a2a',
-        borderRight: '1px solid #444',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        zIndex: 10,
-        overflow: 'hidden'
+      {/* Main Canvas Area */}
+      <div style={{ 
+        flex: 1,
+        position: 'relative',
+        overflow: 'hidden',
       }}>
-        {viewport.scale > 0.1 && (() => {
-          const { gridSpacing, minRow, maxRow } = packageDims as any;
-          if (!gridSpacing) return null;
-          
-          const rowLabels: JSX.Element[] = [];
-          
-          // Generate labels in correct row order (A, B, C, ..., Z, AA, AB, ...)
-          console.log(`🔍 Grid dimensions - minRow: ${minRow}, maxRow: ${maxRow}`);
-          
-          for (let rowIndex = minRow; rowIndex <= maxRow; rowIndex++) {
-            const rowLetter = indexToRow(rowIndex);
-            console.log(`🔍 Processing row ${rowIndex} -> ${rowLetter}`);
+        {/* Grid Labels - Top (Columns) - Enhanced visibility - Issue #14 */}
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0, // No margin for maximum viewer area
+          right: 0,
+          height: 16, // Increased from 10px to 16px for better readability
+          backgroundColor: '#2a2a2a',
+          borderBottom: '1px solid #444',
+          display: 'flex',
+          alignItems: 'center',
+          zIndex: 10,
+          overflow: 'hidden'
+        }}>
+          {viewport.scale > 0.1 && (() => {
+            const { gridSpacing, minCol, maxCol } = packageDims as any;
+            if (!gridSpacing) return null;
             
-            // Find a representative pin for this row to get grid coordinate
-            const representativePin = pins.find(pin => 
-              pin.gridPosition && pin.gridPosition.row === rowLetter
-            );
+            const columnLabels: JSX.Element[] = [];
             
-            // Find a representative pin for this row to get exact position
-            if (!representativePin) continue;
-            
-            // Use the actual pin's transformed position WITHOUT rotation for grid labels
-            const pinTransformed = transformGridLabelPosition(representativePin);
-            const screenY = pinTransformed.y; // No additional viewport transform needed
-            
-            // Grid labels should always show the original grid coordinates regardless of rotation
-            const displayText = rowLetter;
-            
-            const labelTop = Math.round(screenY - 6 - 16); // Center label on pin with viewport transform, shifted up by one character height
-            const containerHeight = stageSize.height; // Use full viewer area - no margins
-            
-            // Show labels that are visible in the current viewport with wider buffer
-            if (labelTop >= -50 && labelTop <= containerHeight + 50) { // Wider buffer for better visibility
-              rowLabels.push(
-                <div
-                  key={`row-${rowIndex}`}
-                  style={{
-                    position: 'absolute',
-                    left: 0,
-                    top: labelTop,
-                    width: 20, // Increased from 14px for better readability
-                    height: 16, // Increased from 12px for better readability
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 11, // Increased from 8px for better readability
-                    fontWeight: 'bold',
-                    color: '#e0e0e0',
-                    textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
-                    pointerEvents: 'none',
-                    overflow: 'hidden'
-                  }}
-                >
-                  {displayText}
-                </div>
+            // Generate labels in correct column order (1, 2, 3, ...)
+            for (let colIndex = minCol; colIndex <= maxCol; colIndex++) {
+              // Find a representative pin for this column to get grid coordinate
+              const representativePin = pins.find(pin => 
+                pin.gridPosition && pin.gridPosition.col === colIndex
               );
+              
+              if (!representativePin) continue;
+              
+              // Use the actual pin's transformed position WITHOUT rotation for grid labels
+              const pinTransformed = transformGridLabelPosition(representativePin);
+              const screenX = pinTransformed.x; // No additional viewport transform needed
+              
+              // Grid labels should always show the original grid coordinates regardless of rotation
+              const displayText = colIndex.toString();
+              
+              const labelLeft = Math.round(screenX - 6); // Center label on pin with viewport transform
+              const containerWidth = stageSize.width; // Use full viewer area - no margins
+              
+              // Show labels that are visible in the current viewport with wider buffer
+              if (labelLeft >= -50 && labelLeft <= containerWidth + 50) { // Wider buffer for better visibility
+                columnLabels.push(
+                  <div
+                    key={`col-${colIndex}`}
+                    style={{
+                      position: 'absolute',
+                      left: labelLeft,
+                      top: -5, // Shift 5px up from toolbar area
+                      width: 20, // Increased from 14px for better readability
+                      height: 16, // Increased from 12px for better readability
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 11, // Increased from 8px for better readability
+                      fontWeight: 'bold',
+                      color: '#e0e0e0',
+                      textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
+                      pointerEvents: 'none',
+                      overflow: 'hidden'
+                    }}
+                  >
+                    {displayText}
+                  </div>
+                );
+              }
             }
-          }
-          
-          return rowLabels;
-        })()}
-      </div>
-      
-      {/* Main Canvas - Maximum viewer area utilization for Issue #14 */}
-      <Stage
+            
+            return columnLabels;
+          })()}
+        </div>
+        
+        {/* Grid Labels - Left (Rows) - Enhanced visibility - Issue #14 */}
+        <div style={{
+          position: 'absolute',
+          top: 16, // Match top label height
+          left: 0,
+          width: 16, // Increased from 10px for better readability
+          bottom: 0,
+          backgroundColor: '#2a2a2a',
+          borderRight: '1px solid #444',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+        }}>
+          {viewport.scale > 0.1 && (() => {
+            const { gridSpacing, minRow, maxRow } = packageDims as any;
+            if (!gridSpacing) return null;
+            
+            const rowLabels: JSX.Element[] = [];
+            
+            // Generate labels in correct row order (A, B, C, ..., Z, AA, AB, ...)
+            console.log(`🔍 Grid dimensions - minRow: ${minRow}, maxRow: ${maxRow}`);
+            
+            for (let rowIndex = minRow; rowIndex <= maxRow; rowIndex++) {
+              const rowLetter = indexToRow(rowIndex);
+              console.log(`🔍 Processing row ${rowIndex} -> ${rowLetter}`);
+              
+              // Find a representative pin for this row to get grid coordinate
+              const representativePin = pins.find(pin => 
+                pin.gridPosition && pin.gridPosition.row === rowLetter
+              );
+              
+              // Find a representative pin for this row to get exact position
+              if (!representativePin) continue;
+              
+              // Use the actual pin's transformed position WITHOUT rotation for grid labels
+              const pinTransformed = transformGridLabelPosition(representativePin);
+              const screenY = pinTransformed.y; // No additional viewport transform needed
+              
+              // Grid labels should always show the original grid coordinates regardless of rotation
+              const displayText = rowLetter;
+              
+              const labelTop = Math.round(screenY - 6 - 16 - 5); // Center label on pin with viewport transform, shifted up by one character height + 5px
+              const containerHeight = stageSize.height; // Use full viewer area - no margins
+              
+              // Show labels that are visible in the current viewport with wider buffer
+              if (labelTop >= -50 && labelTop <= containerHeight + 50) { // Wider buffer for better visibility
+                rowLabels.push(
+                  <div
+                    key={`row-${rowIndex}`}
+                    style={{
+                      position: 'absolute',
+                      left: 0,
+                      top: labelTop,
+                      width: 20, // Increased from 14px for better readability
+                      height: 16, // Increased from 12px for better readability
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 11, // Increased from 8px for better readability
+                      fontWeight: 'bold',
+                      color: '#e0e0e0',
+                      textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
+                      pointerEvents: 'none',
+                      overflow: 'hidden'
+                    }}
+                  >
+                    {displayText}
+                  </div>
+                );
+              }
+            }
+            
+            return rowLabels;
+          })()}
+        </div>
+        
+        {/* Main Canvas with Stage */}
+        <div style={{
+          position: 'absolute',
+          top: 16, // Account for top labels
+          left: 16, // Account for left labels
+          right: 0,
+          bottom: 0,
+        }}>
+          <Stage
         ref={(ref) => {
           stageRef.current = ref;
           // Force size update when Stage is mounted (especially for VS Code webview)
@@ -1184,23 +1218,6 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
             }
             
             return <>{lines}</>;
-          })()}
-
-          {/* Package label - Fixed position at top of canvas */}
-          {(() => {
-            if (!pkg) return null;
-            
-            return (
-              <Text
-                x={stageSize.width / 2 - 100}
-                y={20}
-                width={200}
-                text={`${pkg.device} (${pkg.packageType})`}
-                fontSize={14}
-                fill="#ccc"
-                align="center"
-              />
-            );
           })()}
 
           {/* Pin rendering with smart viewport culling and LOD optimization */}
@@ -1609,15 +1626,6 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
             });
           })()}
           
-          {/* View info */}
-          <Text
-            x={10}
-            y={10}
-            text={`View: ${isTopView ? 'TOP' : 'BOTTOM'} | Rotation: ${rotation}° | Zoom: ${(zoom * 100).toFixed(0)}%`}
-            fontSize={12}
-            fill="#999"
-          />
-          
           {/* Legend */}
           <Group x={10} y={stageSize.height - 200}>
             {/* Bank Groups header background */}
@@ -1751,6 +1759,8 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
           </Group>
         </Layer>
       </Stage>
+        </div>
+      </div>
     </div>
   );
 };

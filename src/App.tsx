@@ -27,8 +27,6 @@ const App: React.FC<AppProps> = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [rightSidebarTab, setRightSidebarTab] = useState<'validation' | 'batch' | null>('validation');
-  const [sidebarWidth, setSidebarWidth] = useState(300);
-  const [isResizing, setIsResizing] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   
   // Dynamic maximization states for Issue #14
@@ -468,50 +466,6 @@ const App: React.FC<AppProps> = () => {
     }
   };
 
-  // Sidebar resize handlers - Enhanced for Issue #14: dynamic sizing
-  const handleMouseDown = (e: React.MouseEvent) => {
-    setIsResizing(true);
-    e.preventDefault();
-  };
-
-  const handleMouseMove = React.useCallback((e: MouseEvent) => {
-    if (!isResizing) return;
-    
-    requestAnimationFrame(() => {
-      const newWidth = e.clientX;
-      // Dynamic max width: 50% of window width for large displays, min 200px - Issue #14
-      const maxWidth = Math.max(400, window.innerWidth * 0.5);
-      const minWidth = Math.min(250, window.innerWidth * 0.15); // Responsive min width
-      
-      // Constrain width between dynamic min and max width
-      if (newWidth >= minWidth && newWidth <= maxWidth) {
-        setSidebarWidth(newWidth);
-      }
-    });
-  }, [isResizing]);
-
-  const handleMouseUp = React.useCallback(() => {
-    setIsResizing(false);
-  }, []);
-
-  // Add event listeners for mouse move and up
-  React.useEffect(() => {
-    if (isResizing) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = 'col-resize';
-      document.body.style.userSelect = 'none';
-      
-      return () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-        document.body.style.cursor = '';
-        document.body.style.userSelect = '';
-      };
-    }
-    return undefined;
-  }, [isResizing, handleMouseMove, handleMouseUp]);
-
   const stats = getPinStats();
 
   // Create sorted pins for the sidebar list (without affecting the canvas)
@@ -800,7 +754,7 @@ const App: React.FC<AppProps> = () => {
         {/* Sidebar - Dynamic visibility for Issue #14 */}
         {!autoHideSidebars && (
         <aside style={{
-          width: `${sidebarWidth}px`,
+          width: '300px', // 🚀 固定幅に変更 - リサイズ機能を削除
           backgroundColor: '#252525',
           borderRight: '1px solid #444',
           display: 'flex',
@@ -975,32 +929,6 @@ const App: React.FC<AppProps> = () => {
               </>
             )}
           </div>
-          
-          {/* Resize Handle */}
-          <div
-            style={{
-              position: 'absolute',
-              top: 0,
-              right: 0,
-              width: '4px',
-              height: '100%',
-              backgroundColor: isResizing ? '#007acc' : 'transparent',
-              cursor: 'col-resize',
-              zIndex: 10,
-              transition: isResizing ? 'none' : 'background-color 0.2s ease',
-            }}
-            onMouseDown={handleMouseDown}
-            onMouseEnter={(e) => {
-              if (!isResizing) {
-                e.currentTarget.style.backgroundColor = '#555';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!isResizing) {
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }
-            }}
-          />
         </aside>
         )}
 
@@ -1018,7 +946,7 @@ const App: React.FC<AppProps> = () => {
             className="toolbar-scrollbar"
             style={{
               height: '32px', // Further reduced from 42px to 32px for Issue #14 vertical optimization
-              backgroundColor: '#2a2a2a',
+              backgroundColor: '#2a2a2a', // Opaque background for better readability
               borderBottom: '1px solid #444',
               display: 'flex',
               alignItems: 'center',
@@ -1250,11 +1178,11 @@ const App: React.FC<AppProps> = () => {
           {/* Main View Area - Optimized vertical layout for Issue #14 */}
           <div style={{
             flex: 1,
-            minWidth: '400px', // Ensure minimum width to prevent complete collapse
+            minWidth: '0', // 🚀 FULL-SCREEN FIX: Remove width constraint to allow full expansion
             backgroundColor: '#1a1a1a',
             overflow: 'hidden',
             display: 'flex',
-            flexShrink: 1, // Allow shrinking but respect minWidth
+            flexShrink: 1, // Allow shrinking
             width: '100%', // Force full width utilization - Issue #14
             minHeight: 0, // Allow vertical shrinking - Issue #14
             height: '100%', // Force full height utilization - Issue #14
@@ -1280,7 +1208,6 @@ const App: React.FC<AppProps> = () => {
                   rotation={viewConfig.rotation}
                   isTopView={viewConfig.isTopView}
                   onZoomChange={setZoom}
-                  resetTrigger={viewConfig.resetTrigger}
                 />
               ) : (
                 <div style={{

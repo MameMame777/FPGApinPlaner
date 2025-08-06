@@ -110,7 +110,7 @@ const initialViewConfig: ViewConfig = {
   showPinNumbers: true,
   showSignalNames: true,
   showPinTypes: false,
-  resetTrigger: 0,
+  // resetTrigger removed - was causing unwanted automatic viewport changes
 };
 
 const initialFilters: FilterState = {
@@ -351,7 +351,7 @@ export const useAppStore = create<AppState & AppActions>()(
     resetZoom: () =>
       set((state) => {
         state.viewConfig.zoom = 1.0;
-        state.viewConfig.resetTrigger += 1; // Force reset even if zoom was already 100%
+        // resetTrigger removed - no longer triggering automatic viewport changes
       }),
 
     updateViewConfig: (config) =>
