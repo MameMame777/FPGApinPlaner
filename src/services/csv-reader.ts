@@ -426,23 +426,23 @@ export class CSVReader {
           });
           
           // まず生データを確認（JSON形式）
-          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false });
+          const jsonData: (string | undefined)[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false });
           console.log('🔍 Raw data sample (first 15 rows):', jsonData.slice(0, 15));
           console.log('📊 Total data rows:', jsonData.length);
           
           // データ密度を確認
-          const nonEmptyRows = (jsonData as any[][]).filter((row: any[]) => 
+          const nonEmptyRows = jsonData.filter((row) => 
             row && Array.isArray(row) && row.some(cell => cell && cell.toString().trim())
           );
           console.log('📈 Non-empty rows:', nonEmptyRows.length);
           
           // Intel/Altera形式を検出して特別処理
-          const isIntelAlteraFormat = CSVReader.detectIntelAlteraFormat(jsonData as any[][]);
+          const isIntelAlteraFormat = CSVReader.detectIntelAlteraFormat(jsonData);
           console.log('🔍 Format detection result:', isIntelAlteraFormat ? 'Intel/Altera' : 'Standard CSV');
           
           if (isIntelAlteraFormat) {
             console.log('🔍 Intel/Altera format detected, using special processing');
-            const processedData = CSVReader.processIntelAlteraXLSX(jsonData as any[][]);
+            const processedData = CSVReader.processIntelAlteraXLSX(jsonData);
             resolve(processedData);
           } else {
             // CSVに変換（空行を保持しない設定）
