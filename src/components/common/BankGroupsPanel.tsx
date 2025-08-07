@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Pin } from '../../types';
 import { BankStatsService } from '../../services/bank-stats-service';
 import { getOptimizedBankColor } from '../../utils/bank-color-utils';
+import { useAppStore } from '../../stores/app-store';
 
 interface BankGroupsPanelProps {
   pins: Pin[];
@@ -16,6 +17,9 @@ export const BankGroupsPanel: React.FC<BankGroupsPanelProps> = ({
   const [expandedBank, setExpandedBank] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'bankId' | 'utilization' | 'totalPins'>('bankId');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  // Store actions for bank visibility management (Issue #19)
+  const { visibleBanks, toggleBankVisibility, showAllBanks } = useAppStore();
 
   // Bank統計を計算
   const bankSummary = useMemo(() => {
@@ -85,13 +89,40 @@ export const BankGroupsPanel: React.FC<BankGroupsPanelProps> = ({
     return sortOrder === 'asc' ? '↑' : '↓';
   };
 
+  // Bank表示状態を判定する関数 (Issue #19)
+  // デバッグ知見: visibleBanks の状態による表示ロジック
+  // - visibleBanks.size === 0: 全Bank表示（デフォルト状態）
+  // - visibleBanks.has(bankId): 該当Bankが選択されている
+  const isBankVisible = (bankId: string) => {
+    if (visibleBanks.size === 0) return true; // デフォルトで全て表示
+    return visibleBanks.has(bankId);
+  };
+
+  // Bankクリックハンドラー (Issue #19)
+  // デバッグ知見: アラートを使った動作確認が有効
+  // 実際のピンフィルタリングはストアのtoggleBankVisibilityで処理される
+  const handleBankClick = (bankId: string) => {
+    console.log(`🎯 Bank ${bankId} clicked! Current visibility:`, isBankVisible(bankId));
+    alert(`Bank ${bankId} clicked!`); // 追加テスト
+    toggleBankVisibility(bankId);
+  };
+
+  // 全て表示ボタンのハンドラー
+  const handleShowAllBanks = () => {
+    console.log('👁️ Show all banks clicked');
+    alert('Show all banks clicked!'); // 追加テスト
+    showAllBanks();
+  };
+
   const getBankColorStyle = (bankId: string) => {
     if (bankId === 'UNASSIGNED') return { backgroundColor: '#6b7280', color: 'white' };
     const color = getOptimizedBankColor(bankId);
+    const isVisible = isBankVisible(bankId);
     return { 
-      backgroundColor: `${color}20`,
+      backgroundColor: isVisible ? `${color}20` : `${color}05`,
       borderLeft: `4px solid ${color}`,
-      color: '#1f2937'
+      color: isVisible ? '#1f2937' : '#9ca3af',
+      opacity: isVisible ? 1 : 0.5,
     };
   };
 
@@ -144,10 +175,56 @@ export const BankGroupsPanel: React.FC<BankGroupsPanelProps> = ({
         </div>
       )}
 
+      {/* TEST: デバッグ用のテストボタン */}
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+        <h3 className="text-sm font-medium text-red-800 mb-2">🔧 Debug Test Buttons</h3>
+        <div className="flex gap-2">
+          <button 
+            onClick={() => alert('Simple button works!')}
+            className="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600"
+          >
+            Test Simple Click
+          </button>
+          <button 
+            onClick={handleShowAllBanks}
+            className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600"
+          >
+            Test Show All
+          </button>
+          <button 
+            onClick={() => handleBankClick('TEST')}
+            className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
+            Test Bank Click
+          </button>
+        </div>
+      </div>
+
       {/* Banks統計テーブル */}
       <div className="bg-white rounded-lg border shadow-sm">
         <div className="p-4 border-b">
-          <h3 className="text-lg font-medium text-gray-800">Bank Details</h3>
+          <div className="flex justify-between items-center">
+            <h3 className="text-lg font-medium text-gray-800">Bank Details</h3>
+            {/* Bank表示コントロール (Issue #19) */}
+            <div className="flex gap-2">
+              <button
+                onClick={handleShowAllBanks}
+                className="px-3 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors"
+                title="Show all banks"
+              >
+                👁️ Show All
+              </button>
+            </div>
+          </div>
+          <div className="flex justify-between items-center">
+            <p className="text-sm text-gray-600 mt-1">
+              💡 Click on any bank row to toggle its visibility in the pin list
+            </p>
+            {/* デバッグ情報 */}
+            <div className="text-xs text-gray-400">
+              Visible Banks: {visibleBanks.size === 0 ? 'All' : Array.from(visibleBanks).join(', ')}
+            </div>
+          </div>
         </div>
         
         <div className="overflow-x-auto">
@@ -190,15 +267,23 @@ export const BankGroupsPanel: React.FC<BankGroupsPanelProps> = ({
               {sortedBankStats.map((stat) => (
                 <React.Fragment key={stat.bankId}>
                   <tr 
-                    className="hover:bg-gray-50"
+                    className="hover:bg-gray-50 cursor-pointer transition-all duration-200"
                     style={getBankColorStyle(stat.bankId)}
+                    onClick={() => handleBankClick(stat.bankId)}
+                    title={`Click to ${isBankVisible(stat.bankId) ? 'hide' : 'show'} Bank ${stat.bankId} pins`}
                   >
                     <td className="px-4 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <div 
-                          className="w-3 h-3 rounded-full mr-2"
-                          style={{ backgroundColor: stat.bankId === 'UNASSIGNED' ? '#6b7280' : getOptimizedBankColor(stat.bankId) }}
-                        />
+                        <div className="flex items-center mr-2">
+                          {/* 表示状態インジケーター */}
+                          <span className="text-lg mr-1">
+                            {isBankVisible(stat.bankId) ? '👁️' : '🙈'}
+                          </span>
+                          <div 
+                            className="w-3 h-3 rounded-full"
+                            style={{ backgroundColor: stat.bankId === 'UNASSIGNED' ? '#6b7280' : getOptimizedBankColor(stat.bankId) }}
+                          />
+                        </div>
                         <span className="text-sm font-medium">
                           {stat.bankId === 'UNASSIGNED' ? 'Unassigned' : `Bank ${stat.bankId}`}
                         </span>
@@ -234,7 +319,10 @@ export const BankGroupsPanel: React.FC<BankGroupsPanelProps> = ({
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm">
                       <button
-                        onClick={() => setExpandedBank(expandedBank === stat.bankId ? null : stat.bankId)}
+                        onClick={(e) => {
+                          e.stopPropagation(); // 親の行クリックイベントを防ぐ
+                          setExpandedBank(expandedBank === stat.bankId ? null : stat.bankId);
+                        }}
                         className="text-blue-600 hover:text-blue-900 font-medium"
                       >
                         {expandedBank === stat.bankId ? 'Hide' : 'Details'}

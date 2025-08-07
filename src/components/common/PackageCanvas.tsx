@@ -59,7 +59,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
   onZoomChange,
   resetTrigger = 0
 }) => {
-  const { togglePinSelection, selectPins } = useAppStore();
+  const { togglePinSelection, selectPins, visibleBanks, toggleBankVisibility, showAllBanks, pins: allPins } = useAppStore();
   const stageRef = useRef<any>(null);
   const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null); // For debouncing resize - Issue #14
   const [stageSize, setStageSize] = useState({ width: 800, height: 600 });
@@ -80,6 +80,9 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
   const [mouseDownTime, setMouseDownTime] = useState(0);
   const [mouseDownPosition, setMouseDownPosition] = useState({ x: 0, y: 0 });
   
+  // 🏪 Debug: Log received pins for Bank visibility tracking
+  console.log(`📦 PackageCanvas: Received ${pins.length} pins (filtered)`);
+  
   // LOD System integration
   const currentLOD = LODSystem.getLODLevel(viewport.scale);
   
@@ -87,8 +90,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
   const pinIndexes = useMemo(() => {
     PerformanceService.startRenderMeasurement('pin-indexing');
     const indexes = PerformanceService.createPinIndexes(pins);
-    const duration = PerformanceService.endRenderMeasurement('pin-indexing');
-    console.log(`📊 Pin indexing took ${duration.toFixed(2)}ms`);
+    PerformanceService.endRenderMeasurement('pin-indexing');
     return indexes;
   }, [pins]);
   
@@ -160,8 +162,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
       selectedPinObjects.forEach(pin => allVisiblePins.set(pin.id, pin));
       
       const result = Array.from(allVisiblePins.values());
-      const duration = PerformanceService.endRenderMeasurement('viewport-culling');
-      console.log(`🎯 Detail view (rotation-aware): ${result.length}/${pins.length} pins visible (${duration.toFixed(2)}ms)`);
+      PerformanceService.endRenderMeasurement('viewport-culling');
       return result;
     }
     
@@ -169,8 +170,8 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
     else {
       // Ultra-low zoom: show ALL pins for complete overview
       if (viewport.scale <= 0.2) {
-        const duration = PerformanceService.endRenderMeasurement('viewport-culling');
-        console.log(`🌍 Ultra-wide overview: ${pins.length}/${pins.length} pins visible (${duration.toFixed(2)}ms)`);
+        PerformanceService.endRenderMeasurement('viewport-culling');
+        // console.log(`🌍 Ultra-wide overview: ${pins.length}/${pins.length} pins visible`);
         return pins; // Show all pins for complete overview
       }
       
@@ -208,8 +209,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
           }
         });
         
-        const duration = PerformanceService.endRenderMeasurement('viewport-culling');
-        console.log(`🌎 Wide overview: ${overviewPins.length}/${pins.length} pins visible (${duration.toFixed(2)}ms)`);
+        PerformanceService.endRenderMeasurement('viewport-culling');
         return overviewPins;
       }
       
@@ -247,8 +247,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
         contextPins.forEach(pin => mediumZoomVisiblePins.set(pin.id, pin));
         
         const mediumResult = Array.from(mediumZoomVisiblePins.values());
-        const mediumDuration = PerformanceService.endRenderMeasurement('viewport-culling');
-        console.log(`🎯 Medium zoom (rotation-aware): ${mediumResult.length}/${pins.length} pins visible (focus: ${focusAreaPins.length}, context: ${contextPins.length}, selected: ${selectedPinObjects.length}) (${mediumDuration.toFixed(2)}ms)`);
+        PerformanceService.endRenderMeasurement('viewport-culling');
         return mediumResult;
       }
       
@@ -285,8 +284,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
           }
         });
         
-        const duration = PerformanceService.endRenderMeasurement('viewport-culling');
-        console.log(`📊 Balanced overview: ${overviewPins.length}/${pins.length} pins visible (${duration.toFixed(2)}ms)`);
+        PerformanceService.endRenderMeasurement('viewport-culling');
         return overviewPins;
       }
     }
@@ -836,7 +834,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
     }
   };
 
-  if (!pkg || pins.length === 0) {
+  if (!pkg) {
     return (
       <div style={{
         width: '100%',
@@ -1880,23 +1878,65 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
           <Group x={10} y={stageSize.height - 200}>
             {/* Bank Groups and Pin Types Legend - side by side */}
             {/* Bank Groups Section */}
-            <Rect
-              x={24}
-              y={-2}
-              width={80}
-              height={16}
-              fill="rgba(0, 0, 0, 0.7)"
-              cornerRadius={2}
-            />
-            <Text
-              x={27}
-              y={0}
-              text="Bank Groups:"
-              fontSize={12}
-              fill="#ccc"
-            />
+            {/* Issue #19: Bank Groups クリック機能 - シンプル化されたUI */}
+            {/* デバッグ知見: 複雑な状態表示 ([ALL]/[SOME]/[NONE]) より、
+                シンプルな「Bank Groups」表示の方がユーザビリティが高い */}
             {(() => {
-              const uniqueBanks = [...new Set(pins.map(pin => pin.bank).filter(Boolean))]
+              // Status text - シンプルに
+              const statusText = "Bank Groups";
+                
+              return (
+                <>
+                  <Rect
+                    x={24}
+                    y={-2}
+                    width={statusText.length * 6 + 8}
+                    height={16}
+                    fill="rgba(0, 0, 0, 0.7)"
+                    cornerRadius={2}
+                    onClick={() => {
+                      console.log(`🎯 Bank Groups header clicked - showing all banks!`);
+                      showAllBanks();
+                    }}
+                    onMouseEnter={(e) => {
+                      const shape = e.target as any;
+                      shape.fill("rgba(0, 0, 0, 0.9)");
+                      shape.getLayer()?.batchDraw();
+                    }}
+                    onMouseLeave={(e) => {
+                      const shape = e.target as any;
+                      shape.fill("rgba(0, 0, 0, 0.7)");
+                      shape.getLayer()?.batchDraw();
+                    }}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  <Text
+                    x={27}
+                    y={0}
+                    text={statusText}
+                    fontSize={12}
+                    fill="#4AE24A"
+                    onClick={() => {
+                      console.log(`🎯 Bank Groups text clicked - showing all banks!`);
+                      showAllBanks();
+                    }}
+                    onMouseEnter={(e) => {
+                      const shape = e.target as any;
+                      shape.fill("#fff");
+                      shape.getLayer()?.batchDraw();
+                    }}
+                    onMouseLeave={(e) => {
+                      const shape = e.target as any;
+                      shape.fill("#4AE24A");
+                      shape.getLayer()?.batchDraw();
+                    }}
+                    style={{ cursor: 'pointer' }}
+                  />
+                </>
+              );
+            })()}
+            {(() => {
+              const uniqueBanks = [...new Set(allPins.map(pin => pin.bank).filter(Boolean))]
                 .sort((a, b) => {
                   const aNum = parseInt(a!);
                   const bNum = parseInt(b!);
@@ -1904,41 +1944,79 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                 })
                 .slice(0, 6); // Show max 6 banks in legend to avoid clutter
               
-              return uniqueBanks.map((bank, index) => (
-                <Group key={bank} y={20 + index * 18} x={27}>
-                  <Circle
-                    x={12}
-                    y={2}
-                    radius={4}
-                    fill={getOptimizedBankColor(bank)}
-                    stroke="#000"
-                    strokeWidth={1}
-                  />
-                  <Text
-                    x={25}
-                    y={-6}
-                    text={`Bank ${bank}`}
-                    fontSize={10}
-                    fill="#999"
-                  />
-                  {/* Bank name text background */}
-                  <Rect
-                    x={23}
-                    y={-8}
-                    width={`Bank ${bank}`.length * 6 + 4}
-                    height={14}
-                    fill="rgba(0, 0, 0, 0.6)"
-                    cornerRadius={2}
-                  />
-                  <Text
-                    x={25}
-                    y={-6}
-                    text={`Bank ${bank}`}
-                    fontSize={10}
-                    fill="#ccc"
-                  />
-                </Group>
-              ));
+              return uniqueBanks.map((bank, index) => {
+                const isBankVisible = visibleBanks.size === 0 || visibleBanks.has(bank!);
+                
+                return (
+                  <Group key={bank} y={20 + index * 18} x={27}>
+                    {/* Clickable background for bank item */}
+                    <Rect
+                      x={8}
+                      y={-8}
+                      width={`Bank ${bank}`.length * 6 + 20}
+                      height={16}
+                      fill="rgba(0, 0, 0, 0)"
+                      stroke="rgba(255, 255, 255, 0.1)"
+                      strokeWidth={1}
+                      cornerRadius={2}
+                      onClick={() => {
+                        console.log(`🎯 BANK ${bank} CLICKED!`);
+                        console.log(`Before: visibleBanks =`, Array.from(visibleBanks));
+                        console.log(`Before: Bank ${bank} is visible =`, visibleBanks.has(bank!));
+                        console.log(`Before: Total pins received =`, pins.length);
+                        toggleBankVisibility(bank!);
+                        // Note: State update is async, so we can't see the result immediately here
+                      }}
+                      onMouseEnter={(e) => {
+                        const shape = e.target as any;
+                        shape.stroke("rgba(255, 255, 255, 0.3)");
+                        shape.getLayer()?.batchDraw();
+                      }}
+                      onMouseLeave={(e) => {
+                        const shape = e.target as any;
+                        shape.stroke("rgba(255, 255, 255, 0.1)");
+                        shape.getLayer()?.batchDraw();
+                      }}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <Circle
+                      x={12}
+                      y={2}
+                      radius={4}
+                      fill={isBankVisible ? getOptimizedBankColor(bank) : '#444'}
+                      stroke={isBankVisible ? "#000" : "#666"}
+                      strokeWidth={1}
+                      listening={false}
+                    />
+                    {/* Bank name text background */}
+                    <Rect
+                      x={23}
+                      y={-8}
+                      width={`Bank ${bank}`.length * 6 + 4}
+                      height={14}
+                      fill="rgba(0, 0, 0, 0.6)"
+                      cornerRadius={2}
+                      listening={false}
+                    />
+                    <Text
+                      x={25}
+                      y={-6}
+                      text={`Bank ${bank}`}
+                      fontSize={10}
+                      fill={isBankVisible ? "#ccc" : "#666"}
+                      listening={false}
+                    />
+                    {/* Visibility indicator */}
+                    <Text
+                      x={10}
+                      y={-6}
+                      text={isBankVisible ? "👁" : "🚫"}
+                      fontSize={8}
+                      listening={false}
+                    />
+                  </Group>
+                );
+              });
             })()}
 
             {/* Pin Types Section */}

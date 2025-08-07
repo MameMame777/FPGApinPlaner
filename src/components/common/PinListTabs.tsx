@@ -240,6 +240,11 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect }) => {
 
   return (
     <div className="pin-list-tabs">
+      {/* デバッグ情報 */}
+      <div style={{ padding: '8px', background: '#f0f0f0', fontSize: '12px', color: '#333' }}>
+        🔧 Debug: Total tabs: {TAB_CONFIGS.length}, Available tabs: {TAB_CONFIGS.map(t => t.id).join(', ')}, Active: {listView.activeTab}
+      </div>
+      
       {/* Tab Headers */}
       <div className="tab-header" style={{ 
         display: 'flex', 
