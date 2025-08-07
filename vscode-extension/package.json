@@ -2,7 +2,7 @@
   "name": "fpga-pin-planner",
   "displayName": "FPGA Pin Planner",
   "description": "Advanced FPGA Pin Assignment and Management Tool with Voltage/IO Standard Selection",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "publisher": "MameMame777",
   "author": "MameMame777 <mame@example.com>",
   "license": "MIT",
