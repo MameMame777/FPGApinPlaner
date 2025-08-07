@@ -50,7 +50,7 @@ export const PinItem: React.FC<PinItemProps> = ({
       onClick={() => onSelect(pin.id)}
       style={{
         display: 'flex',
-        alignItems: 'center',
+        flexDirection: 'column',
         padding: '8px 12px',
         margin: '2px 0',
         backgroundColor: isSelected ? '#444' : (isDifferentialPairPartner ? '#3d4852' : (isPairPin ? '#2d3748' : '#2a2a2a')), // 差動ペアパートナーの背景色を追加
@@ -111,86 +111,104 @@ export const PinItem: React.FC<PinItemProps> = ({
         </div>
       )}
 
-      {/* Pin Type Indicator */}
+      {/* Top Row: Pin Info and Assignment Status */}
       <div
         style={{
-          width: '12px',
-          height: '12px',
-          borderRadius: '50%',
-          backgroundColor: getPinTypeColor(pin.pinType),
-          marginRight: '8px',
-          flexShrink: 0,
-        }}
-      />
-
-      {/* Pin Number */}
-      <div
-        style={{
-          minWidth: '60px',
-          fontFamily: 'monospace',
-          fontSize: '12px',
-          color: '#ccc',
+          display: 'flex',
+          alignItems: 'center',
+          marginBottom: '4px',
         }}
       >
-        {pin.pinNumber}
+        {/* Pin Type Indicator */}
+        <div
+          style={{
+            width: '12px',
+            height: '12px',
+            borderRadius: '50%',
+            backgroundColor: getPinTypeColor(pin.pinType),
+            marginRight: '8px',
+            flexShrink: 0,
+          }}
+        />
+
+        {/* Pin Number */}
+        <div
+          style={{
+            minWidth: '60px',
+            fontFamily: 'monospace',
+            fontSize: '12px',
+            color: '#ccc',
+          }}
+        >
+          {pin.pinNumber}
+        </div>
+
+        {/* Pin Name */}
+        <div
+          style={{
+            minWidth: '120px',
+            fontSize: '11px',
+            color: '#999',
+            marginRight: '8px',
+            flex: 1,
+          }}
+        >
+          {pin.pinName}
+        </div>
+
+        {/* Assignment Status */}
+        <div
+          style={{
+            width: '8px',
+            height: '8px',
+            borderRadius: '50%',
+            backgroundColor: pin.isAssigned ? '#4AE24A' : '#666',
+            marginLeft: '8px',
+            flexShrink: 0,
+          }}
+        />
       </div>
 
-      {/* Pin Name */}
+      {/* Second Row: Signal Assignment */}
       <div
         style={{
-          minWidth: '120px',
-          fontSize: '11px',
-          color: '#999',
-          marginRight: '8px',
+          display: 'flex',
+          alignItems: 'center',
+          marginBottom: '4px',
         }}
       >
-        {pin.pinName}
+        <input
+          type="text"
+          value={pin.signalName}
+          onChange={handleSignalChange}
+          placeholder="Signal name"
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            flex: 1,
+            padding: '4px 8px',
+            fontSize: '12px',
+            backgroundColor: '#1a1a1a',
+            border: '1px solid #555',
+            borderRadius: '3px',
+            color: '#fff',
+          }}
+        />
       </div>
 
-      {/* Signal Assignment */}
-      <input
-        type="text"
-        value={pin.signalName}
-        onChange={handleSignalChange}
-        placeholder="Signal name"
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          minWidth: '120px',
-          width: '120px',
-          padding: '4px 8px',
-          fontSize: '12px',
-          backgroundColor: '#1a1a1a',
-          border: '1px solid #555',
-          borderRadius: '3px',
-          color: '#fff',
-          marginRight: '8px',
-        }}
-      />
-
-      {/* Bank Info */}
+      {/* Third Row: Bank Info */}
       {pin.bank && (
         <div
           style={{
-            minWidth: '40px',
+            display: 'flex',
+            alignItems: 'center',
             fontSize: '11px',
             color: '#666',
-            textAlign: 'center',
           }}
         >
-          Bank {pin.bank}
+          <span style={{ marginRight: '4px' }}>🏦</span>
+          <span>Bank {pin.bank}</span>
         </div>
       )}
-
-      {/* Assignment Status */}
-      <div
-        style={{
-          width: '8px',
-          height: '8px',
-          borderRadius: '50%',
-          backgroundColor: pin.isAssigned ? '#4AE24A' : '#666',
-          marginLeft: '8px',
-        }}
-      />
     </div>
   );
 };
