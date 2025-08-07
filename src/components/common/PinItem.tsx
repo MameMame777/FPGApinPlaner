@@ -155,7 +155,8 @@ export const PinItem: React.FC<PinItemProps> = ({
         placeholder="Signal name"
         onClick={(e) => e.stopPropagation()}
         style={{
-          flex: 1,
+          minWidth: '120px',
+          width: '120px',
           padding: '4px 8px',
           fontSize: '12px',
           backgroundColor: '#1a1a1a',

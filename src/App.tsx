@@ -34,6 +34,11 @@ const App: React.FC<AppProps> = () => {
   const [autoHideSidebars, setAutoHideSidebars] = useState(false);
   const [hideFooter, setHideFooter] = useState(false);
   
+  // Resizable panel states
+  const [leftPanelWidth, setLeftPanelWidth] = useState(320); // 初期幅を320pxに調整
+  const [rightPanelWidth, setRightPanelWidth] = useState(280); // 初期幅を280pxに調整
+  const [isResizing, setIsResizing] = useState<'left' | 'right' | null>(null);
+  
   // Initialize hotkeys
   useAppHotkeys();
 
@@ -123,6 +128,38 @@ const App: React.FC<AppProps> = () => {
       setHideFooter(false);
     }
   };
+
+  // Panel resizing functionality
+  const handleMouseDown = (panelType: 'left' | 'right') => (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(panelType);
+  };
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (!isResizing) return;
+    
+    const containerWidth = window.innerWidth;
+    if (isResizing === 'left') {
+      const newWidth = Math.max(200, Math.min(500, e.clientX));
+      setLeftPanelWidth(newWidth);
+    } else if (isResizing === 'right') {
+      const newWidth = Math.max(200, Math.min(500, containerWidth - e.clientX));
+      setRightPanelWidth(newWidth);
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsResizing(null);
+  };
+
+  useEffect(() => {
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing]);
 
   // Handle VS Code messages
   useEffect(() => {
@@ -771,10 +808,10 @@ const App: React.FC<AppProps> = () => {
         minHeight: 0, // Allow vertical shrinking - Issue #14
         height: '100%', // Force full height utilization - Issue #14
       }}>
-        {/* Sidebar - Dynamic visibility for Issue #14 */}
+        {/* Sidebar - Dynamic visibility and resizable width for Issue #14 */}
         {!autoHideSidebars && (
         <aside style={{
-          width: '300px', // 🚀 固定幅に変更 - リサイズ機能を削除
+          width: `${leftPanelWidth}px`,
           backgroundColor: '#252525',
           borderRight: '1px solid #444',
           display: 'flex',
@@ -783,8 +820,24 @@ const App: React.FC<AppProps> = () => {
           position: 'relative',
           minHeight: 0, // Allow vertical shrinking - Issue #14
           height: '100%', // Force full height utilization - Issue #14
+          minWidth: '200px', // 最小幅
+          maxWidth: '500px', // 最大幅
         }}>
-          {/* Search and Filters */}
+          {/* Resize handle for left panel */}
+          <div
+            onMouseDown={handleMouseDown('left')}
+            style={{
+              position: 'absolute',
+              right: 0,
+              top: 0,
+              bottom: 0,
+              width: '4px',
+              cursor: 'col-resize',
+              zIndex: 10,
+              backgroundColor: isResizing === 'left' ? '#007acc' : 'transparent',
+            }}
+            title="Drag to resize panel"
+          />
           <div style={{
             padding: '16px',
             borderBottom: '1px solid #444',
@@ -1242,12 +1295,13 @@ const App: React.FC<AppProps> = () => {
               )}
             </div>
 
-            {/* Right Sidebar - Dynamic visibility for Issue #14 */}
+            {/* Right Sidebar - Dynamic visibility and resizable width for Issue #14 */}
             {!autoHideSidebars && rightSidebarTab && (
               <div 
                 style={{ 
-                  width: `${Math.min(300, window.innerWidth * 0.2)}px`, // Responsive width: max 300px or 20% of screen
-                  minWidth: '250px', // Minimum width for usability
+                  width: `${rightPanelWidth}px`,
+                  minWidth: '200px', // 最小幅
+                  maxWidth: '500px', // 最大幅
                   borderLeft: '1px solid #555',
                   backgroundColor: '#1e1e1e',
                   display: 'flex',
@@ -1255,8 +1309,24 @@ const App: React.FC<AppProps> = () => {
                   height: '100%',
                   overflow: 'hidden',
                   minHeight: 0, // Allow vertical shrinking - Issue #14
+                  position: 'relative',
                 }}
               >
+                {/* Resize handle for right panel */}
+                <div
+                  onMouseDown={handleMouseDown('right')}
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: '4px',
+                    cursor: 'col-resize',
+                    zIndex: 10,
+                    backgroundColor: isResizing === 'right' ? '#007acc' : 'transparent',
+                  }}
+                  title="Drag to resize panel"
+                />
                 {rightSidebarTab === 'validation' && (
                   <div style={{ height: '100%', overflow: 'hidden' }} className="custom-scrollbar">
                     <ValidationPanel 
