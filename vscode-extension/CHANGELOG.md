@@ -2,6 +2,18 @@
 
 All notable changes to the "FPGA Pin Planner" extension will be documented in this file.
 
+## [1.0.3] - 2025-08-07
+
+### Changed
+- 🔄 **Core Updates**: Applied latest user modifications and improvements
+- 🛠️ **Code Enhancements**: Updated service modules and core application logic
+- 📝 **Documentation**: Updated README and configuration files
+- ⚡ **Build Optimization**: Refreshed build process with latest changes
+
+### Fixed
+- 🔧 **Asset Synchronization**: Ensured latest webview assets are properly bundled
+- 📦 **Package Integrity**: Verified all user modifications are included in the build
+
 ## [1.0.2] - 2025-08-07
 
 ### Changed
