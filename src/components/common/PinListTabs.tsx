@@ -3,8 +3,6 @@ import { useAppStore } from '../../stores/app-store';
 import { TAB_CONFIGS } from '../../constants/tab-configs';
 import { EditableTableCell } from '../common/EditableTableCell';
 import { VirtualizedPinList } from '../common/VirtualizedPinList';
-import { SimpleScrollTest } from '../common/SimpleScrollTest';
-import { BasicScrollTest } from '../common/BasicScrollTest';
 import { BankGroupsPanel } from '../common/BankGroupsPanel';
 import { getBankBackgroundColor } from '../../utils/ui-utils';
 import { 

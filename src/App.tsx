@@ -274,7 +274,7 @@ const App: React.FC<AppProps> = () => {
     backgroundCheck: true
   });
 
-  const handleOpenCSV = () => {
+  const handleOpenPinFile = () => {
     fileInputRef.current?.click();
   };
 
@@ -288,12 +288,13 @@ const App: React.FC<AppProps> = () => {
     setError(null);
 
     try {
-      console.log('🔄 CSV解析を開始します...');
+      const fileExtension = file.name.split('.').pop()?.toLowerCase();
+      console.log('🔄 ファイル解析を開始します... (', fileExtension, ')');
       const result = await CSVReader.parseCSVFile(file);
-      console.log('📊 CSV解析結果:', result);
+      console.log('📊 ファイル解析結果:', result);
       
       if (result.success) {
-        console.log('✅ CSV解析成功:', result.pins.length, 'pins found');
+        console.log('✅ ファイル解析成功:', result.pins.length, 'pins found');
         const packageData = CSVReader.createPackageFromPins(result.pins, file.name);
         console.log('📦 パッケージデータ作成:', packageData);
         loadPackage(packageData);
@@ -303,8 +304,8 @@ const App: React.FC<AppProps> = () => {
           console.warn('⚠️ Import warnings:', result.warnings);
         }
       } else {
-        console.error('❌ CSV解析失敗:', result.errors);
-        setError(`Failed to import CSV: ${result.errors.join(', ')}`);
+        console.error('❌ ファイル解析失敗:', result.errors);
+        setError(`Failed to import file: ${result.errors.join(', ')}`);
       }
     } catch (error) {
       console.error('💥 ファイル読み取りエラー:', error);
@@ -671,12 +672,12 @@ const App: React.FC<AppProps> = () => {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".csv,.txt"
+            accept=".csv,.txt,.xlsx,.xls"
             onChange={handleFileSelect}
             style={{ display: 'none' }}
           />
           <button 
-            onClick={handleOpenCSV}
+            onClick={handleOpenPinFile}
             disabled={isImporting}
             style={{
               padding: '8px 16px',
@@ -688,7 +689,7 @@ const App: React.FC<AppProps> = () => {
               fontSize: '14px',
             }}
           >
-            {isImporting ? '📂 Loading...' : '📂 Open CSV'}
+            {isImporting ? '📂 Loading...' : '📂 Open Pin File'}
           </button>
           
           {/* Export dropdown menu */}

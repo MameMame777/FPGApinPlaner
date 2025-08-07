@@ -20,7 +20,6 @@ export const SimpleScrollTest: React.FC<SimpleScrollTestProps> = ({
   columns,
   selectedRows,
   hoveredRowId,
-  onRowSelection,
   onPinSelect,
   onHover,
   renderCellContent,
