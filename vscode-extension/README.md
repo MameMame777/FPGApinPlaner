@@ -11,6 +11,7 @@ Advanced FPGA Pin Assignment and Management Tool with Voltage/IO Standard Select
 - 📊 **Interactive Interface**: User-friendly webview interface with resizable panels
 - 🎯 **Context Integration**: Right-click context menus for CSV and constraint files
 - 📊 **Bank Analysis**: Dynamic bank statistics and differential pair management
+- 🚀 **Optimized Performance**: Streamlined codebase with enhanced performance and stability
 
 ## Quick Start
 
@@ -97,6 +98,19 @@ Access extension settings via `File > Preferences > Settings` and search for "FP
 - No additional dependencies required
 
 ## Release Notes
+
+### 1.0.2 (Latest)
+- ✅ **Performance Optimization**: Removed BGM audio functionality for improved stability
+- ✅ **Code Refactoring**: Streamlined codebase and eliminated unused components
+- ✅ **Enhanced UI**: Cleaner interface with better user experience
+- ✅ **Bug Fixes**: Resolved audio playback loop issues and improved overall reliability
+
+### 1.0.1
+- ✅ **Resizable UI Panels**: Added drag-to-resize functionality for left and right sidebars
+- ✅ **Dynamic Bank Groups**: CSV-based automatic bank statistics generation
+- ✅ **Improved Canvas Legend**: Parallel display of Bank Groups and Pin Types
+- ✅ **Differential Pair Enhancement**: Auto-sorting and visual indicators
+- ✅ **Clean Build System**: Automated build scripts for consistent packaging
 
 ### 1.0.0
 - Initial release

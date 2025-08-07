@@ -2,6 +2,24 @@
 
 All notable changes to the "FPGA Pin Planner" extension will be documented in this file.
 
+## [1.0.2] - 2025-08-07
+
+### Changed
+- 🚀 **Performance Optimization**: Removed BGM audio functionality for improved stability and performance
+- 🧹 **Code Refactoring**: Streamlined codebase by eliminating unused audio components
+- 📦 **Bundle Size Reduction**: Reduced extension size by removing audio-related dependencies
+- 🎨 **Enhanced UI**: Cleaner interface with better user experience and responsiveness
+
+### Removed
+- 🎵 **BGM Audio System**: Removed background music functionality to resolve playback issues
+- 📱 **Audio Controls**: Removed BGM control components from the interface
+- 🔧 **Audio Dependencies**: Cleaned up audio-related imports and stores
+
+### Fixed
+- 🐛 **Audio Loop Issues**: Resolved continuous audio playback loop problems
+- ⚡ **Memory Usage**: Improved memory efficiency by removing audio processing overhead
+- 🔧 **Build Process**: Enhanced clean build process for better consistency
+
 ## [1.0.1] - 2025-08-03
 
 ### Changed

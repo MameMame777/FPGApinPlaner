@@ -37,6 +37,11 @@ coverage/
 *.temp
 bundle-report.txt
 
+# Debug and test files
+debug*.html
+test-csv-loading.html
+test-voltage-io.html
+
 # OS generated files
 Thumbs.db
 ehthumbs.db
