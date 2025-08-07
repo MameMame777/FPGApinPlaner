@@ -343,8 +343,7 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect }) => {
               const aNum = parseInt(a!);
               const bNum = parseInt(b!);
               return isNaN(aNum) || isNaN(bNum) ? a!.localeCompare(b!) : aNum - bNum;
-            })
-            .slice(0, 8) // 最大8個のBANKを表示
+            }) // Dynamic bank display - no limit
             .map(bank => (
               <div
                 key={bank}

@@ -1875,7 +1875,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
           })()}
           
           {/* Legend */}
-          <Group x={10} y={stageSize.height - 200}>
+          <Group x={10} y={30}>
             {/* Bank Groups and Pin Types Legend - side by side */}
             {/* Bank Groups Section */}
             {/* Issue #19: Bank Groups クリック機能 - シンプル化されたUI */}
@@ -1892,7 +1892,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                     y={-2}
                     width={statusText.length * 6 + 8}
                     height={16}
-                    fill="rgba(0, 0, 0, 0.7)"
+                    fill="rgba(0, 0, 0, 0.85)"
                     cornerRadius={2}
                     onClick={() => {
                       console.log(`🎯 Bank Groups header clicked - showing all banks!`);
@@ -1905,7 +1905,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                     }}
                     onMouseLeave={(e) => {
                       const shape = e.target as any;
-                      shape.fill("rgba(0, 0, 0, 0.7)");
+                      shape.fill("rgba(0, 0, 0, 0.85)");
                       shape.getLayer()?.batchDraw();
                     }}
                     style={{ cursor: 'pointer' }}
@@ -1941,8 +1941,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                   const aNum = parseInt(a!);
                   const bNum = parseInt(b!);
                   return aNum - bNum;
-                })
-                .slice(0, 6); // Show max 6 banks in legend to avoid clutter
+                }); // Dynamic bank generation - no limit
               
               return uniqueBanks.map((bank, index) => {
                 const isBankVisible = visibleBanks.size === 0 || visibleBanks.has(bank!);
@@ -1994,7 +1993,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                       y={-8}
                       width={`Bank ${bank}`.length * 6 + 4}
                       height={14}
-                      fill="rgba(0, 0, 0, 0.6)"
+                      fill="rgba(0, 0, 0, 0.8)"
                       cornerRadius={2}
                       listening={false}
                     />
@@ -2025,7 +2024,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
               y={-2}
               width={130}
               height={16}
-              fill="rgba(0, 0, 0, 0.7)"
+              fill="rgba(0, 0, 0, 0.85)"
               cornerRadius={2}
             />
             <Text
@@ -2078,7 +2077,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                     y={-8}
                     width={pinType.length * 6 + 4}
                     height={14}
-                    fill="rgba(0, 0, 0, 0.6)"
+                    fill="rgba(0, 0, 0, 0.8)"
                     cornerRadius={2}
                   />
                   <Text
