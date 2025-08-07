@@ -49,7 +49,7 @@ npm run package
 ### Installation
 After building, install the generated `.vsix` file:
 ```bash
-code --install-extension fpga-pin-planner-1.0.1.vsix --force
+code --install-extension fpga-pin-planner-1.0.2.vsix --force
 ```
 
 ## Commands
