@@ -4,6 +4,7 @@ import { TAB_CONFIGS } from '../../constants/tab-configs';
 import { EditableTableCell } from '../common/EditableTableCell';
 import { CommentManager } from '../../services/comment-service';
 import { VirtualizedPinList } from '../common/VirtualizedPinList';
+import { BankGroupsPanel } from '../common/BankGroupsPanel';
 import { getBankBackgroundColor } from '../../utils/ui-utils';
 import { 
   VOLTAGE_LEVELS, 
@@ -271,15 +272,16 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect }) => {
         ))}
       </div>
 
-      {/* Controls */}
-      <div className="controls" style={{ 
-        padding: '16px', 
-        display: 'flex', 
-        gap: '16px', 
-        alignItems: 'center',
-        backgroundColor: '#2a2a2a',
-        borderBottom: '1px solid #444'
-      }}>
+      {/* Controls - カスタムコンポーネントの場合は表示しない */}
+      {!activeTabConfig.isCustomComponent && (
+        <div className="controls" style={{ 
+          padding: '16px', 
+          display: 'flex', 
+          gap: '16px', 
+          alignItems: 'center',
+          backgroundColor: '#2a2a2a',
+          borderBottom: '1px solid #444'
+        }}>
         {/* Search */}
         {activeTabConfig.showSearch && (
           <div style={{ flex: 1, maxWidth: '300px' }}>
@@ -391,10 +393,11 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect }) => {
             </button>
           </div>
         )}
-      </div>
+        </div>
+      )}
 
-      {/* Bulk Comment Editor */}
-      {showBulkEditor && (
+      {/* Bulk Comment Editor - カスタムコンポーネントの場合は表示しない */}
+      {!activeTabConfig.isCustomComponent && showBulkEditor && (
         <div style={{ 
           padding: '16px', 
           backgroundColor: '#1a1a1a', 
@@ -451,30 +454,49 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect }) => {
         </div>
       )}
 
-      {/* Virtualized Pin List */}
+      {/* Content */}
       <div style={{ flex: 1, minHeight: '400px' }}>
-        {filteredPins.length > 0 ? (
-          <VirtualizedPinList
-            pins={filteredPins}
-            columns={activeTabConfig.columns}
-            selectedRows={listView.selectedRows}
-            hoveredRowId={hoveredRowId}
-            onRowSelection={handleRowSelection}
-            onPinSelect={onPinSelect}
-            onCellEdit={handleCellEdit}
-            onTemplateSelect={handleTemplateSelect}
-            onHover={setHoveredRowId}
-            renderCellContent={renderCellContent}
-          />
+        {activeTabConfig.isCustomComponent ? (
+          // カスタムコンポーネントの表示
+          activeTabConfig.id === 'bankGroups' ? (
+            <BankGroupsPanel 
+              pins={pins} 
+            />
+          ) : (
+            <div style={{ 
+              padding: '40px', 
+              textAlign: 'center', 
+              color: '#666',
+              fontStyle: 'italic'
+            }}>
+              Custom component not implemented for {activeTabConfig.id}
+            </div>
+          )
         ) : (
-          <div style={{ 
-            padding: '40px', 
-            textAlign: 'center', 
-            color: '#666',
-            fontStyle: 'italic'
-          }}>
-            No pins match the current filters
-          </div>
+          // 通常のリスト表示
+          filteredPins.length > 0 ? (
+            <VirtualizedPinList
+              pins={filteredPins}
+              columns={activeTabConfig.columns}
+              selectedRows={listView.selectedRows}
+              hoveredRowId={hoveredRowId}
+              onRowSelection={handleRowSelection}
+              onPinSelect={onPinSelect}
+              onCellEdit={handleCellEdit}
+              onTemplateSelect={handleTemplateSelect}
+              onHover={setHoveredRowId}
+              renderCellContent={renderCellContent}
+            />
+          ) : (
+            <div style={{ 
+              padding: '40px', 
+              textAlign: 'center', 
+              color: '#666',
+              fontStyle: 'italic'
+            }}>
+              No pins match the current filters
+            </div>
+          )
         )}
       </div>
     </div>

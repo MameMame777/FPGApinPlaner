@@ -1878,52 +1878,41 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
           
           {/* Legend */}
           <Group x={10} y={stageSize.height - 200}>
-            {/* Bank Groups header background */}
+            {/* Bank Groups and Pin Types Legend - side by side */}
+            {/* Bank Groups Section */}
             <Rect
-              x={-3}
+              x={24}
               y={-2}
-              width={82}
+              width={80}
               height={16}
               fill="rgba(0, 0, 0, 0.7)"
               cornerRadius={2}
             />
             <Text
-              x={0}
+              x={27}
               y={0}
               text="Bank Groups:"
               fontSize={12}
               fill="#ccc"
             />
-            {/* Dynamic bank legend based on actual data - improved for issue #23 */}
             {(() => {
-              // Get unique banks from current pins
-              const uniqueBanks = Array.from(new Set(pins.map(p => p.bank).filter(Boolean)))
+              const uniqueBanks = [...new Set(pins.map(pin => pin.bank).filter(Boolean))]
                 .sort((a, b) => {
                   const aNum = parseInt(a!);
                   const bNum = parseInt(b!);
-                  return isNaN(aNum) || isNaN(bNum) ? a!.localeCompare(b!) : aNum - bNum;
+                  return aNum - bNum;
                 })
                 .slice(0, 6); // Show max 6 banks in legend to avoid clutter
               
               return uniqueBanks.map((bank, index) => (
-                <Group key={bank} y={20 + index * 18}>
-                  <Rect
-                    x={6}
-                    y={-4}
-                    width={12}
-                    height={12}
-                    fill={getOptimizedBankColor(bank)}
-                    stroke="#000"
-                    strokeWidth={1}
-                    cornerRadius={2}
-                  />
+                <Group key={bank} y={20 + index * 18} x={27}>
                   <Circle
                     x={12}
                     y={2}
-                    radius={3}
-                    fill="#FFF"
+                    radius={4}
+                    fill={getOptimizedBankColor(bank)}
                     stroke="#000"
-                    strokeWidth={0.5}
+                    strokeWidth={1}
                   />
                   <Text
                     x={25}
@@ -1951,9 +1940,8 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                 </Group>
               ));
             })()}
-            
-            {/* Pin Type Legend */}
-            {/* Pin Types header background */}
+
+            {/* Pin Types Section */}
             <Rect
               x={117}
               y={-2}
@@ -1969,48 +1957,62 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
               fontSize={12}
               fill="#ccc"
             />
-            {Object.entries({
-              'I/O': '#FFF',
-              'CONFIG': '#FFD700',
-              'POWER': '#FF4500',
-              'GROUND': '#000',
-              'MIO': '#32CD32',
-              'DDR': '#8A2BE2'
-            }).map(([typeName, color], index) => (
-              <Group key={typeName} y={20 + index * 18} x={120}>
-                <Circle
-                  x={12}
-                  y={2}
-                  radius={4}
-                  fill={color}
-                  stroke="#000"
-                  strokeWidth={1}
-                />
-                <Text
-                  x={25}
-                  y={-6}
-                  text={typeName}
-                  fontSize={10}
-                  fill="#999"
-                />
-                {/* Pin type name text background */}
-                <Rect
-                  x={23}
-                  y={-8}
-                  width={typeName.length * 6 + 4}
-                  height={14}
-                  fill="rgba(0, 0, 0, 0.6)"
-                  cornerRadius={2}
-                />
-                <Text
-                  x={25}
-                  y={-6}
-                  text={typeName}
-                  fontSize={10}
-                  fill="#ccc"
-                />
-              </Group>
-            ))}
+            {(() => {
+              // CSVから読み取った実際のピンタイプを使用
+              const uniquePinTypes = [...new Set(pins.map(pin => pin.pinType).filter(Boolean))]
+                .sort();
+              
+              const pinTypeColors = {
+                IO: '#4A90E2',
+                CONFIG: '#E24A4A', 
+                POWER: '#4AE24A',
+                GROUND: '#333333',
+                MGT: '#9B4AE2',
+                CLOCK: '#E2A64A',
+                ADC: '#4AE2E2',
+                SPECIAL: '#E24AA6',
+                NC: '#666666',
+                RESERVED: '#999999',
+                MIO: '#32CD32',
+                DDR: '#8A2BE2'
+              };
+              
+              return uniquePinTypes.map((pinType, index) => (
+                <Group key={pinType} y={20 + index * 18} x={120}>
+                  <Circle
+                    x={12}
+                    y={2}
+                    radius={4}
+                    fill={pinTypeColors[pinType as keyof typeof pinTypeColors] || '#666666'}
+                    stroke="#000"
+                    strokeWidth={1}
+                  />
+                  <Text
+                    x={25}
+                    y={-6}
+                    text={pinType}
+                    fontSize={10}
+                    fill="#999"
+                  />
+                  {/* Pin type name text background */}
+                  <Rect
+                    x={23}
+                    y={-8}
+                    width={pinType.length * 6 + 4}
+                    height={14}
+                    fill="rgba(0, 0, 0, 0.6)"
+                    cornerRadius={2}
+                  />
+                  <Text
+                    x={25}
+                    y={-6}
+                    text={pinType}
+                    fontSize={10}
+                    fill="#ccc"
+                  />
+                </Group>
+              ));
+            })()}
           </Group>
         </Layer>
       </Stage>

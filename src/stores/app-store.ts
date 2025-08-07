@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { enableMapSet } from 'immer';
-import { Pin, Package, ViewConfig, FilterState, FPGAProject, SortField, SortOrder, ListViewState, ViewMode } from '@/types';
+import { Pin, Package, ViewConfig, FilterState, FPGAProject, SortField, SortOrder, ListViewState, ViewMode, PinColorMode } from '@/types';
 import { UndoRedoService, Action } from '@/services/undo-redo-service';
 import { compareRows } from '@/utils/grid-utils';
 
@@ -23,6 +23,9 @@ interface AppState {
   
   // List view state
   listView: ListViewState;
+  
+  // Pin color mode
+  pinColorMode: PinColorMode;
   
   // Filter state
   filters: FilterState;
@@ -74,6 +77,9 @@ interface AppActions {
   setCommentFilter: (filter: 'all' | 'with-comments' | 'without-comments') => void;
   updateListViewState: (updates: Partial<ListViewState>) => void;
   bulkUpdateComments: (pinIds: string[], comment: string) => void;
+  
+  // Pin color mode management
+  setPinColorMode: (mode: PinColorMode) => void;
   
   // Filter management
   updateFilters: (filters: Partial<FilterState>) => void;
@@ -144,6 +150,7 @@ export const useAppStore = create<AppState & AppActions>()(
     selectedPins: new Set(),
     viewConfig: initialViewConfig,
     listView: initialListView,
+    pinColorMode: 'bank',
     filters: initialFilters,
     isLoading: false,
     error: null,
@@ -686,6 +693,12 @@ export const useAppStore = create<AppState & AppActions>()(
         });
         // Clear selection after bulk update
         state.listView.selectedRows.clear();
+      }),
+
+    // Pin color mode management
+    setPinColorMode: (mode) =>
+      set((state) => {
+        state.pinColorMode = mode;
       }),
 
     addRecentFile: (filePath) =>

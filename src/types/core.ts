@@ -290,9 +290,12 @@ export interface TabConfiguration {
   description?: string;
   showSearch?: boolean;
   showFilters?: boolean;
+  isCustomComponent?: boolean; // カスタムコンポーネントを使用するタブかどうか
 }
 
 export type ViewMode = 'grid' | 'list';
+
+export type PinColorMode = 'bank' | 'pinType';
 
 export interface ListViewState {
   activeTab: string;
