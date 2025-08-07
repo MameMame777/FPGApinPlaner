@@ -5,6 +5,7 @@ import { ExportService } from '@/services/export-service';
 import { PinItem } from '@/components/common/PinItem';
 import { BGMControls } from '@/components/common/BGMControls';
 import { SettingsPanel } from '@/components/common/SettingsPanel';
+import { ConstraintFormatSelector, ConstraintFormat } from '@/components/common/ConstraintFormatSelector';
 import { PinListTabs } from '@/components/common/PinListTabs';
 import PackageCanvas from '@/components/common/PackageCanvas';
 import SaveLoadControls from '@/components/common/SaveLoadControls';
@@ -25,6 +26,7 @@ const App: React.FC<AppProps> = () => {
   const [isImporting, setIsImporting] = useState(false);
   const [lastViewerSelectedPin, setLastViewerSelectedPin] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [showConstraintSelector, setShowConstraintSelector] = useState(false);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [rightSidebarTab, setRightSidebarTab] = useState<'validation' | 'batch' | null>('validation');
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
@@ -457,26 +459,35 @@ const App: React.FC<AppProps> = () => {
   };
 
   // Export handlers
-  const handleExportXDC = async () => {
+  const handleExportConstraints = (format: ConstraintFormat) => {
     if (pins.length === 0) return;
     
-    const xdcContent = ExportService.exportToXDC(pins, currentPackage);
-    const defaultFilename = `${currentPackage?.device || 'fpga'}_pins.xdc`;
+    let content: string;
+    let filename: string;
+    let fileExtension: string;
+    let fileTypes: Record<string, string[]>;
+    let dialogTitle: string;
     
-    const saved = await saveFileInVSCode(
-      xdcContent, 
-      defaultFilename,
-      {
-        'XDC Files': ['xdc'],
-        'All Files': ['*']
-      },
-      'Export XDC Constraints'
-    );
-
-    if (!saved) {
-      // Fallback to browser download
-      ExportService.downloadFile(xdcContent, defaultFilename, 'text/plain');
+    if (format === 'xdc') {
+      content = ExportService.exportToXDC(pins, currentPackage);
+      filename = `${currentPackage?.device || 'fpga'}_pins.xdc`;
+      fileExtension = 'text/plain';
+      fileTypes = { 'XDC Files': ['xdc'], 'All Files': ['*'] };
+      dialogTitle = 'Export XDC Constraints';
+    } else {
+      content = ExportService.exportToSDC(pins, currentPackage);
+      filename = `${currentPackage?.device || 'fpga'}_pins.sdc`;
+      fileExtension = 'text/plain';
+      fileTypes = { 'SDC Files': ['sdc'], 'All Files': ['*'] };
+      dialogTitle = 'Export SDC Constraints';
     }
+    
+    saveFileInVSCode(content, filename, fileTypes, dialogTitle).then(saved => {
+      if (!saved) {
+        // Fallback to browser download
+        ExportService.downloadFile(content, filename, fileExtension);
+      }
+    });
   };
 
   const handleExportCSV = async () => {
@@ -718,7 +729,7 @@ const App: React.FC<AppProps> = () => {
               }}>
                 <button
                   onClick={() => {
-                    handleExportXDC();
+                    setShowConstraintSelector(true);
                     setExportMenuOpen(false);
                   }}
                   style={{
@@ -735,7 +746,7 @@ const App: React.FC<AppProps> = () => {
                   onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#3a3a3a'}
                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                 >
-                  📄 XDC (Xilinx)
+                  📄 Constraints (XDC/SDC)
                 </button>
                 <button
                   onClick={() => {
@@ -1378,6 +1389,16 @@ const App: React.FC<AppProps> = () => {
         isOpen={showSettings} 
         onClose={() => setShowSettings(false)} 
       />
+      
+      {/* Constraint Format Selector */}
+      <ConstraintFormatSelector
+        isOpen={showConstraintSelector}
+        onClose={() => setShowConstraintSelector(false)}
+        onExport={handleExportConstraints}
+        pins={pins}
+        currentPackage={currentPackage}
+      />
+      
       {/* Keyboard Shortcuts Help Dialog */}
       <KeyboardShortcutsHelp 
         isOpen={showKeyboardHelp} 
