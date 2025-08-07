@@ -1295,10 +1295,10 @@ const App: React.FC<AppProps> = () => {
                 <div style={{
                   height: '100%',
                   backgroundColor: '#1a1a1a',
-                  overflow: 'hidden',
+                  overflow: 'hidden', // Back to hidden - scrolling should happen inside PinListTabs
                   width: '100%', // Ensure full width - Issue #14
                   minHeight: 0, // Allow vertical shrinking - Issue #14
-                }} className="custom-scrollbar">
+                }}>
                   <PinListTabs onPinSelect={handleListPinSelect} />
                 </div>
               )}

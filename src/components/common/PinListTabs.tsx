@@ -2,8 +2,9 @@ import React, { useMemo, useState } from 'react';
 import { useAppStore } from '../../stores/app-store';
 import { TAB_CONFIGS } from '../../constants/tab-configs';
 import { EditableTableCell } from '../common/EditableTableCell';
-import { CommentManager } from '../../services/comment-service';
 import { VirtualizedPinList } from '../common/VirtualizedPinList';
+import { SimpleScrollTest } from '../common/SimpleScrollTest';
+import { BasicScrollTest } from '../common/BasicScrollTest';
 import { BankGroupsPanel } from '../common/BankGroupsPanel';
 import { getBankBackgroundColor } from '../../utils/ui-utils';
 import { 
@@ -206,20 +207,6 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect }) => {
     updatePin(pinId, updates);
   };
 
-  const handleTemplateSelect = (pinId: string, templateId: string, variables: Record<string, string>) => {
-    const pin = pins.find(p => p.id === pinId);
-    if (!pin) return;
-
-    let comment: string;
-    if (templateId === 'auto') {
-      comment = CommentManager.generateAutoComment(pin);
-    } else {
-      comment = CommentManager.applyTemplate(templateId, variables);
-    }
-
-    handleCellEdit(pinId, 'comment', comment);
-  };
-
   const handleRowSelection = (pinId: string, selected: boolean) => {
     const newSelection = new Set(listView.selectedRows);
     if (selected) {
@@ -239,7 +226,12 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect }) => {
   };
 
   return (
-    <div className="pin-list-tabs">
+    <div className="pin-list-tabs" style={{ 
+      height: '100%', 
+      display: 'flex', 
+      flexDirection: 'column',
+      overflow: 'hidden' 
+    }}>
       {/* デバッグ情報 */}
       {process.env.NODE_ENV === 'development' && (
         <div style={{ padding: '8px', background: '#f0f0f0', fontSize: '12px', color: '#333' }}>
@@ -461,7 +453,13 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect }) => {
       )}
 
       {/* Content */}
-      <div style={{ flex: 1, minHeight: '400px' }}>
+      <div style={{ 
+        flex: 1, 
+        minHeight: '400px',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column'
+      }}>
         {activeTabConfig.isCustomComponent ? (
           // カスタムコンポーネントの表示
           activeTabConfig.id === 'bankGroups' ? (
@@ -488,8 +486,6 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect }) => {
               hoveredRowId={hoveredRowId}
               onRowSelection={handleRowSelection}
               onPinSelect={onPinSelect}
-              onCellEdit={handleCellEdit}
-              onTemplateSelect={handleTemplateSelect}
               onHover={setHoveredRowId}
               renderCellContent={renderCellContent}
             />
