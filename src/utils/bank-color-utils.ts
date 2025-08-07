@@ -4,14 +4,22 @@
  */
 
 // Text colors used in the application that we need to avoid
+const MAIN_LABEL_TEXT_COLOR = '#e0e0e0';
+const HEADER_TEXT_COLOR = '#ccc';
+const LEGEND_TEXT_COLOR = '#cccccc';
+const WHITE_PIN_TEXT_COLOR = '#FFF';
+const BLACK_TEXT_COLOR = '#000';
+const GRAY_TEXT_COLOR = '#374151';
+const SECONDARY_TEXT_COLOR = '#666';
+
 const TEXT_COLORS = [
-  '#e0e0e0', // Main label text
-  '#ccc',    // Header text
-  '#cccccc', // Legend text
-  '#FFF',    // White pin text
-  '#000',    // Black text
-  '#374151', // Gray text
-  '#666',    // Secondary text
+  MAIN_LABEL_TEXT_COLOR, // Main label text
+  HEADER_TEXT_COLOR,     // Header text
+  LEGEND_TEXT_COLOR,     // Legend text
+  WHITE_PIN_TEXT_COLOR,  // White pin text
+  BLACK_TEXT_COLOR,      // Black text
+  GRAY_TEXT_COLOR,       // Gray text
+  SECONDARY_TEXT_COLOR,  // Secondary text
 ];
 
 // Colors that are too close to text colors (to avoid)
