@@ -1,0 +1,134 @@
+chunk-WAQW2HX5.js?v=05f55ad9:21121 Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+PackageCanvas.tsx:84 📦 PackageCanvas: Received 0 pins (filtered)
+PackageCanvas.tsx:84 📦 PackageCanvas: Received 0 pins (filtered)
+BGMControls.tsx:27 🎵 BGMControls initialized
+BGMControls.tsx:28 🎵 Available tracks count: 3
+BGMControls.tsx:29 🎵 Available tracks: Array(3)
+App.tsx:234 🔍 Checking VS Code environment: Object
+App.tsx:257 ❌ Not in VS Code environment
+BGMControls.tsx:27 🎵 BGMControls initialized
+BGMControls.tsx:28 🎵 Available tracks count: 3
+BGMControls.tsx:29 🎵 Available tracks: Array(3)
+App.tsx:234 🔍 Checking VS Code environment: Object
+App.tsx:257 ❌ Not in VS Code environment
+PackageCanvas.tsx:84 📦 PackageCanvas: Received 0 pins (filtered)
+PackageCanvas.tsx:84 📦 PackageCanvas: Received 0 pins (filtered)
+BGMControls.tsx:64 🎵 BGM toggle button clicked
+BGMControls.tsx:47 🎵 Track selected: Nature Sound
+BGMControls.tsx:48 🎵 All available tracks: (3) [{…}, {…}, {…}]
+BGMControls.tsx:49 🎵 Track count: 3
+audio-store.ts:59 🎵 BGM playBGM called with: {url: 'data:audio/wav;base64,UklGRl4CAABXQVZFZm10IBAAAAAB…h3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh', name: 'Nature Sound', description: '自然の音'}
+audio-store.ts:81 🎵 Playing track: Nature Sound data:audio/wav;base64,UklGRl4CAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YToCAABQaDCMqDKWsDuquE20wF7I0XPR4orZ8qTg/cPl/+vp/fXt/f/x//Xz/fX1/fP3/fH5/e/7/e3+/Ofr8+vt8e/v7fHx7fPz6/X35+f57+np6+/t5/Hv5fP34+X55+fp5+vr5e/t4/Hz4eX14+fx4efz3+nz3enx3+vv3e3t3e/r3e/p3fHn3e/n3fHl3fPj3fHj3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh3fPh
+audio-store.ts:98 🔄 BGM loading started: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:112 ▶️ BGM playing successfully: Nature Sound
+favicon.ico:1 
+            
+            
+           GET http://localhost:5173/favicon.ico 404 (Not Found)
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+BGMControls.tsx:64 🎵 BGM toggle button clicked
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound
+audio-store.ts:102 ✅ BGM ready to play: Nature Sound

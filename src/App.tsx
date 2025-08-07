@@ -3,7 +3,6 @@ import { useAppStore } from '@/stores/app-store';
 import { CSVReader } from '@/services/csv-reader';
 import { ExportService } from '@/services/export-service';
 import { PinItem } from '@/components/common/PinItem';
-import { BGMControls } from '@/components/common/BGMControls';
 import { SettingsPanel } from '@/components/common/SettingsPanel';
 import { ConstraintFormatSelector, ConstraintFormat } from '@/components/common/ConstraintFormatSelector';
 import { PinListTabs } from '@/components/common/PinListTabs';
@@ -669,7 +668,6 @@ const App: React.FC<AppProps> = () => {
           >
             {isMaximized ? '� Restore' : '� Maximize'}
           </button>
-          <BGMControls />
           <input
             ref={fileInputRef}
             type="file"
