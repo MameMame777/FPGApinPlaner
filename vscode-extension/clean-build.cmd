@@ -35,4 +35,4 @@ if %errorlevel% neq 0 (
 )
 
 echo 🎉 Clean build completed successfully!
-echo 💡 To install: code --install-extension fpga-pin-planner-1.0.1.vsix --force
+echo 💡 To install: code --install-extension fpga-pin-planner-1.0.2.vsix --force
