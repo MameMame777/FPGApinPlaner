@@ -104,7 +104,7 @@ export function getAdaptiveTextSize(scale: number, baseSize: number = 12): numbe
  * Check if differential pairs should be rendered
  */
 export function shouldRenderDifferentialPairs(scale: number): boolean {
-  return scale >= 0.5; // Only render diff pairs at medium+ zoom
+  return scale >= 0.3; // Show diff pairs at lower zoom for better visibility
 }
 
 /**

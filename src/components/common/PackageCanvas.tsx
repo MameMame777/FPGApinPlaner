@@ -1,10 +1,38 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { Stage, Layer, Rect, Text, Group, Line, Circle } from 'react-konva';
 import { KonvaEventObject } from 'konva/lib/Node';
 import { Pin, Package } from '@/types';
 import { DifferentialPairUtils } from '@/utils/differential-pair-utils';
+import { rowToIndex, indexToRow } from '@/utils/grid-utils';
+import { getOptimizedBankColor } from '@/utils/bank-color-utils';
 import { LODSystem } from '@/utils/LODSystem';
+import { PerformanceService } from '@/services/performance-service';
 import { useAppStore } from '@/stores/app-store';
+
+// Header Bar Component for displaying information in the red frame area
+const HeaderBar: React.FC<{ fileName: string; viewInfo: string }> = ({ fileName, viewInfo }) => (
+  <div
+    style={{
+      width: '100%',
+      height: '32px',
+      background: 'rgba(0,0,0,0.85)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'flex-start',
+      padding: '0 16px',
+      position: 'relative',
+      zIndex: 2,
+      color: '#e0e0e0',
+      fontSize: '12px',
+      fontWeight: 500,
+      boxSizing: 'border-box',
+      borderBottom: '1px solid #333'
+    }}
+  >
+    <span style={{ transform: 'translateY(-2px)' }}>{viewInfo}</span>
+    <span style={{ transform: 'translateY(-2px)', marginLeft: '360px' }}>{fileName}</span>
+  </div>
+);
 
 interface PackageCanvasProps {
   package: Package | null;
@@ -31,8 +59,9 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
   onZoomChange,
   resetTrigger = 0
 }) => {
-  const { togglePinSelection, selectPins } = useAppStore();
+  const { togglePinSelection, selectPins, visibleBanks, toggleBankVisibility, showAllBanks, pins: allPins } = useAppStore();
   const stageRef = useRef<any>(null);
+  const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null); // For debouncing resize - Issue #14
   const [stageSize, setStageSize] = useState({ width: 800, height: 600 });
   
   // Last selected pin for shift-click range selection
@@ -51,8 +80,215 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
   const [mouseDownTime, setMouseDownTime] = useState(0);
   const [mouseDownPosition, setMouseDownPosition] = useState({ x: 0, y: 0 });
   
+  // 🏪 Debug: Log received pins for Bank visibility tracking
+  console.log(`📦 PackageCanvas: Received ${pins.length} pins (filtered)`);
+  
   // LOD System integration
   const currentLOD = LODSystem.getLODLevel(viewport.scale);
+  
+  // Performance-optimized pin indexing and culling
+  const pinIndexes = useMemo(() => {
+    PerformanceService.startRenderMeasurement('pin-indexing');
+    const indexes = PerformanceService.createPinIndexes(pins);
+    PerformanceService.endRenderMeasurement('pin-indexing');
+    return indexes;
+  }, [pins]);
+  
+  // Smart viewport culling based on user use cases - with rotation support
+  const visiblePins = useMemo(() => {
+    PerformanceService.startRenderMeasurement('viewport-culling');
+    
+    // Calculate current viewport bounds (zero margins for maximum viewer area - Issue #14)
+    const canvasWidth = stageSize.width; // Use full viewer area - no margins
+    const canvasHeight = stageSize.height; // Use full viewer area - no margins
+    const viewportBounds = {
+      x: -viewport.x / viewport.scale - canvasWidth / (2 * viewport.scale),
+      y: -viewport.y / viewport.scale - canvasHeight / (2 * viewport.scale),
+      width: canvasWidth / viewport.scale,
+      height: canvasHeight / viewport.scale,
+      scale: viewport.scale
+    };
+    
+    // Rotation-aware culling function
+    const isPointInBounds = (pin: Pin, bounds: any) => {
+      // Apply same transformation as transformPosition but without viewport scaling
+      let { x, y } = pin.position;
+      
+      // Apply rotation first (at original scale)
+      if (rotation !== 0) {
+        const rad = (rotation * Math.PI) / 180;
+        const cos = Math.cos(rad);
+        const sin = Math.sin(rad);
+        const newX = x * cos - y * sin;
+        const newY = x * sin + y * cos;
+        x = newX;
+        y = newY;
+      }
+      
+      // Apply mirroring for bottom view
+      if (!isTopView) {
+        x = -x;
+      }
+      
+      // Check if the transformed position is within bounds
+      return x >= bounds.x && 
+             x <= bounds.x + bounds.width &&
+             y >= bounds.y && 
+             y <= bounds.y + bounds.height;
+    };
+    
+    // Use case 1: Detail view (high zoom) - show all pins in focused area + selected pins
+    if (viewport.scale > 0.6) {
+      const margin = 200 / viewport.scale; // Adaptive margin based on zoom
+      const extendedBounds = {
+        ...viewportBounds,
+        x: viewportBounds.x - margin,
+        y: viewportBounds.y - margin * 1.5, // Extra margin for upper rows (U, V, W)
+        width: viewportBounds.width + margin * 2,
+        height: viewportBounds.height + margin * 2.5 // Extra height for upper rows
+      };
+      
+      // Always include selected pins regardless of viewport
+      const selectedPinObjects = Array.from(selectedPins)
+        .map(id => pinIndexes.findById(id))
+        .filter(Boolean) as Pin[];
+      
+      // Use rotation-aware culling instead of PerformanceService.cullPins
+      const culledPins = pins.filter(pin => isPointInBounds(pin, extendedBounds));
+      
+      // Combine culled pins with selected pins (remove duplicates)
+      const allVisiblePins = new Map<string, Pin>();
+      culledPins.forEach(pin => allVisiblePins.set(pin.id, pin));
+      selectedPinObjects.forEach(pin => allVisiblePins.set(pin.id, pin));
+      
+      const result = Array.from(allVisiblePins.values());
+      PerformanceService.endRenderMeasurement('viewport-culling');
+      return result;
+    }
+    
+    // Use case 2: Overview mode (low zoom) - show all pins for complete overview
+    else {
+      // Ultra-low zoom: show ALL pins for complete overview
+      if (viewport.scale <= 0.2) {
+        PerformanceService.endRenderMeasurement('viewport-culling');
+        // console.log(`🌍 Ultra-wide overview: ${pins.length}/${pins.length} pins visible`);
+        return pins; // Show all pins for complete overview
+      }
+      
+      // Low to medium zoom: show most pins with some optimization
+      else if (viewport.scale <= 0.4) {
+        // Show 85% of pins - still good overview but with slight optimization
+        const sampleRate = 0.85;
+        const bankGroups = new Map<string, Pin[]>();
+        pins.forEach(pin => {
+          const bank = pin.bank || 'NA';
+          if (!bankGroups.has(bank)) {
+            bankGroups.set(bank, []);
+          }
+          bankGroups.get(bank)!.push(pin);
+        });
+        
+        const overviewPins: Pin[] = [];
+        
+        // Always include all selected pins
+        const selectedPinObjects = Array.from(selectedPins)
+          .map(id => pinIndexes.findById(id))
+          .filter(Boolean) as Pin[];
+        overviewPins.push(...selectedPinObjects);
+        
+        // Sample from each bank proportionally
+        bankGroups.forEach((bankPins) => {
+          const targetCount = Math.max(1, Math.floor(bankPins.length * sampleRate));
+          const step = Math.max(1, Math.floor(bankPins.length / targetCount));
+          
+          for (let i = 0; i < bankPins.length; i += step) {
+            const pin = bankPins[i];
+            if (!selectedPins.has(pin.id)) { // Avoid duplicates
+              overviewPins.push(pin);
+            }
+          }
+        });
+        
+        PerformanceService.endRenderMeasurement('viewport-culling');
+        return overviewPins;
+      }
+      
+      // Medium zoom: hybrid approach - viewport-aware sampling for focus areas
+      else if (viewport.scale <= 0.6) {
+        // Calculate visible area with generous margins for context, extra for upper rows
+        const margin = 300 / viewport.scale;
+        const focusArea = {
+          x: viewportBounds.x - margin,
+          y: viewportBounds.y - margin * 1.5, // Extra margin for upper rows (U, V, W)
+          width: viewportBounds.width + margin * 2,
+          height: viewportBounds.height + margin * 2.5 // Extra height for upper rows
+        };
+        
+        // Always include all selected pins
+        const selectedPinObjects = Array.from(selectedPins)
+          .map(id => pinIndexes.findById(id))
+          .filter(Boolean) as Pin[];
+        
+        // Use rotation-aware culling for focus area
+        const focusAreaPins = pins.filter(pin => isPointInBounds(pin, focusArea));
+        
+        // Sample from remaining pins for context
+        const remainingPins = pins.filter(pin => 
+          !focusAreaPins.some(fp => fp.id === pin.id) && 
+          !selectedPins.has(pin.id)
+        );
+        const sampleStep = Math.max(1, Math.floor(remainingPins.length / 200)); // Show ~200 context pins
+        const contextPins = remainingPins.filter((_, index) => index % sampleStep === 0);
+        
+        // Combine all pin sets
+        const mediumZoomVisiblePins = new Map<string, Pin>();
+        selectedPinObjects.forEach(pin => mediumZoomVisiblePins.set(pin.id, pin));
+        focusAreaPins.forEach(pin => mediumZoomVisiblePins.set(pin.id, pin));
+        contextPins.forEach(pin => mediumZoomVisiblePins.set(pin.id, pin));
+        
+        const mediumResult = Array.from(mediumZoomVisiblePins.values());
+        PerformanceService.endRenderMeasurement('viewport-culling');
+        return mediumResult;
+      }
+      
+      // High-medium zoom: balanced view with more optimization
+      else {
+        // Show representative sample from each bank (original logic)
+        const bankGroups = new Map<string, Pin[]>();
+        pins.forEach(pin => {
+          const bank = pin.bank || 'NA';
+          if (!bankGroups.has(bank)) {
+            bankGroups.set(bank, []);
+          }
+          bankGroups.get(bank)!.push(pin);
+        });
+        
+        // Sample pins from each bank to maintain overview clarity
+        const maxPinsPerBank = Math.max(10, Math.floor(800 / bankGroups.size)); // Increased from 500
+        const overviewPins: Pin[] = [];
+        
+        bankGroups.forEach((bankPins) => {
+          // Always include selected pins from this bank
+          const selectedFromBank = bankPins.filter(pin => selectedPins.has(pin.id));
+          overviewPins.push(...selectedFromBank);
+          
+          // Sample remaining pins from this bank
+          const remainingSlots = maxPinsPerBank - selectedFromBank.length;
+          if (remainingSlots > 0) {
+            const nonSelectedPins = bankPins.filter(pin => !selectedPins.has(pin.id));
+            const step = Math.max(1, Math.floor(nonSelectedPins.length / remainingSlots));
+            
+            for (let i = 0; i < nonSelectedPins.length && overviewPins.length - selectedFromBank.length < remainingSlots; i += step) {
+              overviewPins.push(nonSelectedPins[i]);
+            }
+          }
+        });
+        
+        PerformanceService.endRenderMeasurement('viewport-culling');
+        return overviewPins;
+      }
+    }
+  }, [pins, viewport, selectedPins, stageSize, pinIndexes]);
   
   // Constants for mouse interaction
   const DRAG_THRESHOLD_TIME = 200; // ms - time before starting drag (slightly longer for better UX)
@@ -88,65 +324,112 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
     }
   };
 
-  // Canvas size management - Completely disable ResizeObserver to prevent infinite loops
+  // Canvas size management - Enhanced for Issue #14: dynamic maximization support
   useEffect(() => {
-    // Set initial size once on mount
-    const container = stageRef.current?.container();
+    const updateCanvasSize = () => {
+      const container = stageRef.current?.container();
+      if (container) {
+        const rect = container.getBoundingClientRect();
+        // Maximum viewer area utilization: use full available space to eliminate footer area
+        const newSize = {
+          width: Math.max(400, rect.width), // Use full container width
+          height: Math.max(300, rect.height) // Use full container height to eliminate footer
+        };
+        
+        // Only update if size actually changed to prevent unnecessary re-renders
+        setStageSize(prevSize => {
+          if (prevSize.width !== newSize.width || prevSize.height !== newSize.height) {
+            console.log('📐 Canvas size updated for dynamic maximization:', newSize);
+            return newSize;
+          }
+          return prevSize;
+        });
+      }
+    };
+
+    // Delay initial size calculation to ensure Stage is mounted
+    // VS Code webview environment may need longer initialization time
+    const timeoutId = setTimeout(() => {
+      updateCanvasSize();
+    }, 200); // Extended delay for webview environment
+
+    // Use ResizeObserver for responsive layout - Issue #14
+    const container = stageRef.current?.container()?.parentElement;
     if (container) {
-      const rect = container.getBoundingClientRect();
-      const initialSize = {
-        width: Math.max(400, rect.width),
-        height: Math.max(300, rect.height)
-      };
+      const resizeObserver = new ResizeObserver(() => {
+        // Debounce resize events
+        if (resizeTimeoutRef.current) {
+          clearTimeout(resizeTimeoutRef.current);
+        }
+        resizeTimeoutRef.current = setTimeout(() => {
+          updateCanvasSize();      }, 16); // ~60fps
+      });
+
+      resizeObserver.observe(container);
       
-      console.log('📏 Setting initial canvas size:', initialSize);
-      setStageSize(initialSize);
+      return () => {
+        clearTimeout(timeoutId);
+        if (resizeTimeoutRef.current) {
+          clearTimeout(resizeTimeoutRef.current);
+        }
+        resizeObserver.disconnect();
+      };
     }
+    
+    return () => {
+      clearTimeout(timeoutId);
+    };
   }, []);
 
-  // Set initial viewport position when package is loaded
+  // Set initial viewport position when package is loaded with auto-fit for Issue #14
   useEffect(() => {
     if (pkg && pins.length > 0 && stageSize.width > 0 && stageSize.height > 0) {
-      // console.log('📍 Setting initial viewport position to screen center'); // ログ無効化
-      
-      // Set initial position to center of drawing area (screen center)
-      // This is independent of package dimensions and ensures consistent behavior
-      const initialPosition = {
-        x: 0, // Screen center as origin
-        y: 0, // Screen center as origin
-        scale: 1
-      };
-      
-      // console.log('📐 Initial position set to screen center (0, 0)'); // ログ無効化
-      // console.log('📐 Stage size:', stageSize.width, 'x', stageSize.height); // ログ無効化
-      
-      setViewport(initialPosition);
+      // Calculate optimal zoom and position to fit package in available space
+      const packageDims = getPackageDimensions();
+      if (packageDims) {
+        const { width: pkgWidth, height: pkgHeight, centerX, centerY } = packageDims;
+        
+        // Calculate zoom to fit package in available space - zero margins for maximum viewer area (Issue #14)
+        // Use full viewer area without any padding for complete margin elimination
+        const dynamicPadding = 0; // Zero padding for maximum viewer area - Issue #14
+        const availableWidth = stageSize.width - dynamicPadding * 2; // Full width
+        const availableHeight = stageSize.height - dynamicPadding * 2; // Full height
+        
+        const scaleX = availableWidth / pkgWidth;
+        const scaleY = availableHeight / pkgHeight;
+        // Ensure minimum scale of 0.8 for readability, maximum of 2.0
+        const optimalScale = Math.max(0.8, Math.min(scaleX, scaleY, 2.0));
+        
+        // Center the package in the stage with slight upward bias to show more upper rows
+        const stageCenter = {
+          x: stageSize.width / 2,
+          y: stageSize.height / 2 + 30 // Shift down slightly to show more upper rows (U, V, W)
+        };
+        
+        const initialPosition = {
+          x: stageCenter.x - centerX * optimalScale,
+          y: stageCenter.y - centerY * optimalScale,
+          scale: optimalScale
+        };
+        
+        console.log('📐 Auto-fit viewport:', initialPosition, 'for package:', pkgWidth, 'x', pkgHeight, 'scale:', optimalScale);
+        setViewport(initialPosition);
+      }
     }
-  }, [pkg, pins.length]);
+  }, [pkg, pins.length, stageSize]);
 
-  // Bank-based color logic for tiles
+  // Bank-based color logic for tiles - improved for issue #23
   const getBankColor = (pin: Pin) => {
     // Special handling for power/ground pins
     if (pin.pinType === 'GROUND' || pin.pinName === 'GND') {
-      return '#2C2C2C'; // Dark gray for GND
+      return getOptimizedBankColor('GROUND');
     }
     if (pin.pinType === 'POWER' || pin.pinName?.includes('VCC')) {
-      return '#8B4513'; // Brown for power
+      return getOptimizedBankColor('POWER');
     }
     
-    // Bank-based colors
-    const bankColors = {
-      '0': '#FF6B6B',      // Red - CONFIG bank
-      '34': '#4ECDC4',     // Teal - HR I/O bank 34
-      '35': '#45B7D1',     // Light Blue - HR I/O bank 35
-      '500': '#96CEB4',    // Light Green - MIO bank 500
-      '501': '#FFEAA7',    // Light Yellow - MIO bank 501
-      '502': '#DDA0DD',    // Plum - DDR bank 502
-      'NA': '#708090',     // Slate Gray - Non-bank pins
-    };
-    
-    const bankKey = pin.bank || 'NA';
-    return bankColors[bankKey as keyof typeof bankColors] || '#708090';
+    // Use optimized color system
+    return getOptimizedBankColor(pin.bank);
   };
 
   // Get circle color based on pin type (for inner circle)
@@ -188,24 +471,21 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
       const pinType = DifferentialPairUtils.getDifferentialPairType(pin.pinName) || 
                      (pin.signalName ? DifferentialPairUtils.getDifferentialPairType(pin.signalName) : null);
       
-      // Positive: 赤、Negative: 黄色
-      return pinType === 'positive' ? '#FF0000' : '#FFFF00';
+      // Enhanced colors for better visibility
+      // Positive: bright red, Negative: bright orange
+      return pinType === 'positive' ? '#FF3333' : '#FF9933';
     }
 
     return null;
   };
 
-  // Group pins by bank for boundary highlighting
-  const getPinsByBank = () => {
-    const bankGroups = new Map<string, Pin[]>();
-    pins.forEach(pin => {
-      const bankKey = pin.bank || 'NA';
-      if (!bankGroups.has(bankKey)) {
-        bankGroups.set(bankKey, []);
-      }
-      bankGroups.get(bankKey)!.push(pin);
-    });
-    return bankGroups;
+  // Check if pin has differential pair (for subtle indication)
+  const hasDifferentialPair = (pin: Pin, allPins: Pin[]) => {
+    if (!DifferentialPairUtils.isDifferentialPin(pin)) {
+      return false;
+    }
+    const pairPin = DifferentialPairUtils.findPairPin(pin, allPins);
+    return pairPin !== null;
   };
 
   // Calculate package dimensions based on actual grid layout
@@ -218,10 +498,15 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
     const rows = pins.map(pin => pin.gridPosition?.row).filter(Boolean);
     const cols = pins.map(pin => pin.gridPosition?.col).filter(Boolean);
     
-    const minRow = Math.min(...rows.map(r => r!.charCodeAt(0) - 65));
-    const maxRow = Math.max(...rows.map(r => r!.charCodeAt(0) - 65));
+    console.log(`🔍 Found rows: ${rows.join(', ')}`);
+    
+    const minRow = Math.min(...rows.map(r => rowToIndex(r!)));
+    const maxRow = Math.max(...rows.map(r => rowToIndex(r!)));
     const minCol = Math.min(...cols);
     const maxCol = Math.max(...cols);
+    
+    console.log(`🔍 Row indices - min: ${minRow} (${indexToRow(minRow)}), max: ${maxRow} (${indexToRow(maxRow)})`);
+    console.log(`🔍 Col indices - min: ${minCol}, max: ${maxCol}`);
     
     // Grid spacing matches CSV reader
     const tileSize = 88;
@@ -231,10 +516,10 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
     const gridWidth = (maxCol - minCol + 1) * gridSpacing;
     const gridHeight = (maxRow - minRow + 1) * gridSpacing;
     
-    // Add padding for labels and margins
-    const padding = tileSize;
-    const width = gridWidth + padding * 2;
-    const height = gridHeight + padding * 2;
+    // Add zero padding for maximum viewer area - Issue #14
+    const padding = 0; // Zero padding for complete margin elimination - Issue #14
+    const width = gridWidth + padding * 2; // Use exact grid dimensions
+    const height = gridHeight + padding * 2; // Use exact grid dimensions
     
     // Calculate grid center position
     const gridCenterX = (minCol + maxCol - 1) * gridSpacing / 2;
@@ -266,7 +551,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
     }
   }, [pins.length]);
 
-  // Transform coordinates based on view settings with stable scaling
+  // Transform coordinates for pins with rotation and mirroring
   const transformPosition = (pin: Pin) => {
     let { x, y } = pin.position;
     
@@ -287,9 +572,9 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
       x = -x;
     }
     
-    // Apply viewport scaling and offset (account for label margins)
-    const canvasWidth = stageSize.width - 40; // Account for left margin
-    const canvasHeight = stageSize.height - 30; // Account for top margin
+    // Apply viewport scaling and offset (zero margins for maximum viewer area - Issue #14)
+    const canvasWidth = stageSize.width; // Use full viewer area - no margins
+    const canvasHeight = stageSize.height; // Use full viewer area - no margins
     const transformedX = x * viewport.scale + viewport.x + canvasWidth / 2;
     const transformedY = y * viewport.scale + viewport.y + canvasHeight / 2;
     
@@ -297,6 +582,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
   };
 
   // Apply viewport boundaries to prevent canvas from disappearing off screen
+  // Updated for Issue #14: maximized display area with reduced margins
   const applyViewportBounds = (pos: { x: number; y: number }, scale: number) => {
     // Get actual content dimensions
     const packageDims = getPackageDimensions();
@@ -307,14 +593,14 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
     const canvasWidth = stageSize.width;
     const canvasHeight = stageSize.height;
     
-    // Allow panning beyond content boundaries to show all pins
-    const paddingX = canvasWidth * 0.5; // Allow half screen padding
-    const paddingY = canvasHeight * 0.5;
+    // Allow generous panning beyond content boundaries to show all pins, especially for upper rows
+    const paddingX = canvasWidth * 0.5; // Allow half screen padding horizontally
+    const paddingY = canvasHeight * 0.8; // Increased vertical padding for better access to upper rows
     
-    // Calculate bounds that ensure content is accessible
+    // Calculate bounds that ensure content is accessible, with extra allowance for upper rows
     const minX = -(contentWidth / 2 + paddingX);
     const maxX = contentWidth / 2 + paddingX;
-    const minY = -(contentHeight / 2 + paddingY);
+    const minY = -(contentHeight / 2 + paddingY * 1.5); // Extra allowance for upper rows (U, V, W)
     const maxY = contentHeight / 2 + paddingY;
     
     return {
@@ -548,7 +834,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
     }
   };
 
-  if (!pkg || pins.length === 0) {
+  if (!pkg) {
     return (
       <div style={{
         width: '100%',
@@ -581,212 +867,491 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
     );
   }
 
+  // Information for header bar
+  const viewInfo = `View: ${isTopView ? 'TOP' : 'BOTTOM'} | Rotation: ${rotation}° | Zoom: ${Math.round(zoom * 100)}%`;
+  const fileName = pkg ? `${pkg.device}pkg.csv (${pkg.packageType})` : 'No package loaded';
+
   return (
-    <div style={{ width: '100%', height: '100%', backgroundColor: '#1a1a1a', position: 'relative' }}>
-      {/* Grid Labels - Top (Columns) */}
-      <div style={{
-        position: 'absolute',
-        top: 0,
-        left: 40,
-        right: 0,
-        height: 30,
-        backgroundColor: '#2a2a2a',
-        borderBottom: '1px solid #444',
-        display: 'flex',
-        alignItems: 'center',
-        zIndex: 10,
-        overflow: 'hidden'
+    <div style={{ 
+      width: '100%', 
+      height: '100%', 
+      backgroundColor: '#1a1a1a', 
+      position: 'relative',
+      display: 'flex',
+      flexDirection: 'column',
+    }}>
+      {/* Header Bar in red frame area (tiles-free zone) */}
+      <HeaderBar fileName={fileName} viewInfo={viewInfo} />
+      
+      {/* Main Canvas Area */}
+      <div style={{ 
+        flex: 1,
+        position: 'relative',
+        overflow: 'hidden',
       }}>
-        {viewport.scale > 0.1 && (() => {
-          const { gridSpacing } = packageDims as any;
-          if (!gridSpacing) return null;
-          
-          // Calculate container-relative positions for labels
-          const containerWidth = stageSize.width - 40; // Available width for labels
-          
-          const columnLabels: JSX.Element[] = [];
-          
-          // Generate labels based on actual pin positions to avoid overlap issues
-          const validPins = pins.filter(pin => pin.gridPosition);
-          const processedPositions = new Set();
-          
-          validPins.forEach(pin => {
-            if (!pin.gridPosition) return;
+        {/* Grid Labels - Fixed 4-direction layout with rotation-aware content */}
+        
+        {/* Top Labels */}
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 16,
+          right: 16,
+          height: 16,
+          backgroundColor: '#2a2a2a',
+          border: '1px solid #444',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'flex-start',
+          flexDirection: 'row',
+          zIndex: 10,
+          overflow: 'hidden'
+        }}>
+          {viewport.scale > 0.1 && (() => {
+            const { gridSpacing, minCol, maxCol, minRow, maxRow } = packageDims as any;
+            if (!gridSpacing) return null;
             
-            // Transform pin position to screen coordinates
-            const pinTransformed = transformPosition(pin);
+            const topLabels: JSX.Element[] = [];
             
-            // Check if this pin contributes to column labels (within header area)
-            // Use extended tolerance range to ensure labels remain visible during viewport panning
-            const headerY = 15; // Center of header area
-            const extendedYTolerance = Math.max(300, stageSize.height * 0.8); // Dynamic tolerance based on screen size
+            // Top area content depends on rotation
+            const shouldShowColumns = rotation === 0 || rotation === 180;
             
-            // Round position to avoid duplicate labels for nearby pins
-            const roundedX = Math.round(pinTransformed.x / 25) * 25;
-            const positionKey = `col-${roundedX}`;
-            
-            if (Math.abs(pinTransformed.y - headerY) < extendedYTolerance && !processedPositions.has(positionKey)) {
-              processedPositions.add(positionKey);
-              
-              // Use appropriate grid coordinate based on rotation for the label
-              let displayText: string;
-              switch (rotation) {
-                case 0:
-                case 180:
-                  // Normal orientation: column labels show column numbers
-                  displayText = pin.gridPosition.col.toString();
-                  break;
-                case 90:
-                case 270:
-                  // 90/270 degree rotation: column labels show row letters
-                  displayText = pin.gridPosition.row;
-                  break;
-                default:
-                  displayText = pin.gridPosition.col.toString();
-              }
-              const labelLeft = Math.round(pinTransformed.x - 10);
-              
-              // Check if position is within extended container bounds to provide smooth panning experience
-              const extendedWidth = containerWidth + 200; // Extended bounds prevent label flickering during pan
-              const isVisible = labelLeft >= -100 && labelLeft <= extendedWidth;
-              
-              if (isVisible) {
-                columnLabels.push(
-                  <div
-                    key={positionKey}
-                    style={{
-                      position: 'absolute',
-                      left: labelLeft,
-                      top: 0,
-                      width: 20,
-                      height: 30,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: 12,
-                      fontWeight: 'bold',
-                      color: '#e0e0e0',
-                      textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
-                      pointerEvents: 'none'
-                    }}
-                  >
-                    {displayText}
-                  </div>
+            if (shouldShowColumns) {
+              // Show columns when rotation is 0° or 180°
+              for (let colIndex = minCol; colIndex <= maxCol; colIndex++) {
+                const representativePin = pins.find(pin => 
+                  pin.gridPosition && pin.gridPosition.col === colIndex
                 );
+                
+                if (!representativePin) continue;
+                
+                const pinTransformed = transformPosition(representativePin);
+                const labelPosition = { left: pinTransformed.x - 10, top: -5 };
+                
+                if (labelPosition.left >= -50 && labelPosition.left <= stageSize.width + 50) {
+                  topLabels.push(
+                    <div
+                      key={`top-col-${colIndex}`}
+                      style={{
+                        position: 'absolute',
+                        ...labelPosition,
+                        width: 20,
+                        height: 16,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 11,
+                        fontWeight: 'bold',
+                        color: '#e0e0e0',
+                        textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
+                        pointerEvents: 'none',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      {colIndex}
+                    </div>
+                  );
+                }
+              }
+            } else {
+              // Show rows when rotation is 90° or 270°
+              for (let rowIndex = minRow; rowIndex <= maxRow; rowIndex++) {
+                const rowLetter = indexToRow(rowIndex);
+                const representativePin = pins.find(pin => 
+                  pin.gridPosition && pin.gridPosition.row === rowLetter
+                );
+                
+                if (!representativePin) continue;
+                
+                const pinTransformed = transformPosition(representativePin);
+                const labelPosition = { left: pinTransformed.x - 10, top: -5 };
+                
+                if (labelPosition.left >= -50 && labelPosition.left <= stageSize.width + 50) {
+                  topLabels.push(
+                    <div
+                      key={`top-row-${rowIndex}`}
+                      style={{
+                        position: 'absolute',
+                        ...labelPosition,
+                        width: 20,
+                        height: 16,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 11,
+                        fontWeight: 'bold',
+                        color: '#e0e0e0',
+                        textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
+                        pointerEvents: 'none',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      {rowLetter}
+                    </div>
+                  );
+                }
               }
             }
-          });
-          
-          return columnLabels;
-        })()}
-      </div>
-      
-      {/* Grid Labels - Left (Rows) */}
-      <div style={{
-        position: 'absolute',
-        top: 30,
-        left: 0,
-        width: 40,
-        bottom: 0,
-        backgroundColor: '#2a2a2a',
-        borderRight: '1px solid #444',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        zIndex: 10,
-        overflow: 'hidden'
-      }}>
-        {viewport.scale > 0.1 && (() => {
-          const { gridSpacing } = packageDims as any;
-          if (!gridSpacing) return null;
-          
-          // Calculate container-relative positions for labels
-          const containerHeight = stageSize.height - 30; // Available height for labels
-          
-          const rowLabels: JSX.Element[] = [];
-          
-          // Generate labels based on actual pin positions to avoid overlap issues
-          const validPins = pins.filter(pin => pin.gridPosition);
-          const processedPositions = new Set();
-          
-          validPins.forEach(pin => {
-            if (!pin.gridPosition) return;
             
-            // Transform pin position to screen coordinates
-            const pinTransformed = transformPosition(pin);
+            return topLabels;
+          })()}
+        </div>
+
+        {/* Right Labels */}
+        <div style={{
+          position: 'absolute',
+          top: 16,
+          right: 0,
+          bottom: 16,
+          width: 16,
+          backgroundColor: '#2a2a2a',
+          border: '1px solid #444',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexDirection: 'column',
+          zIndex: 10,
+          overflow: 'hidden'
+        }}>
+          {viewport.scale > 0.1 && (() => {
+            const { gridSpacing, minCol, maxCol, minRow, maxRow } = packageDims as any;
+            if (!gridSpacing) return null;
             
-            // Check if this pin contributes to row labels (within sidebar area)
-            // Use extended tolerance range to ensure labels remain visible during viewport panning
-            const sidebarX = 20; // Center of sidebar area
-            const extendedXTolerance = Math.max(300, stageSize.width * 0.8); // Dynamic tolerance based on screen size
+            const rightLabels: JSX.Element[] = [];
             
-            // Round position to avoid duplicate labels for nearby pins
-            const roundedY = Math.round(pinTransformed.y / 25) * 25;
-            const positionKey = `row-${roundedY}`;
+            // Right area content depends on rotation
+            const shouldShowRows = rotation === 0 || rotation === 180;
             
-            if (Math.abs(pinTransformed.x - sidebarX) < extendedXTolerance && !processedPositions.has(positionKey)) {
-              processedPositions.add(positionKey);
-              
-              // Use appropriate grid coordinate based on rotation for the label
-              let displayText: string;
-              switch (rotation) {
-                case 0:
-                case 180:
-                  // Normal orientation: row labels show row letters
-                  displayText = pin.gridPosition.row;
-                  break;
-                case 90:
-                case 270:
-                  // 90/270 degree rotation: row labels show column numbers
-                  displayText = pin.gridPosition.col.toString();
-                  break;
-                default:
-                  displayText = pin.gridPosition.row;
-              }
-              const labelTop = Math.round(pinTransformed.y - 10);
-              
-              // Check if position is within extended container bounds to provide smooth panning experience
-              const extendedHeight = containerHeight + 200; // Extended bounds prevent label flickering during pan
-              const isVisible = labelTop >= -100 && labelTop <= extendedHeight;
-              
-              if (isVisible) {
-                rowLabels.push(
-                  <div
-                    key={positionKey}
-                    style={{
-                      position: 'absolute',
-                      left: 0,
-                      top: labelTop,
-                      width: 40,
-                      height: 20,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: 12,
-                      fontWeight: 'bold',
-                      color: '#e0e0e0',
-                      textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
-                      pointerEvents: 'none'
-                    }}
-                  >
-                    {displayText}
-                  </div>
+            if (shouldShowRows) {
+              // Show rows when rotation is 0° or 180°
+              for (let rowIndex = minRow; rowIndex <= maxRow; rowIndex++) {
+                const rowLetter = indexToRow(rowIndex);
+                const representativePin = pins.find(pin => 
+                  pin.gridPosition && pin.gridPosition.row === rowLetter
                 );
+                
+                if (!representativePin) continue;
+                
+                const pinTransformed = transformPosition(representativePin);
+                const labelPosition = { left: -5, top: pinTransformed.y - 8 };
+                
+                if (labelPosition.top >= -50 && labelPosition.top <= stageSize.height + 50) {
+                  rightLabels.push(
+                    <div
+                      key={`right-row-${rowIndex}`}
+                      style={{
+                        position: 'absolute',
+                        ...labelPosition,
+                        width: 20,
+                        height: 16,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 11,
+                        fontWeight: 'bold',
+                        color: '#e0e0e0',
+                        textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
+                        pointerEvents: 'none',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      {rowLetter}
+                    </div>
+                  );
+                }
+              }
+            } else {
+              // Show columns when rotation is 90° or 270°
+              for (let colIndex = minCol; colIndex <= maxCol; colIndex++) {
+                const representativePin = pins.find(pin => 
+                  pin.gridPosition && pin.gridPosition.col === colIndex
+                );
+                
+                if (!representativePin) continue;
+                
+                const pinTransformed = transformPosition(representativePin);
+                const labelPosition = { left: -5, top: pinTransformed.y - 8 };
+                
+                if (labelPosition.top >= -50 && labelPosition.top <= stageSize.height + 50) {
+                  rightLabels.push(
+                    <div
+                      key={`right-col-${colIndex}`}
+                      style={{
+                        position: 'absolute',
+                        ...labelPosition,
+                        width: 20,
+                        height: 16,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 11,
+                        fontWeight: 'bold',
+                        color: '#e0e0e0',
+                        textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
+                        pointerEvents: 'none',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      {colIndex}
+                    </div>
+                  );
+                }
               }
             }
-          });
-          
-          return rowLabels;
-        })()}
-      </div>
-      
-      {/* Main Canvas */}
-      <Stage
-        ref={stageRef}
-        width={Math.max(100, stageSize.width - 40)} // Account for left margin with minimum
-        height={Math.max(100, stageSize.height - 30)} // Account for top margin with minimum
-        x={40} // Offset for left label area
-        y={30} // Offset for top label area
+            
+            return rightLabels;
+          })()}
+        </div>
+
+        {/* Bottom Labels */}
+        <div style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 16,
+          right: 16,
+          height: 16,
+          backgroundColor: '#2a2a2a',
+          border: '1px solid #444',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'flex-start',
+          flexDirection: 'row',
+          zIndex: 10,
+          overflow: 'hidden'
+        }}>
+          {viewport.scale > 0.1 && (() => {
+            const { gridSpacing, minCol, maxCol, minRow, maxRow } = packageDims as any;
+            if (!gridSpacing) return null;
+            
+            const bottomLabels: JSX.Element[] = [];
+            
+            // Bottom area content depends on rotation
+            const shouldShowColumns = rotation === 0 || rotation === 180;
+            
+            if (shouldShowColumns) {
+              // Show columns when rotation is 0° or 180°
+              for (let colIndex = minCol; colIndex <= maxCol; colIndex++) {
+                const representativePin = pins.find(pin => 
+                  pin.gridPosition && pin.gridPosition.col === colIndex
+                );
+                
+                if (!representativePin) continue;
+                
+                const pinTransformed = transformPosition(representativePin);
+                const labelPosition = { left: pinTransformed.x - 10, top: -5 };
+                
+                if (labelPosition.left >= -50 && labelPosition.left <= stageSize.width + 50) {
+                  bottomLabels.push(
+                    <div
+                      key={`bottom-col-${colIndex}`}
+                      style={{
+                        position: 'absolute',
+                        ...labelPosition,
+                        width: 20,
+                        height: 16,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 11,
+                        fontWeight: 'bold',
+                        color: '#e0e0e0',
+                        textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
+                        pointerEvents: 'none',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      {colIndex}
+                    </div>
+                  );
+                }
+              }
+            } else {
+              // Show rows when rotation is 90° or 270°
+              for (let rowIndex = minRow; rowIndex <= maxRow; rowIndex++) {
+                const rowLetter = indexToRow(rowIndex);
+                const representativePin = pins.find(pin => 
+                  pin.gridPosition && pin.gridPosition.row === rowLetter
+                );
+                
+                if (!representativePin) continue;
+                
+                const pinTransformed = transformPosition(representativePin);
+                const labelPosition = { left: pinTransformed.x - 10, top: -5 };
+                
+                if (labelPosition.left >= -50 && labelPosition.left <= stageSize.width + 50) {
+                  bottomLabels.push(
+                    <div
+                      key={`bottom-row-${rowIndex}`}
+                      style={{
+                        position: 'absolute',
+                        ...labelPosition,
+                        width: 20,
+                        height: 16,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 11,
+                        fontWeight: 'bold',
+                        color: '#e0e0e0',
+                        textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
+                        pointerEvents: 'none',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      {rowLetter}
+                    </div>
+                  );
+                }
+              }
+            }
+            
+            return bottomLabels;
+          })()}
+        </div>
+
+        {/* Left Labels */}
+        <div style={{
+          position: 'absolute',
+          top: 16,
+          left: 0,
+          bottom: 16,
+          width: 16,
+          backgroundColor: '#2a2a2a',
+          border: '1px solid #444',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexDirection: 'column',
+          zIndex: 10,
+          overflow: 'hidden'
+        }}>
+          {viewport.scale > 0.1 && (() => {
+            const { gridSpacing, minCol, maxCol, minRow, maxRow } = packageDims as any;
+            if (!gridSpacing) return null;
+            
+            const leftLabels: JSX.Element[] = [];
+            
+            // Left area content depends on rotation
+            const shouldShowRows = rotation === 0 || rotation === 180;
+            
+            if (shouldShowRows) {
+              // Show rows when rotation is 0° or 180°
+              for (let rowIndex = minRow; rowIndex <= maxRow; rowIndex++) {
+                const rowLetter = indexToRow(rowIndex);
+                const representativePin = pins.find(pin => 
+                  pin.gridPosition && pin.gridPosition.row === rowLetter
+                );
+                
+                if (!representativePin) continue;
+                
+                const pinTransformed = transformPosition(representativePin);
+                const labelPosition = { left: -5, top: pinTransformed.y - 8 };
+                
+                if (labelPosition.top >= -50 && labelPosition.top <= stageSize.height + 50) {
+                  leftLabels.push(
+                    <div
+                      key={`left-row-${rowIndex}`}
+                      style={{
+                        position: 'absolute',
+                        ...labelPosition,
+                        width: 20,
+                        height: 16,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 11,
+                        fontWeight: 'bold',
+                        color: '#e0e0e0',
+                        textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
+                        pointerEvents: 'none',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      {rowLetter}
+                    </div>
+                  );
+                }
+              }
+            } else {
+              // Show columns when rotation is 90° or 270°
+              for (let colIndex = minCol; colIndex <= maxCol; colIndex++) {
+                const representativePin = pins.find(pin => 
+                  pin.gridPosition && pin.gridPosition.col === colIndex
+                );
+                
+                if (!representativePin) continue;
+                
+                const pinTransformed = transformPosition(representativePin);
+                const labelPosition = { left: -5, top: pinTransformed.y - 8 };
+                
+                if (labelPosition.top >= -50 && labelPosition.top <= stageSize.height + 50) {
+                  leftLabels.push(
+                    <div
+                      key={`left-col-${colIndex}`}
+                      style={{
+                        position: 'absolute',
+                        ...labelPosition,
+                        width: 20,
+                        height: 16,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 11,
+                        fontWeight: 'bold',
+                        color: '#e0e0e0',
+                        textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
+                        pointerEvents: 'none',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      {colIndex}
+                    </div>
+                  );
+                }
+              }
+            }
+            
+            return leftLabels;
+          })()}
+        </div>
+        
+        {/* Main Canvas with Stage - Fixed margins for 4-direction labels */}
+        <div style={{
+          position: 'absolute',
+          top: 16,    // Top label height
+          left: 16,   // Left label width
+          right: 16,  // Right label width
+          bottom: 16, // Bottom label height
+          overflow: 'hidden'
+        }}>
+          <Stage
+        ref={(ref) => {
+          stageRef.current = ref;
+          // Force size update when Stage is mounted (especially for VS Code webview)
+          if (ref) {
+            setTimeout(() => {
+              const container = ref.container();
+              if (container) {
+                const rect = container.getBoundingClientRect();
+                const newSize = {
+                  width: Math.max(400, rect.width),
+                  height: Math.max(300, rect.height)
+                };
+                setStageSize(prevSize => {
+                  if (prevSize.width !== newSize.width || prevSize.height !== newSize.height) {
+                    console.log('📐 Stage mounted - Canvas size updated:', newSize);
+                    return newSize;
+                  }
+                  return prevSize;
+                });
+              }
+            }, 50); // Quick update on mount
+          }
+        }}
+        width={Math.max(100, stageSize.width)} // Full container width for maximum viewer area
+        height={Math.max(100, stageSize.height)} // Full container height to eliminate footer area
+        x={0} // Use full container area
+        y={0} // Use full container area
         onClick={handleStageClick}
         onWheel={handleWheel}
         onMouseDown={handleMouseDown}
@@ -796,42 +1361,22 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
         style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
       >
         <Layer>
+          {/* Package outline and pins - with individual viewport transform */}
           {/* Package outline */}
           {(() => {
             const { gridSpacing, minRow, maxRow, minCol, maxCol } = packageDims as any;
             
             if (!gridSpacing) return null;
             
-            // Helper function to transform grid coordinates (same as transformPosition)
+            // Helper function to transform grid coordinates with viewport
             const transformGridCoord = (gridX: number, gridY: number) => {
-              let x = gridX;
-              let y = gridY;
-              
-              // Apply rotation first (at original scale)
-              if (rotation !== 0) {
-                const rad = (rotation * Math.PI) / 180;
-                const cos = Math.cos(rad);
-                const sin = Math.sin(rad);
-                const newX = x * cos - y * sin;
-                const newY = x * sin + y * cos;
-                x = newX;
-                y = newY;
-              }
-              
-              // Apply mirroring for bottom view
-              if (!isTopView) {
-                x = -x;
-              }
-              
-              // Apply viewport scaling and offset
-              const transformedX = x * viewport.scale + viewport.x + stageSize.width / 2;
-              const transformedY = y * viewport.scale + viewport.y + stageSize.height / 2;
-              
-              return { x: transformedX, y: transformedY };
+              // Create temporary pin object for position transformation
+              const tempPin = { position: { x: gridX, y: gridY } } as Pin;
+              return transformPosition(tempPin); // transformPosition already includes all transforms
             };
             
-            // Calculate package outline corners based on grid boundaries
-            const padding = gridSpacing * 0.8; // Add some padding around the grid
+            // Calculate package outline corners based on grid boundaries (zero padding for maximum area)
+            const padding = 0; // Zero padding for maximum viewer area - Issue #14
             const topLeft = transformGridCoord((minCol - 1.5) * gridSpacing - padding, (minRow - 0.5) * gridSpacing - padding);
             const topRight = transformGridCoord((maxCol + 0.5) * gridSpacing + padding, (minRow - 0.5) * gridSpacing - padding);
             const bottomLeft = transformGridCoord((minCol - 1.5) * gridSpacing - padding, (maxRow + 0.5) * gridSpacing + padding);
@@ -864,35 +1409,14 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
             
             if (!gridSpacing) return null;
             
-            const lines = [];
-            
-            // Helper function to transform grid coordinates (same as transformPosition)
+            // Helper function to transform grid coordinates (already includes viewport transform)
             const transformGridCoord = (gridX: number, gridY: number) => {
-              let x = gridX;
-              let y = gridY;
-              
-              // Apply rotation first (at original scale)
-              if (rotation !== 0) {
-                const rad = (rotation * Math.PI) / 180;
-                const cos = Math.cos(rad);
-                const sin = Math.sin(rad);
-                const newX = x * cos - y * sin;
-                const newY = x * sin + y * cos;
-                x = newX;
-                y = newY;
-              }
-              
-              // Apply mirroring for bottom view
-              if (!isTopView) {
-                x = -x;
-              }
-              
-              // Apply viewport scaling and offset
-              const transformedX = x * viewport.scale + viewport.x + stageSize.width / 2;
-              const transformedY = y * viewport.scale + viewport.y + stageSize.height / 2;
-              
-              return { x: transformedX, y: transformedY };
+              // Create temporary pin object for position transformation
+              const tempPin = { position: { x: gridX, y: gridY } } as Pin;
+              return transformPosition(tempPin); // transformPosition already includes all transforms
             };
+            
+            const lines = [];
             
             // Major grid lines - tile boundaries (darker)
             // Vertical grid lines - align with column boundaries
@@ -971,88 +1495,41 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
             return <>{lines}</>;
           })()}
 
-          {/* Package label */}
+          {/* Pin rendering with smart viewport culling and LOD optimization */}
           {(() => {
-            const { gridSpacing, minRow, minCol, maxCol } = packageDims as any;
+            PerformanceService.startRenderMeasurement('pin-rendering');
             
-            if (!gridSpacing) return null;
-            
-            // Helper function to transform grid coordinates (same as transformPosition)
-            const transformGridCoord = (gridX: number, gridY: number) => {
-              let x = gridX;
-              let y = gridY;
-              
-              // Apply rotation first (at original scale)
-              if (rotation !== 0) {
-                const rad = (rotation * Math.PI) / 180;
-                const cos = Math.cos(rad);
-                const sin = Math.sin(rad);
-                const newX = x * cos - y * sin;
-                const newY = x * sin + y * cos;
-                x = newX;
-                y = newY;
-              }
-              
-              // Apply mirroring for bottom view
-              if (!isTopView) {
-                x = -x;
-              }
-              
-              // Apply viewport scaling and offset
-              const transformedX = x * viewport.scale + viewport.x + stageSize.width / 2;
-              const transformedY = y * viewport.scale + viewport.y + stageSize.height / 2;
-              
-              return { x: transformedX, y: transformedY };
-            };
-            
-            // Position label at the top center of the package outline
-            const centerX = (minCol + maxCol - 1) * gridSpacing / 2;
-            const topY = (minRow - 0.5) * gridSpacing - gridSpacing * 0.8 - 20; // Above the package outline
-            const labelPos = transformGridCoord(centerX, topY);
-            
-            return (
-              <Text
-                x={labelPos.x - 100}
-                y={labelPos.y}
-                width={200}
-                text={`${pkg.device} (${pkg.packageType})`}
-                fontSize={14}
-                fill="#ccc"
-                align="center"
-              />
-            );
-          })()}
-
-          {/* Pin rendering with LOD optimization */}
-          {(() => {
             // Use viewport-based sizing for stable scaling
             const baseTileSize = 88; // Base tile size
             const tileSize = Math.max(20, baseTileSize * viewport.scale);
             
             // LOD system for performance
-            const lodLevel = LODSystem.getLODLevel(viewport.scale);
-            const maxVisiblePins = LODSystem.getMaxElements(currentLOD);
             const shouldRenderDetails = LODSystem.shouldRenderPinDetails(viewport.scale);
             const shouldRenderPinNames = LODSystem.shouldRenderText(viewport.scale, 'pin');
             const shouldRenderSignalNames = LODSystem.shouldRenderText(viewport.scale, 'signal');
             const fontMultiplier = LODSystem.getAdaptiveTextSize(viewport.scale, 12) / 12;
             
-            // Limit pins based on LOD for very low zoom levels
-            const pinsToRender = maxVisiblePins < pins.length ? 
-              pins.slice(0, maxVisiblePins) : pins;
+            // Use smart viewport culling instead of simple pin limit
+            const pinsToRender = visiblePins;
             
-            console.log(`🎯 LOD Level: ${lodLevel}, Rendering: ${pinsToRender.length}/${pins.length} pins`);
+            const renderDuration = PerformanceService.endRenderMeasurement('pin-rendering');
+            console.log(`🎯 Smart culling: Rendering ${pinsToRender.length}/${pins.length} pins (${renderDuration.toFixed(2)}ms)`);
             
             return pinsToRender.map(pin => {
               const pos = transformPosition(pin);
               const isSelected = selectedPins.has(pin.id);
               const bankColor = getBankColor(pin);
               const circleColor = getPinTypeColor(pin);
-              const fontSize = Math.max(6, Math.min(16, viewport.scale * 10 * fontMultiplier));
-              const smallFontSize = Math.max(5, Math.min(12, viewport.scale * 8 * fontMultiplier));
+              // Enhanced font sizing for better pin review on large screens
+              const baseFontSize = viewport.scale * 10 * fontMultiplier;
+              const fontSize = Math.max(8, Math.min(20, baseFontSize)); // Increased min/max for better readability
+              const smallFontSize = Math.max(6, Math.min(16, viewport.scale * 8 * fontMultiplier));
               
               // 差動ペアのハイライト色を取得
-              const differentialHighlightColor = getDifferentialHighlightColor(pin, pins, selectedPins);
+              const differentialHighlightColor = getDifferentialHighlightColor(pin, visiblePins, selectedPins);
+              
+              // Check if this pin has a differential pair (for subtle indication)
+              const hasDP = hasDifferentialPair(pin, pins);
               
               // Use LOD-based detail rendering
               const showDetails = shouldRenderDetails || isSelected;
@@ -1089,23 +1566,36 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                     />
                   )}
                   
-                  {/* Inner circle with pin type color */}
+                  {/* Inner circle with pin type color - optimized for large screen review */}
                   <Circle
                     x={pos.x}
                     y={pos.y}
-                    radius={Math.max(6, tileSize * 0.25)}
+                    radius={Math.max(8, tileSize * 0.3)} // Increased min radius and ratio for better visibility
                     fill={circleColor}
                     stroke="#000"
                     strokeWidth={1}
                     listening={false} // Disable mouse events on circle to allow tile selection
                   />
                   
-                  {/* Differential pair highlight ring */}
+                  {/* Subtle differential pair indicator (small dot) */}
+                  {hasDP && !differentialHighlightColor && tileSize > 40 && (
+                    <Circle
+                      x={pos.x + tileSize * 0.3}
+                      y={pos.y - tileSize * 0.3}
+                      radius={3}
+                      fill="#FF6600"
+                      stroke="#FFF"
+                      strokeWidth={1}
+                      listening={false}
+                    />
+                  )}
+                  
+                  {/* Differential pair highlight ring - enhanced for large screen review */}
                   {differentialHighlightColor && (
                     <Circle
                       x={pos.x}
                       y={pos.y}
-                      radius={Math.max(8, tileSize * 0.35)}
+                      radius={Math.max(10, tileSize * 0.4)} // Increased for better visibility
                       fill="transparent"
                       stroke={differentialHighlightColor}
                       strokeWidth={3}
@@ -1200,19 +1690,26 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
             });
           })()}
           
-          {/* Differential pair connection lines with LOD */}
+          {/* Differential pair connection lines with viewport optimization */}
           {LODSystem.shouldRenderDifferentialPairs(viewport.scale) && (() => {
+            PerformanceService.startRenderMeasurement('diff-pair-lines');
+            
             const connectionLines: JSX.Element[] = [];
             const processedPairs = new Set();
             
-            pins.forEach(pin => {
+            // Only process visible pins for differential pairs
+            visiblePins.forEach(pin => {
               if (processedPairs.has(pin.id)) return;
               
               // Check if this pin is part of a differential pair
               if (DifferentialPairUtils.isDifferentialPin(pin)) {
                 const pairPin = DifferentialPairUtils.findPairPin(pin, pins);
                 
-                if (pairPin && !processedPairs.has(pairPin.id)) {
+                // Only draw line if both pins are visible or if either is selected
+                const isPairVisible = pairPin && visiblePins.includes(pairPin);
+                const isEitherSelected = selectedPins.has(pin.id) || (pairPin && selectedPins.has(pairPin.id));
+                
+                if (pairPin && !processedPairs.has(pairPin.id) && (isPairVisible || isEitherSelected)) {
                   // Mark both pins as processed to avoid duplicate lines
                   processedPairs.add(pin.id);
                   processedPairs.add(pairPin.id);
@@ -1221,8 +1718,8 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                   const pos2 = transformPosition(pairPin);
                   
                   // Get colors for the differential pair
-                  const color1 = getDifferentialHighlightColor(pin, pins, selectedPins);
-                  const color2 = getDifferentialHighlightColor(pairPin, pins, selectedPins);
+                  const color1 = getDifferentialHighlightColor(pin, visiblePins, selectedPins);
+                  const color2 = getDifferentialHighlightColor(pairPin, visiblePins, selectedPins);
                   
                   // Use the first color found, or default to a neutral color
                   const lineColor = color1 || color2 || '#FF6600';
@@ -1243,34 +1740,69 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                       />
                     );
                   }
+                  
+                  // Add differential pair label at midpoint
+                  if (distance > 100 && viewport.scale > 0.4) {
+                    const midX = (pos1.x + pos2.x) / 2;
+                    const midY = (pos1.y + pos2.y) / 2;
+                    const pairType = DifferentialPairUtils.getDifferentialPairType(pin.pinName);
+                    const labelText = pairType === 'positive' ? '+/-' : '-/+';
+                    
+                    connectionLines.push(
+                      <Group key={`diff-label-${pin.id}-${pairPin.id}`}>
+                        <Rect
+                          x={midX - 10}
+                          y={midY - 8}
+                          width={20}
+                          height={16}
+                          fill="rgba(0, 0, 0, 0.8)"
+                          cornerRadius={2}
+                          listening={false}
+                        />
+                        <Text
+                          x={midX}
+                          y={midY - 6}
+                          text={labelText}
+                          fontSize={10}
+                          fill={lineColor}
+                          align="center"
+                          offsetX={10}
+                          listening={false}
+                        />
+                      </Group>
+                    );
+                  }
                 }
               }
             });
             
+            const diffRenderDuration = PerformanceService.endRenderMeasurement('diff-pair-lines');
+            console.log(`🔗 Differential pairs: ${connectionLines.length} lines (${diffRenderDuration.toFixed(2)}ms)`);
+            
             return connectionLines;
           })()}
           
-          {/* Bank group boundaries with LOD - drawn below selection highlights */}
+          {/* Bank group boundaries with viewport optimization */}
           {LODSystem.shouldRenderAtLOD(currentLOD, 2) && (() => {
-            const bankGroups = getPinsByBank();
+            PerformanceService.startRenderMeasurement('bank-boundaries');
+            
+            // Only calculate boundaries for banks that have visible pins
+            const visibleBankGroups = new Map<string, Pin[]>();
+            visiblePins.forEach(pin => {
+              const bank = pin.bank || 'NA';
+              if (!visibleBankGroups.has(bank)) {
+                visibleBankGroups.set(bank, []);
+              }
+              visibleBankGroups.get(bank)!.push(pin);
+            });
+            
             const baseTileSize = 88;
             const tileSize = Math.max(20, baseTileSize * viewport.scale);
             const padding = 6; // Reduced padding to minimize overlap
             
-            // Define different dash patterns for each bank to reduce visual overlap
-            const dashPatterns = {
-              '0': [10, 5],      // CONFIG bank - standard dash
-              '34': [15, 3],     // HR I/O bank 34 - longer dash
-              '35': [8, 8],      // HR I/O bank 35 - equal dash/gap
-              '500': [12, 3, 3, 3], // MIO bank 500 - dash-dot
-              '501': [6, 6, 6, 6], // MIO bank 501 - medium equal
-              '502': [20, 5],    // DDR bank 502 - long dash
-              'NA': [5, 5]       // Non-bank pins - short dash
-            };
-            
             // Calculate boundaries first to detect overlaps
             const bankBoundaries = new Map();
-            Array.from(bankGroups.entries()).forEach(([bankKey, bankPins]) => {
+            Array.from(visibleBankGroups.entries()).forEach(([bankKey, bankPins]) => {
               if (bankKey === 'NA' || bankPins.length < 2) return;
               
               const positions = bankPins.map(pin => transformPosition(pin));
@@ -1286,26 +1818,12 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
               bankBoundaries.set(bankKey, boundary);
             });
             
-            return Array.from(bankBoundaries.entries()).map(([bankKey, boundary]) => {
+            const renderedBoundaries = Array.from(bankBoundaries.entries()).map(([bankKey, boundary]) => {
               // Get bank color for the boundary
               const bankColor = getBankColor(boundary.pins[0]);
-              const dashPattern = dashPatterns[bankKey as keyof typeof dashPatterns] || [10, 5];
               
-              // Check for overlaps with other banks to adjust stroke width
-              let hasOverlap = false;
-              for (const [otherBankKey, otherBoundary] of bankBoundaries.entries()) {
-                if (otherBankKey === bankKey) continue;
-                
-                // Simple overlap detection
-                const overlapX = !(boundary.maxX < otherBoundary.minX || boundary.minX > otherBoundary.maxX);
-                const overlapY = !(boundary.maxY < otherBoundary.minY || boundary.minY > otherBoundary.maxY);
-                
-                if (overlapX && overlapY) {
-                  hasOverlap = true;
-                  break;
-                }
-              }
-              
+              // Remove grid lines around bank boundaries as per issue #23
+              // Only render subtle background highlighting, no strokes
               return (
                 <Rect
                   key={`bank-boundary-${bankKey}`}
@@ -1313,16 +1831,19 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                   y={boundary.minY}
                   width={boundary.maxX - boundary.minX}
                   height={boundary.maxY - boundary.minY}
-                  fill="transparent"
-                  stroke={bankColor}
-                  strokeWidth={hasOverlap ? 1.5 : 2} // Thinner stroke for overlapping banks
-                  dash={dashPattern} // Different dash pattern for each bank
+                  fill={`${bankColor}10`} // Very subtle background tint (6% opacity)
+                  stroke="transparent" // No stroke lines
                   cornerRadius={6}
-                  opacity={hasOverlap ? 0.6 : 0.8} // Lower opacity for overlapping banks
+                  opacity={0.3} // Subtle opacity for background grouping
                   listening={false} // Disable mouse events to allow pin selection
                 />
               );
             });
+            
+            const bankRenderDuration = PerformanceService.endRenderMeasurement('bank-boundaries');
+            console.log(`🏦 Bank boundaries: ${bankBoundaries.size} boundaries (${bankRenderDuration.toFixed(2)}ms)`);
+            
+            return renderedBoundaries;
           })()}
           
           {/* Selection highlights - drawn on top of everything */}
@@ -1353,88 +1874,152 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
             });
           })()}
           
-          {/* View info */}
-          <Text
-            x={10}
-            y={10}
-            text={`View: ${isTopView ? 'TOP' : 'BOTTOM'} | Rotation: ${rotation}° | Zoom: ${(zoom * 100).toFixed(0)}%`}
-            fontSize={12}
-            fill="#999"
-          />
-          
           {/* Legend */}
           <Group x={10} y={stageSize.height - 200}>
-            {/* Bank Groups header background */}
-            <Rect
-              x={-3}
-              y={-2}
-              width={82}
-              height={16}
-              fill="rgba(0, 0, 0, 0.7)"
-              cornerRadius={2}
-            />
-            <Text
-              x={0}
-              y={0}
-              text="Bank Groups:"
-              fontSize={12}
-              fill="#ccc"
-            />
-            {Object.entries({
-              'Bank 0': '#FF6B6B',
-              'Bank 34': '#4ECDC4',
-              'Bank 35': '#45B7D1',
-              'Bank 500': '#96CEB4',
-              'Bank 501': '#FFEAA7',
-              'Bank 502': '#DDA0DD'
-            }).map(([bankName, color], index) => (
-              <Group key={bankName} y={20 + index * 18}>
-                <Rect
-                  x={6}
-                  y={-4}
-                  width={12}
-                  height={12}
-                  fill={color}
-                  stroke="#000"
-                  strokeWidth={1}
-                  cornerRadius={2}
-                />
-                <Circle
-                  x={12}
-                  y={2}
-                  radius={3}
-                  fill="#FFF"
-                  stroke="#000"
-                  strokeWidth={0.5}
-                />
-                <Text
-                  x={25}
-                  y={-6}
-                  text={bankName}
-                  fontSize={10}
-                  fill="#999"
-                />
-                {/* Bank name text background */}
-                <Rect
-                  x={23}
-                  y={-8}
-                  width={bankName.length * 6 + 4}
-                  height={14}
-                  fill="rgba(0, 0, 0, 0.6)"
-                  cornerRadius={2}
-                />
-                <Text
-                  x={25}
-                  y={-6}
-                  text={bankName}
-                  fontSize={10}
-                  fill="#ccc"
-                />
-              </Group>
-            ))}
-            
-            {/* Pin Type Legend */}
-            {/* Pin Types header background */}
+            {/* Bank Groups and Pin Types Legend - side by side */}
+            {/* Bank Groups Section */}
+            {/* Issue #19: Bank Groups クリック機能 - シンプル化されたUI */}
+            {/* デバッグ知見: 複雑な状態表示 ([ALL]/[SOME]/[NONE]) より、
+                シンプルな「Bank Groups」表示の方がユーザビリティが高い */}
+            {(() => {
+              // Status text - シンプルに
+              const statusText = "Bank Groups";
+                
+              return (
+                <>
+                  <Rect
+                    x={24}
+                    y={-2}
+                    width={statusText.length * 6 + 8}
+                    height={16}
+                    fill="rgba(0, 0, 0, 0.7)"
+                    cornerRadius={2}
+                    onClick={() => {
+                      console.log(`🎯 Bank Groups header clicked - showing all banks!`);
+                      showAllBanks();
+                    }}
+                    onMouseEnter={(e) => {
+                      const shape = e.target as any;
+                      shape.fill("rgba(0, 0, 0, 0.9)");
+                      shape.getLayer()?.batchDraw();
+                    }}
+                    onMouseLeave={(e) => {
+                      const shape = e.target as any;
+                      shape.fill("rgba(0, 0, 0, 0.7)");
+                      shape.getLayer()?.batchDraw();
+                    }}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  <Text
+                    x={27}
+                    y={0}
+                    text={statusText}
+                    fontSize={12}
+                    fill="#4AE24A"
+                    onClick={() => {
+                      console.log(`🎯 Bank Groups text clicked - showing all banks!`);
+                      showAllBanks();
+                    }}
+                    onMouseEnter={(e) => {
+                      const shape = e.target as any;
+                      shape.fill("#fff");
+                      shape.getLayer()?.batchDraw();
+                    }}
+                    onMouseLeave={(e) => {
+                      const shape = e.target as any;
+                      shape.fill("#4AE24A");
+                      shape.getLayer()?.batchDraw();
+                    }}
+                    style={{ cursor: 'pointer' }}
+                  />
+                </>
+              );
+            })()}
+            {(() => {
+              const uniqueBanks = [...new Set(allPins.map(pin => pin.bank).filter(Boolean))]
+                .sort((a, b) => {
+                  const aNum = parseInt(a!);
+                  const bNum = parseInt(b!);
+                  return aNum - bNum;
+                })
+                .slice(0, 6); // Show max 6 banks in legend to avoid clutter
+              
+              return uniqueBanks.map((bank, index) => {
+                const isBankVisible = visibleBanks.size === 0 || visibleBanks.has(bank!);
+                
+                return (
+                  <Group key={bank} y={20 + index * 18} x={27}>
+                    {/* Clickable background for bank item */}
+                    <Rect
+                      x={8}
+                      y={-8}
+                      width={`Bank ${bank}`.length * 6 + 20}
+                      height={16}
+                      fill="rgba(0, 0, 0, 0)"
+                      stroke="rgba(255, 255, 255, 0.1)"
+                      strokeWidth={1}
+                      cornerRadius={2}
+                      onClick={() => {
+                        console.log(`🎯 BANK ${bank} CLICKED!`);
+                        console.log(`Before: visibleBanks =`, Array.from(visibleBanks));
+                        console.log(`Before: Bank ${bank} is visible =`, visibleBanks.has(bank!));
+                        console.log(`Before: Total pins received =`, pins.length);
+                        toggleBankVisibility(bank!);
+                        // Note: State update is async, so we can't see the result immediately here
+                      }}
+                      onMouseEnter={(e) => {
+                        const shape = e.target as any;
+                        shape.stroke("rgba(255, 255, 255, 0.3)");
+                        shape.getLayer()?.batchDraw();
+                      }}
+                      onMouseLeave={(e) => {
+                        const shape = e.target as any;
+                        shape.stroke("rgba(255, 255, 255, 0.1)");
+                        shape.getLayer()?.batchDraw();
+                      }}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <Circle
+                      x={12}
+                      y={2}
+                      radius={4}
+                      fill={isBankVisible ? getOptimizedBankColor(bank) : '#444'}
+                      stroke={isBankVisible ? "#000" : "#666"}
+                      strokeWidth={1}
+                      listening={false}
+                    />
+                    {/* Bank name text background */}
+                    <Rect
+                      x={23}
+                      y={-8}
+                      width={`Bank ${bank}`.length * 6 + 4}
+                      height={14}
+                      fill="rgba(0, 0, 0, 0.6)"
+                      cornerRadius={2}
+                      listening={false}
+                    />
+                    <Text
+                      x={25}
+                      y={-6}
+                      text={`Bank ${bank}`}
+                      fontSize={10}
+                      fill={isBankVisible ? "#ccc" : "#666"}
+                      listening={false}
+                    />
+                    {/* Visibility indicator */}
+                    <Text
+                      x={10}
+                      y={-6}
+                      text={isBankVisible ? "👁" : "🚫"}
+                      fontSize={8}
+                      listening={false}
+                    />
+                  </Group>
+                );
+              });
+            })()}
+
+            {/* Pin Types Section */}
             <Rect
               x={117}
               y={-2}
@@ -1450,53 +2035,70 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
               fontSize={12}
               fill="#ccc"
             />
-            {Object.entries({
-              'I/O': '#FFF',
-              'CONFIG': '#FFD700',
-              'POWER': '#FF4500',
-              'GROUND': '#000',
-              'MIO': '#32CD32',
-              'DDR': '#8A2BE2'
-            }).map(([typeName, color], index) => (
-              <Group key={typeName} y={20 + index * 18} x={120}>
-                <Circle
-                  x={12}
-                  y={2}
-                  radius={4}
-                  fill={color}
-                  stroke="#000"
-                  strokeWidth={1}
-                />
-                <Text
-                  x={25}
-                  y={-6}
-                  text={typeName}
-                  fontSize={10}
-                  fill="#999"
-                />
-                {/* Pin type name text background */}
-                <Rect
-                  x={23}
-                  y={-8}
-                  width={typeName.length * 6 + 4}
-                  height={14}
-                  fill="rgba(0, 0, 0, 0.6)"
-                  cornerRadius={2}
-                />
-                <Text
-                  x={25}
-                  y={-6}
-                  text={typeName}
-                  fontSize={10}
-                  fill="#ccc"
-                />
-              </Group>
-            ))}
+            {(() => {
+              // CSVから読み取った実際のピンタイプを使用
+              const uniquePinTypes = [...new Set(pins.map(pin => pin.pinType).filter(Boolean))]
+                .sort();
+              
+              const pinTypeColors = {
+                IO: '#4A90E2',
+                CONFIG: '#E24A4A', 
+                POWER: '#4AE24A',
+                GROUND: '#333333',
+                MGT: '#9B4AE2',
+                CLOCK: '#E2A64A',
+                ADC: '#4AE2E2',
+                SPECIAL: '#E24AA6',
+                NC: '#666666',
+                RESERVED: '#999999',
+                MIO: '#32CD32',
+                DDR: '#8A2BE2'
+              };
+              
+              return uniquePinTypes.map((pinType, index) => (
+                <Group key={pinType} y={20 + index * 18} x={120}>
+                  <Circle
+                    x={12}
+                    y={2}
+                    radius={4}
+                    fill={pinTypeColors[pinType as keyof typeof pinTypeColors] || '#666666'}
+                    stroke="#000"
+                    strokeWidth={1}
+                  />
+                  <Text
+                    x={25}
+                    y={-6}
+                    text={pinType}
+                    fontSize={10}
+                    fill="#999"
+                  />
+                  {/* Pin type name text background */}
+                  <Rect
+                    x={23}
+                    y={-8}
+                    width={pinType.length * 6 + 4}
+                    height={14}
+                    fill="rgba(0, 0, 0, 0.6)"
+                    cornerRadius={2}
+                  />
+                  <Text
+                    x={25}
+                    y={-6}
+                    text={pinType}
+                    fontSize={10}
+                    fill="#ccc"
+                  />
+                </Group>
+              ));
+            })()}
           </Group>
         </Layer>
       </Stage>
+        </div>
+      </div>
     </div>
   );
 };
 
 export default PackageCanvas;
+

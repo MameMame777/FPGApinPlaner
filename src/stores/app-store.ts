@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { enableMapSet } from 'immer';
-import { Pin, Package, ViewConfig, FilterState, FPGAProject, SortField, SortOrder, ListViewState, ViewMode } from '@/types';
+import { Pin, Package, ViewConfig, FilterState, FPGAProject, SortField, SortOrder, ListViewState, ViewMode, PinColorMode } from '@/types';
 import { UndoRedoService, Action } from '@/services/undo-redo-service';
+import { compareRows } from '@/utils/grid-utils';
 
 // Enable Immer MapSet plugin
 enableMapSet();
@@ -17,11 +18,17 @@ interface AppState {
   filteredPins: Pin[];
   selectedPins: Set<string>;
   
+  // Bank visibility management (Issue #19)
+  visibleBanks: Set<string>;
+  
   // View configuration
   viewConfig: ViewConfig;
   
   // List view state
   listView: ListViewState;
+  
+  // Pin color mode
+  pinColorMode: PinColorMode;
   
   // Filter state
   filters: FilterState;
@@ -74,12 +81,20 @@ interface AppActions {
   updateListViewState: (updates: Partial<ListViewState>) => void;
   bulkUpdateComments: (pinIds: string[], comment: string) => void;
   
+  // Pin color mode management
+  setPinColorMode: (mode: PinColorMode) => void;
+  
   // Filter management
   updateFilters: (filters: Partial<FilterState>) => void;
   clearFilters: () => void;
   applyFilters: () => void;
   setSortField: (field: SortField) => void;
   setSortOrder: (order: SortOrder) => void;
+  
+  // Bank visibility management (Issue #19)
+  toggleBankVisibility: (bankId: string) => void;
+  setBankVisibility: (bankId: string, visible: boolean) => void;
+  showAllBanks: () => void;
   
   // Differential pair management
   assignDifferentialPair: (positiveId: string, negativeId: string, baseName: string) => void;
@@ -109,7 +124,7 @@ const initialViewConfig: ViewConfig = {
   showPinNumbers: true,
   showSignalNames: true,
   showPinTypes: false,
-  resetTrigger: 0,
+  // resetTrigger removed - was causing unwanted automatic viewport changes
 };
 
 const initialFilters: FilterState = {
@@ -119,7 +134,7 @@ const initialFilters: FilterState = {
   voltageFilter: [],
   assignmentStatus: 'all',
   showOnlyDifferentialPairs: false,
-  sortField: 'pinNumber',
+  sortField: 'grid',
   sortOrder: 'asc',
 };
 
@@ -141,8 +156,10 @@ export const useAppStore = create<AppState & AppActions>()(
     pins: [],
     filteredPins: [],
     selectedPins: new Set(),
+    visibleBanks: new Set(), // デフォルトで空（全て表示）
     viewConfig: initialViewConfig,
     listView: initialListView,
+    pinColorMode: 'bank',
     filters: initialFilters,
     isLoading: false,
     error: null,
@@ -196,6 +213,15 @@ export const useAppStore = create<AppState & AppActions>()(
         state.viewConfig = initialViewConfig;
         state.filters = initialFilters;
         
+        // Initialize visibleBanks with all banks from loaded pins
+        const allBanks = new Set<string>();
+        packageData.pins.forEach(pin => {
+          const bank = pin.bank || 'NA';
+          allBanks.add(bank);
+        });
+        state.visibleBanks = allBanks;
+        console.log('🏪 ストア: newProject - 初期化された visibleBanks:', Array.from(allBanks));
+        
         // Apply initial filters and sorting
         get().applyFilters();
       }),
@@ -218,6 +244,16 @@ export const useAppStore = create<AppState & AppActions>()(
         state.pins = packageData.pins;
         state.filteredPins = packageData.pins;
         state.selectedPins.clear();
+        
+        // Initialize visibleBanks with all banks from loaded pins
+        const allBanks = new Set<string>();
+        packageData.pins.forEach(pin => {
+          const bank = pin.bank || 'NA';
+          allBanks.add(bank);
+        });
+        state.visibleBanks = allBanks;
+        console.log('🏪 ストア: 初期化された visibleBanks:', Array.from(allBanks));
+        
         console.log('🏪 ストア更新完了:', {
           packageName: state.package?.name,
           pinsCount: state.pins.length,
@@ -350,7 +386,7 @@ export const useAppStore = create<AppState & AppActions>()(
     resetZoom: () =>
       set((state) => {
         state.viewConfig.zoom = 1.0;
-        state.viewConfig.resetTrigger += 1; // Force reset even if zoom was already 100%
+        // resetTrigger removed - no longer triggering automatic viewport changes
       }),
 
     updateViewConfig: (config) =>
@@ -435,6 +471,23 @@ export const useAppStore = create<AppState & AppActions>()(
               valueA = a.bank || '';
               valueB = b.bank || '';
               break;
+            case 'grid':
+              // Grid position sorting: compare rows first, then columns
+              if (a.gridPosition && b.gridPosition) {
+                const rowComparison = compareRows(a.gridPosition.row, b.gridPosition.row);
+                if (process.env.NODE_ENV === 'development') {
+                  console.log(`🔄 Store grid sort: ${a.gridPosition.row} vs ${b.gridPosition.row} = ${rowComparison}`);
+                }
+                if (rowComparison !== 0) {
+                  return state.filters.sortOrder === 'asc' ? rowComparison : -rowComparison;
+                }
+                // If rows are equal, compare columns
+                const colComparison = a.gridPosition.col - b.gridPosition.col;
+                return state.filters.sortOrder === 'asc' ? colComparison : -colComparison;
+              }
+              valueA = a.gridPosition?.row || '';
+              valueB = b.gridPosition?.row || '';
+              break;
             default:
               valueA = a.pinNumber;
               valueB = b.pinNumber;
@@ -461,6 +514,25 @@ export const useAppStore = create<AppState & AppActions>()(
     applyFilters: () =>
       set((state) => {
         let filtered = [...state.pins];
+
+        // Filter by Bank visibility (Issue #19)
+        // デバッグ知見: Bank フィルタリングのロジック
+        // - visibleBanks.size === 0: 全Bank表示（デフォルト）
+        // - visibleBanks.size > 0: 選択されたBankのみ表示
+        // 空のSetの場合は全て表示、要素がある場合は選択されたBankのみ表示
+        console.log(`🏪 applyFilters: visibleBanks =`, Array.from(state.visibleBanks));
+        console.log(`🏪 applyFilters: pins before bank filter =`, filtered.length);
+        
+        if (state.visibleBanks.size > 0) {
+          const beforeCount = filtered.length;
+          filtered = filtered.filter(pin => {
+            const bankId = pin.bank || 'UNASSIGNED';
+            return state.visibleBanks.has(bankId);
+          });
+          console.log(`🏪 applyFilters: filtered from ${beforeCount} to ${filtered.length} pins`);
+        } else {
+          console.log(`🏪 applyFilters: visibleBanks is empty, showing all pins`);
+        }
 
         // Filter by pin types
         if (state.filters.pinTypes.length > 0) {
@@ -550,6 +622,9 @@ export const useAppStore = create<AppState & AppActions>()(
 
     setSortField: (field) =>
       set((state) => {
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`🎯 Changing sort field from ${state.filters.sortField} to ${field}`);
+        }
         state.filters.sortField = field;
         // Re-apply sorting immediately
         get().applyFilters();
@@ -561,6 +636,57 @@ export const useAppStore = create<AppState & AppActions>()(
         // Re-apply sorting immediately
         get().applyFilters();
       }),
+
+    // Bank visibility management (Issue #19)
+    // デバッグ知見: Zustandの状態更新はimmerを使用しているため、
+    // 状態更新(set)とフィルタリング(applyFilters)を分離する必要がある
+    toggleBankVisibility: (bankId) => {
+      set((state) => {
+        console.log(`🏪 toggleBankVisibility called for Bank ${bankId}`);
+        console.log(`🏪 Before: visibleBanks =`, Array.from(state.visibleBanks));
+        
+        if (state.visibleBanks.has(bankId)) {
+          state.visibleBanks.delete(bankId);
+          console.log(`🏪 Removed Bank ${bankId} from visibleBanks`);
+        } else {
+          state.visibleBanks.add(bankId);
+          console.log(`🏪 Added Bank ${bankId} to visibleBanks`);
+        }
+        
+        console.log(`🏪 After: visibleBanks =`, Array.from(state.visibleBanks));
+      });
+      
+      // 重要: フィルタリングは状態更新後に別途実行する必要がある
+      // Zustand + Immerでは、set()内でget()を呼ぶと古い状態を参照してしまう
+      console.log(`🏪 Calling applyFilters after state update...`);
+      get().applyFilters();
+    },
+
+    setBankVisibility: (bankId, visible) => {
+      set((state) => {
+        if (visible) {
+          state.visibleBanks.add(bankId);
+        } else {
+          state.visibleBanks.delete(bankId);
+        }
+      });
+      // Re-apply filters to update filteredPins
+      get().applyFilters();
+    },
+
+    showAllBanks: () => {
+      set((state) => {
+        // 全てのBankを表示するため、visibleBanksを空にする（デフォルト動作）
+        // デバッグ知見: visibleBanks.size === 0 の場合、applyFiltersで全ピンを表示
+        console.log(`🏪 showAllBanks: clearing visibleBanks`);
+        state.visibleBanks.clear();
+      });
+      get().applyFilters();
+    },
+
+    // hideAllBanks機能を削除（シンプル化のため）
+    // 元々は __HIDE_ALL__ マーカーを使った複雑な状態管理だったが、
+    // ユーザビリティ向上のため「全表示」のみのシンプルな仕様に変更
 
     // Differential pair management
     assignDifferentialPair: (positiveId, negativeId, baseName) =>
@@ -665,6 +791,12 @@ export const useAppStore = create<AppState & AppActions>()(
         });
         // Clear selection after bulk update
         state.listView.selectedRows.clear();
+      }),
+
+    // Pin color mode management
+    setPinColorMode: (mode) =>
+      set((state) => {
+        state.pinColorMode = mode;
       }),
 
     addRecentFile: (filePath) =>

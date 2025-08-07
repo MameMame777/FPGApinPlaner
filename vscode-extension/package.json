@@ -2,7 +2,7 @@
   "name": "fpga-pin-planner",
   "displayName": "FPGA Pin Planner",
   "description": "Advanced FPGA Pin Assignment and Management Tool with Voltage/IO Standard Selection",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "publisher": "MameMame777",
   "author": "MameMame777 <mame@example.com>",
   "license": "MIT",
@@ -36,6 +36,8 @@
   "icon": "images/icon.png",
   "activationEvents": [
     "onCommand:fpgaPinPlanner.openPlanner",
+    "onCommand:fpgaPinPlanner.openGUI",
+    "onCommand:fpgaPinPlanner.loadSampleData",
     "onLanguage:csv",
     "workspaceContains:**/*.csv",
     "workspaceContains:**/*.xdc",
@@ -170,73 +172,6 @@
         },
         {
           "command": "fpgaPinPlanner.loadSampleData"
-        }
-      ],
-      "view/title": [
-        {
-          "command": "fpgaPinPlanner.importCSVWithDialog",
-          "when": "view == fpgaPinPlanner.fileManager",
-          "group": "navigation",
-          "title": "Load CSV"
-        },
-        {
-          "command": "fpgaPinPlanner.loadProjectWithDialog",
-          "when": "view == fpgaPinPlanner.fileManager",
-          "group": "navigation",
-          "title": "Load Project"
-        },
-        {
-          "command": "fpgaPinPlanner.openGUI",
-          "when": "view == fpgaPinPlanner.pinList",
-          "group": "navigation"
-        },
-        {
-          "command": "fpgaPinPlanner.importCSVWithDialog",
-          "when": "view == fpgaPinPlanner.pinList",
-          "group": "navigation"
-        },
-        {
-          "command": "fpgaPinPlanner.exportXDCWithDialog",
-          "when": "view == fpgaPinPlanner.batchOperations",
-          "group": "navigation"
-        },
-        {
-          "command": "fpgaPinPlanner.saveProjectWithDialog",
-          "when": "view == fpgaPinPlanner.batchOperations",
-          "group": "navigation"
-        }
-      ]
-    },
-    "viewsContainers": {
-      "activitybar": [
-        {
-          "id": "fpga-pin-planner",
-          "title": "FPGA Pin Planner",
-          "icon": "$(circuit-board)"
-        }
-      ]
-    },
-    "views": {
-      "fpga-pin-planner": [
-        {
-          "id": "fpgaPinPlanner.fileManager",
-          "name": "File Manager",
-          "icon": "$(folder)"
-        },
-        {
-          "id": "fpgaPinPlanner.pinList",
-          "name": "Pin List",
-          "icon": "$(list-unordered)"
-        },
-        {
-          "id": "fpgaPinPlanner.validation",
-          "name": "Validation",
-          "icon": "$(check)"
-        },
-        {
-          "id": "fpgaPinPlanner.batchOperations",
-          "name": "Batch Operations",
-          "icon": "$(gear)"
         }
       ]
     },

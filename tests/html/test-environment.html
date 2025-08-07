@@ -84,12 +84,6 @@
             <div id="store-status">未テスト</div>
             <button onclick="testStore()">ストアテスト</button>
         </div>
-        
-        <div class="status-card">
-            <h3>🎵 BGM機能</h3>
-            <div id="bgm-status">未テスト</div>
-            <button onclick="testBGM()">BGMテスト</button>
-        </div>
     </div>
     
     <div class="test-section">
@@ -217,26 +211,6 @@
             }
         }
         
-        async function testBGM() {
-            log('🎵 BGM機能をテスト中...');
-            updateStatus('bgm-status', 'テスト中...', '');
-            
-            try {
-                // Audio APIのテスト
-                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                if (audioContext) {
-                    updateStatus('bgm-status', '✅ 対応', 'success');
-                    log('✅ BGM機能: Web Audio API対応確認');
-                    audioContext.close();
-                } else {
-                    throw new Error('Audio APIが利用できません');
-                }
-            } catch (error) {
-                updateStatus('bgm-status', '❌ 非対応', 'error');
-                log(`❌ BGM機能: ${error.message}`);
-            }
-        }
-        
         function openMainApp() {
             log('🚀 メインアプリケーションを開きます...');
             window.open('http://localhost:5175', '_blank');
@@ -261,8 +235,6 @@
             await testCSV();
             await new Promise(resolve => setTimeout(resolve, 500));
             await testStore();
-            await new Promise(resolve => setTimeout(resolve, 500));
-            await testBGM();
             log('✅ 全テスト完了');
         }
         

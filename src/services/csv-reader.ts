@@ -1,4 +1,6 @@
-import { Pin, Package, CSVFormat, ImportResult, ColumnMapping, Position, GridPosition } from '@/types';
+import { Pin, Package, GridPosition, Position, ImportResult, CSVFormat, ColumnMapping } from '@/types';
+import { rowToIndex } from '@/utils/grid-utils';
+import * as XLSX from 'xlsx';
 
 export class CSVReader {
   private static readonly XILINX_HEADERS = [
@@ -12,7 +14,15 @@ export class CSVReader {
 
   static async parseCSVFile(file: File): Promise<ImportResult> {
     try {
-      const content = await this.readFileContent(file);
+      const fileExtension = file.name.split('.').pop()?.toLowerCase();
+      let content: string;
+      
+      if (fileExtension === 'xlsx' || fileExtension === 'xls') {
+        content = await this.readXLSXFileContent(file);
+      } else {
+        content = await this.readFileContent(file);
+      }
+      
       return this.parseCSVContent(content);
     } catch (error) {
       return {
@@ -30,12 +40,20 @@ export class CSVReader {
     
     // Try ultra-fast Versal pattern matching first
     const versalResult = this.tryVersalPatternMatching(content);
-    if (versalResult) {
-      return versalResult;
+    if (versalResult !== null) {
+      return await versalResult;
+    }
+    
+    // Check for Intel/Altera format in CSV content
+    console.log('🔧 About to try Intel/Altera pattern matching...');
+    const intelAlteraResult = this.tryIntelAlteraPatternMatching(content);
+    if (intelAlteraResult !== null) {
+      console.log('✅ Intel/Altera pattern detected, processing...');
+      return await intelAlteraResult;
     }
     
     // Fallback to generic parsing
-    console.log('📋 Versal pattern not found, using generic approach...');
+    console.log('📋 Versal and Intel/Altera patterns not found, using generic approach...');
     return this.parseCSVContentGeneric(content);
   }
 
@@ -184,6 +202,125 @@ export class CSVReader {
     return this.parseCSVWithKnownHeader(lines, headerLineIndex, dataStartIndex);
   }
 
+  static tryIntelAlteraPatternMatching(content: string): Promise<ImportResult> | null {
+    console.log('🔧 Trying Intel/Altera pattern matching...');
+    const lines = content.split('\n').map(line => line.trim());
+    console.log(`📄 Total lines: ${lines.length}`);
+    
+    let headerLineIndex = -1;
+    let dataStartIndex = -1;
+    
+    // Look for Intel/Altera format characteristics
+    for (let i = 0; i < Math.min(20, lines.length); i++) {
+      const line = lines[i];
+      
+      if (line && line.toLowerCase().includes('pin name/function')) {
+        headerLineIndex = i;
+        dataStartIndex = i + 1;
+        console.log(`✅ Found Intel/Altera header at line ${i + 1}: ${line.substring(0, 100)}`);
+        break;
+      }
+    }
+    
+    if (headerLineIndex === -1) {
+      console.log('❌ Intel/Altera pattern not found');
+      return null;
+    }
+    
+    // Intel/Altera format detected, process with special handling
+    return this.parseIntelAlteraCSV(lines, headerLineIndex, dataStartIndex);
+  }
+
+  static async parseIntelAlteraCSV(lines: string[], _headerLineIndex: number, dataStartIndex: number): Promise<ImportResult> {
+    console.log('🔧 Processing Intel/Altera CSV format...');
+    
+    const pins: Pin[] = [];
+    const warnings: string[] = [];
+    const errors: string[] = [];
+    
+    let validPins = 0;
+    let processed = 0;
+    
+    for (let i = dataStartIndex; i < lines.length; i++) {
+      const line = lines[i];
+      
+      if (!line || line.replace(/,/g, '').trim() === '') {
+        continue;
+      }
+      
+      const columns = this.parseCSVLine(line);
+      
+      // Intel/Altera format: Pin, Pin Name, Signal, Direction, Voltage, Package_Pin, Row, Col, Bank, Type
+      // We expect at least 6 columns for basic pin data
+      if (columns.length >= 6) {
+        const pinNumber = columns[0]?.trim();
+        const pinName = columns[1]?.trim();
+        const row = columns[6]?.trim();
+        const col = columns[7]?.trim();
+        
+        // Skip only if essential data is missing
+        if (!pinNumber || !row || !col) {
+          continue;
+        }
+        
+        // Note: Power pins (VCC/GND) are now included for complete package visualization
+        
+        try {
+          const gridPosition: GridPosition = {
+            row: row,
+            col: parseInt(col, 10) || 1,
+          };
+          
+          const position = this.gridToPosition(gridPosition);
+          
+          const pin: Pin = {
+            id: crypto.randomUUID(),
+            pinNumber: pinNumber,
+            pinName: pinName || pinNumber,
+            signalName: columns[2]?.trim() || '',
+            direction: this.parseDirection(columns[3]),
+            pinType: this.determinePinType(pinName || pinNumber),
+            voltage: columns[4]?.trim() || '3.3V',
+            packagePin: columns[5]?.trim() || pinNumber,
+            position,
+            gridPosition,
+            isAssigned: !!(columns[2]?.trim()),
+            bank: columns[8]?.trim() || 'NA',
+          };
+          
+          pins.push(pin);
+          validPins++;
+        } catch (error) {
+          if (errors.length < 20) {
+            errors.push(`Line ${i + 1}: ${(error as Error).message}`);
+          }
+        }
+      }
+      
+      processed++;
+      
+      if (processed % 1000 === 0) {
+        console.log(`🔄 Intel/Altera processing: ${processed} lines, ${validPins} pins`);
+      }
+    }
+    
+    console.log(`✅ Intel/Altera processing complete: ${validPins} pins found from ${processed} lines`);
+    
+    return {
+      success: pins.length > 0,
+      pins,
+      warnings,
+      errors,
+      format: {
+        type: 'generic',
+        hasHeader: true,
+        commentPrefix: '#',
+        delimiter: ',',
+        expectedColumns: ['Pin', 'Pin Name', 'Signal', 'Direction', 'Voltage', 'Package_Pin', 'Row', 'Col', 'Bank', 'Type'],
+      },
+    };
+  }
+
   static async parseCSVWithKnownHeader(lines: string[], headerLineIndex: number, dataStartIndex: number): Promise<ImportResult> {
     console.log('⚡ Fast processing with known header...');
     
@@ -259,6 +396,74 @@ export class CSVReader {
       reader.onload = (e) => resolve(e.target?.result as string);
       reader.onerror = () => reject(new Error('Failed to read file'));
       reader.readAsText(file);
+    });
+  }
+
+  private static async readXLSXFileContent(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = e.target?.result;
+          const workbook = XLSX.read(data, { type: 'binary' });
+          
+          console.log('📊 XLSX Workbook info:', {
+            sheetNames: workbook.SheetNames,
+            totalSheets: workbook.SheetNames.length
+          });
+          
+          // 最初のシートを取得
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          
+          // シートの範囲情報を表示
+          const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+          console.log('📋 Sheet range:', {
+            sheetName,
+            range: worksheet['!ref'],
+            rows: range.e.r - range.s.r + 1,
+            cols: range.e.c - range.s.c + 1
+          });
+          
+          // まず生データを確認（JSON形式）
+          const jsonData: (string | undefined)[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false });
+          console.log('🔍 Raw data sample (first 15 rows):', jsonData.slice(0, 15));
+          console.log('📊 Total data rows:', jsonData.length);
+          
+          // データ密度を確認
+          const nonEmptyRows = jsonData.filter((row) => 
+            row && Array.isArray(row) && row.some(cell => cell && cell.toString().trim())
+          );
+          console.log('📈 Non-empty rows:', nonEmptyRows.length);
+          
+          // Intel/Altera形式を検出して特別処理
+          const isIntelAlteraFormat = CSVReader.detectIntelAlteraFormat(jsonData);
+          console.log('🔍 Format detection result:', isIntelAlteraFormat ? 'Intel/Altera' : 'Standard CSV');
+          
+          if (isIntelAlteraFormat) {
+            console.log('🔍 Intel/Altera format detected, using special processing');
+            const processedData = CSVReader.processIntelAlteraXLSX(jsonData);
+            resolve(processedData);
+          } else {
+            // CSVに変換（空行を保持しない設定）
+            const csvData = XLSX.utils.sheet_to_csv(worksheet, { strip: false });
+            const csvLines = csvData.split('\n').filter(line => line.trim());
+            console.log('📄 CSV conversion result:', {
+              originalRows: range.e.r - range.s.r + 1,
+              csvLines: csvLines.length,
+              firstTenLines: csvLines.slice(0, 10),
+              linesWithCommas: csvLines.filter(line => line.includes(',')).length
+            });
+            
+            resolve(csvData);
+          }
+        } catch (error) {
+          console.error('❌ XLSX parsing error:', error);
+          reject(new Error(`Failed to parse XLSX file: ${(error as Error).message}`));
+        }
+      };
+      reader.onerror = () => reject(new Error('Failed to read XLSX file'));
+      reader.readAsBinaryString(file);
     });
   }
 
@@ -409,8 +614,9 @@ export class CSVReader {
   }
 
   private static gridToPosition(grid: GridPosition): Position {
-    // Optimized grid to position conversion
-    const rowOffset = grid.row.charCodeAt(0) - 'A'.charCodeAt(0);
+    // Use proper grid to position conversion with support for double letter rows
+    // Fixes Issue #12: AA+ rows were not displaying due to charCodeAt(0) limitation
+    const rowOffset = rowToIndex(grid.row);
     const gridSpacing = 88; // Tile size from PackageCanvas
     
     return {
@@ -497,8 +703,8 @@ export class CSVReader {
       };
     }
 
-    // Calculate dimensions from pin positions
-    const maxRow = Math.max(...pins.map(p => p.gridPosition.row.charCodeAt(0) - 'A'.charCodeAt(0))) + 1;
+    // Calculate dimensions from pin positions using proper row indexing
+    const maxRow = Math.max(...pins.map(p => rowToIndex(p.gridPosition.row))) + 1;
     const maxCol = Math.max(...pins.map(p => p.gridPosition.col));
 
     return {
@@ -513,5 +719,146 @@ export class CSVReader {
       pins,
       totalPins: pins.length,
     };
+  }
+
+  private static detectIntelAlteraFormat(jsonData: any[][]): boolean {
+    console.log('🔍 Detecting Intel/Altera format...');
+    
+    // ヘッダー行を探す（最初の10行以内）
+    for (let i = 0; i < Math.min(10, jsonData.length); i++) {
+      const row = jsonData[i];
+      if (row && Array.isArray(row) && row.length >= 4) {
+        const rowStr = row.join(',').toLowerCase();
+        console.log(`Row ${i}: "${rowStr.substring(0, 100)}..."`);
+        
+        // Intel/Altera形式の特徴的なヘッダーをチェック
+        // 例: "V81,Bank Number,VREF,Pin Name/Function,Optional Function(s),Configuration Function"
+        if (rowStr.includes('pin name/function') && 
+            (rowStr.includes('bank number') || rowStr.includes('bank')) && 
+            (rowStr.includes('vref') || rowStr.includes('configuration function'))) {
+          console.log('✅ Intel/Altera format detected!');
+          return true;
+        }
+      }
+    }
+    console.log('❌ Intel/Altera format not detected');
+    return false;
+  }
+
+  private static processIntelAlteraXLSX(jsonData: any[][]): string {
+    console.log('🔧 Processing Intel/Altera XLSX format...');
+    
+    // ヘッダー行を見つける
+    let headerRowIndex = -1;
+    let pinNumberCol = -1;
+    let pinNameCol = -1;
+    let bankCol = -1;
+    
+    for (let i = 0; i < Math.min(10, jsonData.length); i++) {
+      const row = jsonData[i];
+      if (row && Array.isArray(row) && row.length >= 4) {
+        const headers = row.map(h => h ? h.toString().toLowerCase().trim() : '');
+        
+        // Intel/Altera形式のヘッダーを探す
+        if (headers.some(h => h.includes('pin name/function'))) {
+          headerRowIndex = i;
+          
+          // 列のインデックスを特定
+          for (let j = 0; j < headers.length; j++) {
+            const header = headers[j];
+            if (j === 0 && (header.includes('v') || header.match(/^[a-z]\d+$/) || header.length <= 3)) {
+              pinNumberCol = j; // 最初の列はピン番号（V81など）
+            } else if (header.includes('pin name/function')) {
+              pinNameCol = j;
+            } else if (header.includes('bank number') || header.includes('bank')) {
+              bankCol = j;
+            }
+          }
+          break;
+        }
+      }
+    }
+    
+    if (headerRowIndex === -1) {
+      console.warn('⚠️ Intel/Altera header not found, fallback to standard processing');
+      return ''; // Empty fallback
+    }
+    
+    console.log('📋 Intel/Altera format detected:', {
+      headerRowIndex,
+      pinNumberCol,
+      pinNameCol,
+      bankCol
+    });
+    
+    // データ行を処理
+    const csvRows: string[] = [];
+    let processedPins = 0; // 処理カウンター
+    
+    // ヘッダーを作成（標準形式に変換）
+    csvRows.push('Pin,Pin Name,Signal,Direction,Voltage,Package_Pin,Row,Col,Bank,Type');
+    
+    for (let i = headerRowIndex + 1; i < jsonData.length; i++) {
+      const row = jsonData[i];
+      if (!row || !Array.isArray(row) || row.length < 4) continue;
+      
+      const pinNumber = row[pinNumberCol] ? row[pinNumberCol].toString().trim() : '';
+      const pinName = row[pinNameCol] ? row[pinNameCol].toString().trim() : '';
+      const bank = row[bankCol] ? row[bankCol].toString().trim() : '';
+      
+      // デバッグ情報を追加
+      if (processedPins < 10) {
+        console.log(`🔍 Processing pin ${processedPins + 1}: Number="${pinNumber}", Name="${pinName}", Bank="${bank}"`);
+      }
+      
+      // 有効なピンかチェック（NCピンのみスキップ、電源ピンは含める）
+      if (!pinNumber || pinNumber === '' || 
+          pinName.toLowerCase().includes('nc') ||
+          pinName.toLowerCase().includes('no connect')) {
+        if (processedPins < 10) console.log(`⏭️ Skipping NC/empty pin: "${pinNumber}" / "${pinName}"`);
+        continue;
+      }
+      
+      // ピン番号の形式をチェック（より柔軟な形式を受け入れる）
+      // 例：V81, A1, B2, GPIO_01, PIN_01など
+      if (!pinNumber.match(/^[A-Z0-9_]+\d*$/i)) {
+        if (processedPins < 10) console.log(`🔍 Skipping invalid pin format: "${pinNumber}"`);
+        continue;
+      }
+      
+      // ピンタイプを判定
+      let pinType = 'IO';
+      if (pinName.toLowerCase().includes('power') || 
+          pinName.toLowerCase().includes('vcc') ||
+          pinName.toLowerCase().includes('gnd')) {
+        pinType = 'POWER';
+      }
+      
+      // 行・列を抽出（例：V81 -> row: V, col: 81）
+      const match = pinNumber.match(/^([A-Z])(\d+)$/i);
+      const rowLetter = match ? match[1].toUpperCase() : 'A';
+      const colNumber = match ? match[2] : '1';
+      
+      // CSV行を作成
+      const csvRow = [
+        pinNumber,           // Pin
+        pinName || pinNumber, // Pin Name
+        '',                  // Signal (empty)
+        '',                  // Direction (empty)
+        '',                  // Voltage (empty)
+        pinNumber,           // Package_Pin
+        rowLetter,           // Row
+        colNumber,           // Col
+        bank || 'NA',        // Bank
+        pinType              // Type
+      ].join(',');
+      
+      csvRows.push(csvRow);
+      processedPins++;
+    }
+    
+    console.log(`✅ Intel/Altera processing complete: ${processedPins} pins processed from ${jsonData.length - headerRowIndex - 1} data rows`);
+    
+    return csvRows.join('\n');
   }
 }

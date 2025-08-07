@@ -8,8 +8,10 @@ Advanced FPGA Pin Assignment and Management Tool with Voltage/IO Standard Select
 - 📤 **Multi-Format Export**: Export constraints in XDC (Xilinx), SDC (Synopsys), and QSF (Intel Quartus) formats
 - ⚡ **Voltage & I/O Standards**: Comprehensive voltage level and I/O standard management
 - 🔍 **Pin Validation**: Real-time constraint validation and error detection
-- 📊 **Interactive Interface**: User-friendly webview interface for pin management
+- 📊 **Interactive Interface**: User-friendly webview interface with resizable panels
 - 🎯 **Context Integration**: Right-click context menus for CSV and constraint files
+- 📊 **Bank Analysis**: Dynamic bank statistics and differential pair management
+- 🚀 **Optimized Performance**: Streamlined codebase with enhanced performance and stability
 
 ## Quick Start
 
@@ -17,6 +19,38 @@ Advanced FPGA Pin Assignment and Management Tool with Voltage/IO Standard Select
 2. Open the Command Palette (`Ctrl+Shift+P`)
 3. Search for "FPGA" to see all available commands
 4. Use `FPGA: Open Pin Planner` to start the main interface
+
+## Development Build
+
+### Prerequisites
+- Node.js (v16 or later)
+- npm
+- TypeScript
+- vsce (VS Code Extension Manager)
+
+### Clean Build Process
+For developers who want to build the extension from source:
+
+```bash
+# Option 1: Use the automated PowerShell script
+.\clean-build.ps1
+
+# Option 2: Use the batch file
+.\clean-build.cmd
+
+# Option 3: Manual step-by-step build
+cd .. && npm run build && cd vscode-extension
+npm install
+npm run package
+```
+
+**Important**: Always build the main application first (`npm run build` in root directory) before building the extension to ensure the latest webview content is included.
+
+### Installation
+After building, install the generated `.vsix` file:
+```bash
+code --install-extension fpga-pin-planner-1.0.2.vsix --force
+```
 
 ## Commands
 
@@ -64,6 +98,19 @@ Access extension settings via `File > Preferences > Settings` and search for "FP
 - No additional dependencies required
 
 ## Release Notes
+
+### 1.0.2 (Latest)
+- ✅ **Performance Optimization**: Removed BGM audio functionality for improved stability
+- ✅ **Code Refactoring**: Streamlined codebase and eliminated unused components
+- ✅ **Enhanced UI**: Cleaner interface with better user experience
+- ✅ **Bug Fixes**: Resolved audio playback loop issues and improved overall reliability
+
+### 1.0.1
+- ✅ **Resizable UI Panels**: Added drag-to-resize functionality for left and right sidebars
+- ✅ **Dynamic Bank Groups**: CSV-based automatic bank statistics generation
+- ✅ **Improved Canvas Legend**: Parallel display of Bank Groups and Pin Types
+- ✅ **Differential Pair Enhancement**: Auto-sorting and visual indicators
+- ✅ **Clean Build System**: Automated build scripts for consistent packaging
 
 ### 1.0.0
 - Initial release

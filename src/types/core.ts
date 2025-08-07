@@ -145,10 +145,10 @@ export interface ViewConfig {
   showPinNumbers: boolean;
   showSignalNames: boolean;
   showPinTypes: boolean;
-  resetTrigger: number;         // Counter to force viewport reset
+  // resetTrigger removed - was causing unwanted automatic viewport changes
 }
 
-export type SortField = 'pinNumber' | 'pinName' | 'signalName' | 'pinType' | 'bank';
+export type SortField = 'pinNumber' | 'pinName' | 'signalName' | 'pinType' | 'bank' | 'grid';
 export type SortOrder = 'asc' | 'desc';
 
 export interface FilterState {
@@ -290,9 +290,12 @@ export interface TabConfiguration {
   description?: string;
   showSearch?: boolean;
   showFilters?: boolean;
+  isCustomComponent?: boolean; // カスタムコンポーネントを使用するタブかどうか
 }
 
 export type ViewMode = 'grid' | 'list';
+
+export type PinColorMode = 'bank' | 'pinType';
 
 export interface ListViewState {
   activeTab: string;

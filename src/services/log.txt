@@ -1,0 +1,73 @@
+main-780cbbaf.js:154 📂 ファイルが選択されました: 10M08SL.xlsx 47305 bytes
+main-780cbbaf.js:154 🔄 Excel解析を開始します...
+main-780cbbaf.js:144 📦 PackageCanvas: Received 6 pins (filtered)
+main-780cbbaf.js:144 🔍 Found rows: VCCIO, VCCIO, VCCA, VCCA, VCCA, VCCA
+main-780cbbaf.js:144 🔍 Row indices - min: 0 (A), max: 0 (A)
+main-780cbbaf.js:144 🔍 Col indices - min: 1, max: 8
+main-780cbbaf.js:144 🎯 Smart culling: Rendering 6/6 pins (0.00ms)
+main-780cbbaf.js:144 🔗 Differential pairs: 0 lines (0.00ms)
+main-780cbbaf.js:144 🏦 Bank boundaries: 0 boundaries (0.00ms)
+main-780cbbaf.js:144 📦 PackageCanvas: Received 6 pins (filtered)
+main-780cbbaf.js:144 🔍 Found rows: VCCIO, VCCIO, VCCA, VCCA, VCCA, VCCA
+main-780cbbaf.js:144 🔍 Row indices - min: 0 (A), max: 0 (A)
+main-780cbbaf.js:144 🔍 Col indices - min: 1, max: 8
+main-780cbbaf.js:144 🎯 Smart culling: Rendering 6/6 pins (0.00ms)
+main-780cbbaf.js:144 🔗 Differential pairs: 0 lines (0.00ms)
+main-780cbbaf.js:144 🏦 Bank boundaries: 0 boundaries (0.10ms)
+main-780cbbaf.js:93 🚀 Starting ultra-fast CSV parsing...
+main-780cbbaf.js:94 ⚡ Trying ultra-fast Versal pattern matching...
+main-780cbbaf.js:95 📄 Total lines: 85
+main-780cbbaf.js:95 ⚡ Pattern matching line 1...
+main-780cbbaf.js:95 ❌ Versal pattern not found
+main-780cbbaf.js:93 📋 Versal pattern not found, using generic approach...
+main-780cbbaf.js:93 🔄 Fallback to generic CSV processing...
+main-780cbbaf.js:94 📄 Processing 85 lines with generic approach
+main-780cbbaf.js:94 📋 Found header at line 4: V81,Bank Number,VREF,Pin Name/Function,Optional Function(s),Configuration Function,Dedicated Tx/Rx Channel,Emulated LVDS Output Channel,IO Performance
+main-780cbbaf.js:95 🔍 Detected headers: (9) ['v81', 'bank number', 'vref', 'pin name/function', 'optional function(s)', 'configuration function', 'dedicated tx/rx channel', 'emulated lvds output channel', 'io performance']
+main-780cbbaf.js:95 ✅ Found column "pin" at index 3: "pin name/function"
+main-780cbbaf.js:95 ✅ Found column "pin name" at index 3: "pin name/function"
+main-780cbbaf.js:95 ✅ Found column "bank" at index 1: "bank number"
+main-780cbbaf.js:95 ✅ Found column "function" at index 3: "pin name/function"
+main-780cbbaf.js:95 📋 Column mapping result: {pin: 3, pinName: 3, signalName: -1, direction: -1, voltage: -1, …}
+main-780cbbaf.js:94 🔍 Format: {type: 'generic', hasHeader: false, commentPrefix: '#', delimiter: ',', expectedColumns: Array(7)}
+main-780cbbaf.js:94 🔍 Mapping: {pin: 3, pinName: 3, signalName: -1, direction: -1, voltage: -1, …}
+main-780cbbaf.js:94 ✅ Generic processing complete: 6 pins found from 81 lines
+main-780cbbaf.js:154 📊 CSV解析結果: {success: true, pins: Array(6), warnings: Array(0), errors: Array(0), format: {…}}
+main-780cbbaf.js:154 ✅ ファイル解析成功: 6 pins found
+main-780cbbaf.js:154 📦 パッケージデータ作成: {id: '590553df-7810-45cb-a89f-f56c5f43df21', name: '10M08SL.xlsx', device: '10M08SL.xlsx', packageType: 'Unknown', dimensions: {…}, …}
+main-780cbbaf.js:56 🏪 ストア: loadPackage開始 {id: '590553df-7810-45cb-a89f-f56c5f43df21', name: '10M08SL.xlsx', device: '10M08SL.xlsx', packageType: 'Unknown', dimensions: {…}, …}
+main-780cbbaf.js:56 🏪 ストア: 初期化された visibleBanks: ['NA']
+main-780cbbaf.js:56 🏪 ストア更新完了: {packageName: '10M08SL.xlsx', pinsCount: 6, filteredPinsCount: 6}
+main-780cbbaf.js:154 💾 ストアに読み込み完了
+main-780cbbaf.js:144 📦 PackageCanvas: Received 6 pins (filtered)
+main-780cbbaf.js:144 🔍 Found rows: VCCIO, VCCIO, VCCA, VCCA, VCCA, VCCA
+main-780cbbaf.js:144 🔍 Row indices - min: 0 (A), max: 0 (A)
+main-780cbbaf.js:144 🔍 Col indices - min: 1, max: 8
+main-780cbbaf.js:144 🎯 Smart culling: Rendering 6/6 pins (0.00ms)
+main-780cbbaf.js:144 🔗 Differential pairs: 0 lines (0.00ms)
+main-780cbbaf.js:144 🏦 Bank boundaries: 0 boundaries (0.10ms)
+main-780cbbaf.js:144 🔍 Found rows: VCCIO, VCCIO, VCCA, VCCA, VCCA, VCCA
+main-780cbbaf.js:144 🔍 Row indices - min: 0 (A), max: 0 (A)
+main-780cbbaf.js:144 🔍 Col indices - min: 1, max: 8
+main-780cbbaf.js:144 📐 Auto-fit viewport: {x: 0, y: 330, scale: 1.0539772727272727} for package: 704 x 88 scale: 1.0539772727272727
+main-780cbbaf.js:144 📦 PackageCanvas: Received 6 pins (filtered)
+main-780cbbaf.js:144 🔍 Found rows: VCCIO, VCCIO, VCCA, VCCA, VCCA, VCCA
+main-780cbbaf.js:144 🔍 Row indices - min: 0 (A), max: 0 (A)
+main-780cbbaf.js:144 🔍 Col indices - min: 1, max: 8
+main-780cbbaf.js:144 🎯 Smart culling: Rendering 5/6 pins (0.00ms)
+main-780cbbaf.js:144 🔗 Differential pairs: 0 lines (0.00ms)
+main-780cbbaf.js:144 🏦 Bank boundaries: 0 boundaries (0.00ms)
+main-780cbbaf.js:144 📦 PackageCanvas: Received 6 pins (filtered)
+main-780cbbaf.js:144 🔍 Found rows: VCCIO, VCCIO, VCCA, VCCA, VCCA, VCCA
+main-780cbbaf.js:144 🔍 Row indices - min: 0 (A), max: 0 (A)
+main-780cbbaf.js:144 🔍 Col indices - min: 1, max: 8
+main-780cbbaf.js:144 🎯 Smart culling: Rendering 5/6 pins (0.00ms)
+main-780cbbaf.js:144 🔗 Differential pairs: 0 lines (0.00ms)
+main-780cbbaf.js:144 🏦 Bank boundaries: 0 boundaries (0.00ms)
+main-780cbbaf.js:144 📦 PackageCanvas: Received 6 pins (filtered)
+main-780cbbaf.js:144 🔍 Found rows: VCCIO, VCCIO, VCCA, VCCA, VCCA, VCCA
+main-780cbbaf.js:144 🔍 Row indices - min: 0 (A), max: 0 (A)
+main-780cbbaf.js:144 🔍 Col indices - min: 1, max: 8
+main-780cbbaf.js:144 🎯 Smart culling: Rendering 5/6 pins (0.00ms)
+main-780cbbaf.js:144 🔗 Differential pairs: 0 lines (0.00ms)
+main-780cbbaf.js:144 🏦 Bank boundaries: 0 boundaries (0.00ms)

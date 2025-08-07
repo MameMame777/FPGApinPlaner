@@ -3,8 +3,8 @@ import { useAppStore } from '@/stores/app-store';
 import { CSVReader } from '@/services/csv-reader';
 import { ExportService } from '@/services/export-service';
 import { PinItem } from '@/components/common/PinItem';
-import { BGMControls } from '@/components/common/BGMControls';
 import { SettingsPanel } from '@/components/common/SettingsPanel';
+import { ConstraintFormatSelector, ConstraintFormat } from '@/components/common/ConstraintFormatSelector';
 import { PinListTabs } from '@/components/common/PinListTabs';
 import PackageCanvas from '@/components/common/PackageCanvas';
 import SaveLoadControls from '@/components/common/SaveLoadControls';
@@ -16,6 +16,7 @@ import { useValidation } from '@/hooks/useValidation';
 import { ValidationIssue } from '@/services/validation-service';
 import { loadSampleData } from '@/utils/sample-data';
 import { DifferentialPairUtils } from '@/utils/differential-pair-utils';
+import { compareRows } from '@/utils/grid-utils';
 
 interface AppProps {}
 
@@ -24,14 +25,39 @@ const App: React.FC<AppProps> = () => {
   const [isImporting, setIsImporting] = useState(false);
   const [lastViewerSelectedPin, setLastViewerSelectedPin] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [showConstraintSelector, setShowConstraintSelector] = useState(false);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [rightSidebarTab, setRightSidebarTab] = useState<'validation' | 'batch' | null>('validation');
-  const [sidebarWidth, setSidebarWidth] = useState(300);
-  const [isResizing, setIsResizing] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  
+  // Dynamic maximization states for Issue #14
+  const [isMaximized, setIsMaximized] = useState(false);
+  const [autoHideSidebars, setAutoHideSidebars] = useState(false);
+  const [hideFooter, setHideFooter] = useState(false);
+  
+  // Resizable panel states
+  const [leftPanelWidth, setLeftPanelWidth] = useState(320); // 初期幅を320pxに調整
+  const [rightPanelWidth, setRightPanelWidth] = useState(280); // 初期幅を280pxに調整
+  const [isResizing, setIsResizing] = useState<'left' | 'right' | null>(null);
   
   // Initialize hotkeys
   useAppHotkeys();
+
+  // Dynamic maximization keyboard shortcuts for Issue #14
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // F11 for full maximization toggle
+      if (e.key === 'F11') {
+        e.preventDefault();
+        toggleMaximizedMode();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isMaximized, autoHideSidebars, hideFooter]);
 
   // Handle keyboard help event
   useEffect(() => {
@@ -86,9 +112,60 @@ const App: React.FC<AppProps> = () => {
     setViewMode,
   } = useAppStore();
 
+  // Dynamic maximization function for Issue #14
+  const toggleMaximizedMode = () => {
+    setIsMaximized(!isMaximized);
+    if (!isMaximized) {
+      // Enter maximized mode: hide sidebars and footer, fit to screen
+      setAutoHideSidebars(true);
+      setHideFooter(true);
+      // Trigger zoom reset to fit the screen after maximization
+      setTimeout(() => {
+        resetZoom();
+      }, 100); // Small delay to ensure UI updates first
+    } else {
+      // Exit maximized mode: restore sidebars and footer
+      setAutoHideSidebars(false);
+      setHideFooter(false);
+    }
+  };
+
+  // Panel resizing functionality
+  const handleMouseDown = (panelType: 'left' | 'right') => (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(panelType);
+  };
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (!isResizing) return;
+    
+    const containerWidth = window.innerWidth;
+    if (isResizing === 'left') {
+      const newWidth = Math.max(200, Math.min(500, e.clientX));
+      setLeftPanelWidth(newWidth);
+    } else if (isResizing === 'right') {
+      const newWidth = Math.max(200, Math.min(500, containerWidth - e.clientX));
+      setRightPanelWidth(newWidth);
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsResizing(null);
+  };
+
+  useEffect(() => {
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing]);
+
   // Handle VS Code messages
   useEffect(() => {
     const handleVSCodeMessage = (event: MessageEvent) => {
+      console.log('📥 Received message from VS Code:', event.data);
       const message = event.data;
       switch (message.command) {
         case 'loadProject':
@@ -153,11 +230,30 @@ const App: React.FC<AppProps> = () => {
     };
 
     // Check if we're in VS Code environment
+    console.log('🔍 Checking VS Code environment:', {
+      hasVscode: typeof (window as any).vscode !== 'undefined',
+      windowKeys: Object.keys(window),
+      userAgent: navigator.userAgent
+    });
+    
     if (typeof (window as any).vscode !== 'undefined') {
+      console.log('✅ VS Code environment detected, setting up message listener');
       window.addEventListener('message', handleVSCodeMessage);
+      
+      // Notify extension that webview is ready
+      setTimeout(() => {
+        console.log('📢 Notifying VS Code extension that webview is ready');
+        (window as any).vscode.postMessage({
+          command: 'webviewReady'
+        });
+      }, 500);
+      
       return () => {
+        console.log('🧹 Cleaning up VS Code message listener');
         window.removeEventListener('message', handleVSCodeMessage);
       };
+    } else {
+      console.log('❌ Not in VS Code environment');
     }
     
     // Return cleanup function even if not in VS Code
@@ -362,26 +458,35 @@ const App: React.FC<AppProps> = () => {
   };
 
   // Export handlers
-  const handleExportXDC = async () => {
+  const handleExportConstraints = (format: ConstraintFormat) => {
     if (pins.length === 0) return;
     
-    const xdcContent = ExportService.exportToXDC(pins, currentPackage);
-    const defaultFilename = `${currentPackage?.device || 'fpga'}_pins.xdc`;
+    let content: string;
+    let filename: string;
+    let fileExtension: string;
+    let fileTypes: Record<string, string[]>;
+    let dialogTitle: string;
     
-    const saved = await saveFileInVSCode(
-      xdcContent, 
-      defaultFilename,
-      {
-        'XDC Files': ['xdc'],
-        'All Files': ['*']
-      },
-      'Export XDC Constraints'
-    );
-
-    if (!saved) {
-      // Fallback to browser download
-      ExportService.downloadFile(xdcContent, defaultFilename, 'text/plain');
+    if (format === 'xdc') {
+      content = ExportService.exportToXDC(pins, currentPackage);
+      filename = `${currentPackage?.device || 'fpga'}_pins.xdc`;
+      fileExtension = 'text/plain';
+      fileTypes = { 'XDC Files': ['xdc'], 'All Files': ['*'] };
+      dialogTitle = 'Export XDC Constraints';
+    } else {
+      content = ExportService.exportToSDC(pins, currentPackage);
+      filename = `${currentPackage?.device || 'fpga'}_pins.sdc`;
+      fileExtension = 'text/plain';
+      fileTypes = { 'SDC Files': ['sdc'], 'All Files': ['*'] };
+      dialogTitle = 'Export SDC Constraints';
     }
+    
+    saveFileInVSCode(content, filename, fileTypes, dialogTitle).then(saved => {
+      if (!saved) {
+        // Fallback to browser download
+        ExportService.downloadFile(content, filename, fileExtension);
+      }
+    });
   };
 
   const handleExportCSV = async () => {
@@ -428,63 +533,11 @@ const App: React.FC<AppProps> = () => {
     }
   };
 
-  // Sidebar resize handlers
-  const handleMouseDown = (e: React.MouseEvent) => {
-    setIsResizing(true);
-    e.preventDefault();
-  };
-
-  const handleMouseMove = React.useCallback((e: MouseEvent) => {
-    if (!isResizing) return;
-    
-    requestAnimationFrame(() => {
-      const newWidth = e.clientX;
-      // Dynamic max width: 60% of window width, min 200px
-      const maxWidth = Math.max(400, window.innerWidth * 0.6);
-      
-      // Constrain width between 200px and dynamic max width
-      if (newWidth >= 200 && newWidth <= maxWidth) {
-        setSidebarWidth(newWidth);
-      }
-    });
-  }, [isResizing]);
-
-  const handleMouseUp = React.useCallback(() => {
-    setIsResizing(false);
-  }, []);
-
-  // Add event listeners for mouse move and up
-  React.useEffect(() => {
-    if (isResizing) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = 'col-resize';
-      document.body.style.userSelect = 'none';
-      
-      return () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-        document.body.style.cursor = '';
-        document.body.style.userSelect = '';
-      };
-    }
-    return undefined;
-  }, [isResizing, handleMouseMove, handleMouseUp]);
-
   const stats = getPinStats();
 
   // Create sorted pins for the sidebar list (without affecting the canvas)
-  const { sortedPinsForList, differentialPartner } = React.useMemo(() => {
+  const { sortedPinsForList } = React.useMemo(() => {
     const sorted = [...filteredPins];
-    
-    // Find the differential pair partner of the last viewer-selected pin
-    let differentialPartner: Pin | null = null;
-    if (lastViewerSelectedPin) {
-      const selectedPin = pins.find(p => p.id === lastViewerSelectedPin);
-      if (selectedPin) {
-        differentialPartner = DifferentialPairUtils.findPairPin(selectedPin, pins);
-      }
-    }
     
     sorted.sort((a, b) => {
       // First priority: Last viewer-selected pin comes first (only if selected from viewer)
@@ -533,6 +586,20 @@ const App: React.FC<AppProps> = () => {
           valueA = a.bank || '';
           valueB = b.bank || '';
           break;
+        case 'grid':
+          // Grid position sorting: compare rows first, then columns
+          if (a.gridPosition && b.gridPosition) {
+            const rowComparison = compareRows(a.gridPosition.row, b.gridPosition.row);
+            if (rowComparison !== 0) {
+              return filters.sortOrder === 'asc' ? rowComparison : -rowComparison;
+            }
+            // If rows are equal, compare columns
+            const colComparison = a.gridPosition.col - b.gridPosition.col;
+            return filters.sortOrder === 'asc' ? colComparison : -colComparison;
+          }
+          valueA = a.gridPosition?.row || '';
+          valueB = b.gridPosition?.row || '';
+          break;
         default:
           valueA = a.pinNumber;
           valueB = b.pinNumber;
@@ -547,7 +614,7 @@ const App: React.FC<AppProps> = () => {
       return filters.sortOrder === 'asc' ? result : -result;
     });
     
-    return { sortedPinsForList: sorted, differentialPartner };
+    return { sortedPinsForList: sorted };
   }, [filteredPins, filters.sortField, filters.sortOrder, lastViewerSelectedPin, pins]);
 
   return (
@@ -560,26 +627,47 @@ const App: React.FC<AppProps> = () => {
       display: 'flex',
       flexDirection: 'column',
     }}>
-      {/* Header */}
+      {/* Header - Ultra-compact for Issue #14: maximize vertical display area */}
       <header style={{
-        height: '60px',
+        height: '36px', // Reduced from 60px to 36px for Issue #14 vertical optimization
         backgroundColor: '#2a2a2a',
         borderBottom: '1px solid #444',
         display: 'flex',
         alignItems: 'center',
-        padding: '0 20px',
+        padding: '0 16px', // Reduced from 20px to 16px
         boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+        flexShrink: 0, // Prevent header from shrinking - Issue #14
+        minHeight: '36px', // Ensure minimum height for Issue #14
       }}>
         <h1 style={{
           margin: 0,
-          fontSize: '18px',
+          fontSize: '14px', // Reduced from 18px to 14px for Issue #14 vertical optimization
           fontWeight: 600,
           color: '#4A90E2',
         }}>
           FPGA Pin Planner
         </h1>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <BGMControls />
+          {/* Single Maximization Toggle for Issue #14 */}
+          <button
+            onClick={toggleMaximizedMode}
+            style={{
+              padding: '6px 12px',
+              backgroundColor: isMaximized ? '#007acc' : '#333',
+              border: '1px solid #555',
+              borderRadius: '4px',
+              color: isMaximized ? '#fff' : '#ccc',
+              cursor: 'pointer',
+              fontSize: '11px',
+              whiteSpace: 'nowrap',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
+            title={isMaximized ? "Restore Normal View (F11)" : "Maximize Viewer (F11)"}
+          >
+            {isMaximized ? '� Restore' : '� Maximize'}
+          </button>
           <input
             ref={fileInputRef}
             type="file"
@@ -639,7 +727,7 @@ const App: React.FC<AppProps> = () => {
               }}>
                 <button
                   onClick={() => {
-                    handleExportXDC();
+                    setShowConstraintSelector(true);
                     setExportMenuOpen(false);
                   }}
                   style={{
@@ -656,7 +744,7 @@ const App: React.FC<AppProps> = () => {
                   onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#3a3a3a'}
                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                 >
-                  📄 XDC (Xilinx)
+                  📄 Constraints (XDC/SDC)
                 </button>
                 <button
                   onClick={() => {
@@ -721,23 +809,44 @@ const App: React.FC<AppProps> = () => {
         </div>
       </header>
 
-      {/* Main Content */}
+      {/* Main Content - Optimized vertical layout for Issue #14 */}
       <div style={{ 
         flex: 1, 
         display: 'flex',
         overflow: 'hidden',
+        minHeight: 0, // Allow vertical shrinking - Issue #14
+        height: '100%', // Force full height utilization - Issue #14
       }}>
-        {/* Sidebar */}
+        {/* Sidebar - Dynamic visibility and resizable width for Issue #14 */}
+        {!autoHideSidebars && (
         <aside style={{
-          width: `${sidebarWidth}px`,
+          width: `${leftPanelWidth}px`,
           backgroundColor: '#252525',
           borderRight: '1px solid #444',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
           position: 'relative',
+          minHeight: 0, // Allow vertical shrinking - Issue #14
+          height: '100%', // Force full height utilization - Issue #14
+          minWidth: '200px', // 最小幅
+          maxWidth: '500px', // 最大幅
         }}>
-          {/* Search and Filters */}
+          {/* Resize handle for left panel */}
+          <div
+            onMouseDown={handleMouseDown('left')}
+            style={{
+              position: 'absolute',
+              right: 0,
+              top: 0,
+              bottom: 0,
+              width: '4px',
+              cursor: 'col-resize',
+              zIndex: 10,
+              backgroundColor: isResizing === 'left' ? '#007acc' : 'transparent',
+            }}
+            title="Drag to resize panel"
+          />
           <div style={{
             padding: '16px',
             borderBottom: '1px solid #444',
@@ -779,6 +888,7 @@ const App: React.FC<AppProps> = () => {
                 <option value="signalName">Signal Name</option>
                 <option value="pinType">Pin Type</option>
                 <option value="bank">Bank</option>
+                <option value="grid">Grid Position</option>
               </select>
               <button
                 onClick={() => setSortOrder(filters.sortOrder === 'asc' ? 'desc' : 'asc')}
@@ -901,67 +1011,46 @@ const App: React.FC<AppProps> = () => {
               </>
             )}
           </div>
-          
-          {/* Resize Handle */}
-          <div
-            style={{
-              position: 'absolute',
-              top: 0,
-              right: 0,
-              width: '4px',
-              height: '100%',
-              backgroundColor: isResizing ? '#007acc' : 'transparent',
-              cursor: 'col-resize',
-              zIndex: 10,
-              transition: isResizing ? 'none' : 'background-color 0.2s ease',
-            }}
-            onMouseDown={handleMouseDown}
-            onMouseEnter={(e) => {
-              if (!isResizing) {
-                e.currentTarget.style.backgroundColor = '#555';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!isResizing) {
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }
-            }}
-          />
         </aside>
+        )}
 
-        {/* Main View */}
+        {/* Main View - Enhanced flex layout for Issue #14 */}
         <main style={{
           flex: 1,
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
+          minWidth: 0, // Allow flex shrinking - Issue #14
+          minHeight: 0, // Allow flex shrinking - Issue #14
         }}>
-          {/* Toolbar */}
+          {/* Toolbar - Ultra-compact for Issue #14: maximize vertical display area */}
           <div 
             className="toolbar-scrollbar"
             style={{
-              height: '50px',
-              backgroundColor: '#2a2a2a',
+              height: '32px', // Further reduced from 42px to 32px for Issue #14 vertical optimization
+              backgroundColor: '#2a2a2a', // Opaque background for better readability
               borderBottom: '1px solid #444',
               display: 'flex',
               alignItems: 'center',
-              padding: '0 16px',
-              gap: '12px',
+              padding: '0 12px', // Reduced from 16px to 12px
+              gap: '8px', // Reduced from 12px to 8px
               overflowX: 'auto',
               overflowY: 'hidden',
+              flexShrink: 0, // Prevent toolbar from shrinking - Issue #14
+              minHeight: '32px', // Ensure minimum height for Issue #14
             }}>
             {/* View Mode Toggle */}
             <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
               <button 
                 onClick={() => setViewMode('grid')}
                 style={{
-                  padding: '6px 12px',
+                  padding: '4px 8px', // Reduced from 6px 12px for Issue #14 vertical optimization
                   backgroundColor: listView.viewMode === 'grid' ? '#007acc' : '#333',
                   border: '1px solid #555',
                   borderRadius: '4px 0 0 4px',
                   color: listView.viewMode === 'grid' ? '#fff' : '#ccc',
                   cursor: 'pointer',
-                  fontSize: '12px',
+                  fontSize: '11px', // Reduced from 12px to 11px
                   whiteSpace: 'nowrap',
                 }}
                 title="Grid View"
@@ -971,13 +1060,13 @@ const App: React.FC<AppProps> = () => {
               <button 
                 onClick={() => setViewMode('list')}
                 style={{
-                  padding: '6px 12px',
+                  padding: '4px 8px', // Reduced from 6px 12px for Issue #14 vertical optimization
                   backgroundColor: listView.viewMode === 'list' ? '#007acc' : '#333',
                   border: '1px solid #555',
                   borderRadius: '0 4px 4px 0',
                   color: listView.viewMode === 'list' ? '#fff' : '#ccc',
                   cursor: 'pointer',
-                  fontSize: '12px',
+                  fontSize: '11px', // Reduced from 12px to 11px
                   whiteSpace: 'nowrap',
                 }}
                 title="List View"
@@ -1168,20 +1257,27 @@ const App: React.FC<AppProps> = () => {
             </div>
           </div>
 
-          {/* Main View Area */}
+          {/* Main View Area - Optimized vertical layout for Issue #14 */}
           <div style={{
             flex: 1,
-            minWidth: '400px', // Ensure minimum width to prevent complete collapse
+            minWidth: '0', // 🚀 FULL-SCREEN FIX: Remove width constraint to allow full expansion
             backgroundColor: '#1a1a1a',
             overflow: 'hidden',
             display: 'flex',
-            flexShrink: 1, // Allow shrinking but respect minWidth
+            flexShrink: 1, // Allow shrinking
+            width: '100%', // Force full width utilization - Issue #14
+            minHeight: 0, // Allow vertical shrinking - Issue #14
+            height: '100%', // Force full height utilization - Issue #14
           }}>
             <div style={{ 
               flex: 1, 
               overflow: 'hidden',
               display: 'flex',
-              flexDirection: 'column'
+              flexDirection: 'column',
+              minWidth: 0, // Important: allow flex item to shrink below content size - Issue #14
+              width: '100%', // Force full width utilization when sidebar is closed - Issue #14
+              minHeight: 0, // Allow vertical shrinking below content size - Issue #14
+              height: '100%', // Force full height utilization - Issue #14
             }}>
               {listView.viewMode === 'grid' ? (
                 <PackageCanvas
@@ -1194,32 +1290,52 @@ const App: React.FC<AppProps> = () => {
                   rotation={viewConfig.rotation}
                   isTopView={viewConfig.isTopView}
                   onZoomChange={setZoom}
-                  resetTrigger={viewConfig.resetTrigger}
                 />
               ) : (
                 <div style={{
                   height: '100%',
                   backgroundColor: '#1a1a1a',
-                  overflow: 'hidden'
+                  overflow: 'hidden',
+                  width: '100%', // Ensure full width - Issue #14
+                  minHeight: 0, // Allow vertical shrinking - Issue #14
                 }} className="custom-scrollbar">
                   <PinListTabs onPinSelect={handleListPinSelect} />
                 </div>
               )}
             </div>
 
-            {/* Right Sidebar */}
-            {rightSidebarTab && (
+            {/* Right Sidebar - Dynamic visibility and resizable width for Issue #14 */}
+            {!autoHideSidebars && rightSidebarTab && (
               <div 
                 style={{ 
-                  width: '300px',
+                  width: `${rightPanelWidth}px`,
+                  minWidth: '200px', // 最小幅
+                  maxWidth: '500px', // 最大幅
                   borderLeft: '1px solid #555',
                   backgroundColor: '#1e1e1e',
                   display: 'flex',
                   flexDirection: 'column',
                   height: '100%',
-                  overflow: 'hidden'
+                  overflow: 'hidden',
+                  minHeight: 0, // Allow vertical shrinking - Issue #14
+                  position: 'relative',
                 }}
               >
+                {/* Resize handle for right panel */}
+                <div
+                  onMouseDown={handleMouseDown('right')}
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: '4px',
+                    cursor: 'col-resize',
+                    zIndex: 10,
+                    backgroundColor: isResizing === 'right' ? '#007acc' : 'transparent',
+                  }}
+                  title="Drag to resize panel"
+                />
                 {rightSidebarTab === 'validation' && (
                   <div style={{ height: '100%', overflow: 'hidden' }} className="custom-scrollbar">
                     <ValidationPanel 
@@ -1246,28 +1362,41 @@ const App: React.FC<AppProps> = () => {
         </main>
       </div>
 
-      {/* Status Bar */}
+      {/* Status Bar - Dynamic visibility for Issue #14 */}
+      {!hideFooter && (
       <footer style={{
-        height: '24px',
+        height: '16px', // Further reduced from 20px to 16px for Issue #14 vertical optimization
         backgroundColor: '#2a2a2a',
         borderTop: '1px solid #444',
         display: 'flex',
         alignItems: 'center',
         padding: '0 16px',
-        fontSize: '12px',
+        fontSize: '10px', // Further reduced from 11px to 10px
         color: '#999',
+        flexShrink: 0, // Prevent footer from shrinking - Issue #14
       }}>
         <span>Ready</span>
         <div style={{ marginLeft: 'auto' }}>
           <span>Pins: {stats.total} | Assigned: {stats.assigned} | Unassigned: {stats.unassigned}</span>
         </div>
       </footer>
+      )}
       
       {/* Settings Panel */}
       <SettingsPanel 
         isOpen={showSettings} 
         onClose={() => setShowSettings(false)} 
       />
+      
+      {/* Constraint Format Selector */}
+      <ConstraintFormatSelector
+        isOpen={showConstraintSelector}
+        onClose={() => setShowConstraintSelector(false)}
+        onExport={handleExportConstraints}
+        pins={pins}
+        currentPackage={currentPackage}
+      />
+      
       {/* Keyboard Shortcuts Help Dialog */}
       <KeyboardShortcutsHelp 
         isOpen={showKeyboardHelp} 

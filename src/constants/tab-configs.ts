@@ -40,6 +40,18 @@ export const TAB_CONFIGS: TabConfiguration[] = [
     sort: (a: Pin, b: Pin) => (a.signalName || '').localeCompare(b.signalName || '')
   },
   {
+    id: 'bankGroups',
+    title: 'Bank Stats',
+    icon: '📊',
+    description: 'Dynamic bank groups statistics and analysis',
+    showSearch: false,
+    showFilters: false,
+    isCustomComponent: true, // このタブはカスタムコンポーネントを使用
+    columns: [], // カスタムコンポーネントなのでcolumnsは不要
+    filter: () => true,
+    sort: () => 0
+  },
+  {
     id: 'banks',
     title: 'Banks',
     icon: '🏦',

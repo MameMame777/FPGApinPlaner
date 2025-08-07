@@ -1,4 +1,5 @@
 import { Pin, Package, FPGAProject } from '@/types';
+import { rowToIndex } from '@/utils/grid-utils';
 
 // セーブデータの型定義
 export interface FPGAProjectSaveData {
@@ -238,7 +239,7 @@ export class ProjectSaveService {
       device: saveData.package.device,
       packageType: saveData.package.packageType,
       dimensions: {
-        rows: Math.max(...saveData.pins.map(p => p.gridPosition?.row.charCodeAt(0) || 65)) - 64,
+        rows: Math.max(...saveData.pins.map(p => rowToIndex(p.gridPosition?.row || 'A') + 1)),
         cols: Math.max(...saveData.pins.map(p => p.gridPosition?.col || 1))
       },
       totalPins: saveData.pins.length,
@@ -281,8 +282,8 @@ export class ProjectSaveService {
         zoom: saveData.viewSettings.zoom,
         showPinNumbers: true,
         showSignalNames: true,
-        showPinTypes: false,
-        resetTrigger: 0
+        showPinTypes: false
+        // resetTrigger removed - was causing unwanted automatic viewport changes
       },
       filters: {
         pinTypes: [],
@@ -451,8 +452,9 @@ export class ProjectSaveService {
   private static gridToPosition(grid: { row: string; col: number }): { x: number; y: number } {
     // Convert grid position to pixel coordinates that exactly match grid labels
     // This ensures perfect alignment with the visual grid system
+    // Fixes Issue #12: Use rowToIndex for proper AA+ row positioning
     
-    const rowOffset = grid.row.charCodeAt(0) - 'A'.charCodeAt(0);
+    const rowOffset = rowToIndex(grid.row);
     
     // Tile spacing parameters - ensure tiles fit properly
     const tileSize = 88; // Tile size from PackageCanvas
