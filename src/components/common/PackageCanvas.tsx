@@ -4,6 +4,7 @@ import { KonvaEventObject } from 'konva/lib/Node';
 import { Pin, Package } from '@/types';
 import { DifferentialPairUtils } from '@/utils/differential-pair-utils';
 import { rowToIndex, indexToRow } from '@/utils/grid-utils';
+import { getOptimizedBankColor } from '@/utils/bank-color-utils';
 import { LODSystem } from '@/utils/LODSystem';
 import { PerformanceService } from '@/services/performance-service';
 import { useAppStore } from '@/stores/app-store';
@@ -419,29 +420,18 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
     }
   }, [pkg, pins.length, stageSize]);
 
-  // Bank-based color logic for tiles
+  // Bank-based color logic for tiles - improved for issue #23
   const getBankColor = (pin: Pin) => {
     // Special handling for power/ground pins
     if (pin.pinType === 'GROUND' || pin.pinName === 'GND') {
-      return '#2C2C2C'; // Dark gray for GND
+      return getOptimizedBankColor('GROUND');
     }
     if (pin.pinType === 'POWER' || pin.pinName?.includes('VCC')) {
-      return '#8B4513'; // Brown for power
+      return getOptimizedBankColor('POWER');
     }
     
-    // Bank-based colors
-    const bankColors = {
-      '0': '#FF6B6B',      // Red - CONFIG bank
-      '34': '#4ECDC4',     // Teal - HR I/O bank 34
-      '35': '#45B7D1',     // Light Blue - HR I/O bank 35
-      '500': '#96CEB4',    // Light Green - MIO bank 500
-      '501': '#FFEAA7',    // Light Yellow - MIO bank 501
-      '502': '#DDA0DD',    // Plum - DDR bank 502
-      'NA': '#708090',     // Slate Gray - Non-bank pins
-    };
-    
-    const bankKey = pin.bank || 'NA';
-    return bankColors[bankKey as keyof typeof bankColors] || '#708090';
+    // Use optimized color system
+    return getOptimizedBankColor(pin.bank);
   };
 
   // Get circle color based on pin type (for inner circle)
@@ -1812,17 +1802,6 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
             const tileSize = Math.max(20, baseTileSize * viewport.scale);
             const padding = 6; // Reduced padding to minimize overlap
             
-            // Define different dash patterns for each bank to reduce visual overlap
-            const dashPatterns = {
-              '0': [10, 5],      // CONFIG bank - standard dash
-              '34': [15, 3],     // HR I/O bank 34 - longer dash
-              '35': [8, 8],      // HR I/O bank 35 - equal dash/gap
-              '500': [12, 3, 3, 3], // MIO bank 500 - dash-dot
-              '501': [6, 6, 6, 6], // MIO bank 501 - medium equal
-              '502': [20, 5],    // DDR bank 502 - long dash
-              'NA': [5, 5]       // Non-bank pins - short dash
-            };
-            
             // Calculate boundaries first to detect overlaps
             const bankBoundaries = new Map();
             Array.from(visibleBankGroups.entries()).forEach(([bankKey, bankPins]) => {
@@ -1844,23 +1823,9 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
             const renderedBoundaries = Array.from(bankBoundaries.entries()).map(([bankKey, boundary]) => {
               // Get bank color for the boundary
               const bankColor = getBankColor(boundary.pins[0]);
-              const dashPattern = dashPatterns[bankKey as keyof typeof dashPatterns] || [10, 5];
               
-              // Check for overlaps with other banks to adjust stroke width
-              let hasOverlap = false;
-              for (const [otherBankKey, otherBoundary] of bankBoundaries.entries()) {
-                if (otherBankKey === bankKey) continue;
-                
-                // Simple overlap detection
-                const overlapX = !(boundary.maxX < otherBoundary.minX || boundary.minX > otherBoundary.maxX);
-                const overlapY = !(boundary.maxY < otherBoundary.minY || boundary.minY > otherBoundary.maxY);
-                
-                if (overlapX && overlapY) {
-                  hasOverlap = true;
-                  break;
-                }
-              }
-              
+              // Remove grid lines around bank boundaries as per issue #23
+              // Only render subtle background highlighting, no strokes
               return (
                 <Rect
                   key={`bank-boundary-${bankKey}`}
@@ -1868,12 +1833,10 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                   y={boundary.minY}
                   width={boundary.maxX - boundary.minX}
                   height={boundary.maxY - boundary.minY}
-                  fill="transparent"
-                  stroke={bankColor}
-                  strokeWidth={hasOverlap ? 1.5 : 2} // Thinner stroke for overlapping banks
-                  dash={dashPattern} // Different dash pattern for each bank
+                  fill={`${bankColor}10`} // Very subtle background tint (6% opacity)
+                  stroke="transparent" // No stroke lines
                   cornerRadius={6}
-                  opacity={hasOverlap ? 0.6 : 0.8} // Lower opacity for overlapping banks
+                  opacity={0.3} // Subtle opacity for background grouping
                   listening={false} // Disable mouse events to allow pin selection
                 />
               );
@@ -1931,58 +1894,63 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
               fontSize={12}
               fill="#ccc"
             />
-            {Object.entries({
-              'Bank 0': '#FF6B6B',
-              'Bank 34': '#4ECDC4',
-              'Bank 35': '#45B7D1',
-              'Bank 500': '#96CEB4',
-              'Bank 501': '#FFEAA7',
-              'Bank 502': '#DDA0DD'
-            }).map(([bankName, color], index) => (
-              <Group key={bankName} y={20 + index * 18}>
-                <Rect
-                  x={6}
-                  y={-4}
-                  width={12}
-                  height={12}
-                  fill={color}
-                  stroke="#000"
-                  strokeWidth={1}
-                  cornerRadius={2}
-                />
-                <Circle
-                  x={12}
-                  y={2}
-                  radius={3}
-                  fill="#FFF"
-                  stroke="#000"
-                  strokeWidth={0.5}
-                />
-                <Text
-                  x={25}
-                  y={-6}
-                  text={bankName}
-                  fontSize={10}
-                  fill="#999"
-                />
-                {/* Bank name text background */}
-                <Rect
-                  x={23}
-                  y={-8}
-                  width={bankName.length * 6 + 4}
-                  height={14}
-                  fill="rgba(0, 0, 0, 0.6)"
-                  cornerRadius={2}
-                />
-                <Text
-                  x={25}
-                  y={-6}
-                  text={bankName}
-                  fontSize={10}
-                  fill="#ccc"
-                />
-              </Group>
-            ))}
+            {/* Dynamic bank legend based on actual data - improved for issue #23 */}
+            {(() => {
+              // Get unique banks from current pins
+              const uniqueBanks = Array.from(new Set(pins.map(p => p.bank).filter(Boolean)))
+                .sort((a, b) => {
+                  const aNum = parseInt(a!);
+                  const bNum = parseInt(b!);
+                  return isNaN(aNum) || isNaN(bNum) ? a!.localeCompare(b!) : aNum - bNum;
+                })
+                .slice(0, 6); // Show max 6 banks in legend to avoid clutter
+              
+              return uniqueBanks.map((bank, index) => (
+                <Group key={bank} y={20 + index * 18}>
+                  <Rect
+                    x={6}
+                    y={-4}
+                    width={12}
+                    height={12}
+                    fill={getOptimizedBankColor(bank)}
+                    stroke="#000"
+                    strokeWidth={1}
+                    cornerRadius={2}
+                  />
+                  <Circle
+                    x={12}
+                    y={2}
+                    radius={3}
+                    fill="#FFF"
+                    stroke="#000"
+                    strokeWidth={0.5}
+                  />
+                  <Text
+                    x={25}
+                    y={-6}
+                    text={`Bank ${bank}`}
+                    fontSize={10}
+                    fill="#999"
+                  />
+                  {/* Bank name text background */}
+                  <Rect
+                    x={23}
+                    y={-8}
+                    width={`Bank ${bank}`.length * 6 + 4}
+                    height={14}
+                    fill="rgba(0, 0, 0, 0.6)"
+                    cornerRadius={2}
+                  />
+                  <Text
+                    x={25}
+                    y={-6}
+                    text={`Bank ${bank}`}
+                    fontSize={10}
+                    fill="#ccc"
+                  />
+                </Group>
+              ));
+            })()}
             
             {/* Pin Type Legend */}
             {/* Pin Types header background */}
