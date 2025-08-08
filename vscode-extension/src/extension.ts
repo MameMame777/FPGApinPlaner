@@ -83,10 +83,64 @@ export function activate(context: vscode.ExtensionContext) {
 
             // Handle messages from the webview
             panel.webview.onDidReceiveMessage(
-                message => {
+                async message => {
                     switch (message.command) {
                         case 'alert':
                             vscode.window.showInformationMessage(message.text);
+                            return;
+                        case 'showSaveDialog':
+                            try {
+                                const options = { ...message.options };
+                                if (options.defaultUri) {
+                                    delete options.defaultUri;
+                                }
+                                
+                                const result = await vscode.window.showSaveDialog(options);
+                                
+                                // URIを安全にシリアライズ - fsPathのみを送信
+                                let serializedResult = null;
+                                if (result && result.fsPath) {
+                                    serializedResult = {
+                                        fsPath: result.fsPath
+                                    };
+                                }
+                                
+                                panel.webview.postMessage({
+                                    command: 'saveDialogResult', 
+                                    result: serializedResult
+                                });
+                            } catch (error) {
+                                console.error('Save dialog error:', error);
+                                panel.webview.postMessage({
+                                    command: 'saveDialogResult',
+                                    result: undefined,
+                                    error: error
+                                });
+                            }
+                            return;
+                        case 'saveFile':
+                            try {
+                                if (!message.filePath || !message.content) {
+                                    throw new Error('Missing filePath or content for save operation');
+                                }
+                                
+                                const uri = vscode.Uri.file(message.filePath);
+                                const content = new TextEncoder().encode(message.content);
+                                await vscode.workspace.fs.writeFile(uri, content);
+                                
+                                panel.webview.postMessage({
+                                    command: 'saveFileResult',
+                                    success: true,
+                                    filePath: message.filePath
+                                });
+                            } catch (error) {
+                                console.error('File save error:', error);
+                                panel.webview.postMessage({
+                                    command: 'saveFileResult',
+                                    success: false,
+                                    error: error
+                                });
+                            }
                             return;
                     }
                 },
