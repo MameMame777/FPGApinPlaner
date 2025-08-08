@@ -67,11 +67,19 @@ const SaveLoadControls: React.FC<SaveLoadControlsProps> = () => {
           const defaultFilename = `${deviceName}_project_${timestamp}.fpgaproj`;
           console.log('📁 Default filename:', defaultFilename);
           
-          const uri = await new Promise((resolve) => {
+          const uri = await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+              window.removeEventListener('message', handler);
+              console.log('⏰ Save dialog timeout');
+              reject(new Error('Save dialog timeout'));
+            }, 30000); // 30秒タイムアウト
+
             const handler = (event: MessageEvent) => {
               console.log('📨 Received save dialog message:', event.data);
               if (event.data.command === 'saveDialogResult') {
+                clearTimeout(timeout);
                 window.removeEventListener('message', handler);
+                console.log('✅ Save dialog result received:', event.data.result);
                 resolve(event.data.result);
               }
             };
@@ -87,7 +95,6 @@ const SaveLoadControls: React.FC<SaveLoadControlsProps> = () => {
                   'JSON Files': ['json'],
                   'All Files': ['*']
                 }
-                // defaultUriを削除 - エラーの原因
               }
             });
           });

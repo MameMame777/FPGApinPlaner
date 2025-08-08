@@ -460,7 +460,16 @@ const App: React.FC<AppProps> = () => {
 
   // Export handlers
   const handleExportConstraints = (format: ConstraintFormat) => {
-    if (pins.length === 0) return;
+    console.log('🔍 EXPORT DEBUG - handleExportConstraints:');
+    console.log('- pins.length:', pins.length);
+    console.log('- filteredPins.length:', filteredPins.length);
+    
+    // Use filteredPins instead of pins to fix Issue #27
+    const pinsToExport = filteredPins.length > 0 ? filteredPins : pins;
+    if (pinsToExport.length === 0) {
+      console.log('❌ No pins available for export');
+      return;
+    }
     
     let content: string;
     let filename: string;
@@ -469,13 +478,13 @@ const App: React.FC<AppProps> = () => {
     let dialogTitle: string;
     
     if (format === 'xdc') {
-      content = ExportService.exportToXDC(pins, currentPackage);
+      content = ExportService.exportToXDC(pinsToExport, currentPackage);
       filename = `${currentPackage?.device || 'fpga'}_pins.xdc`;
       fileExtension = 'text/plain';
       fileTypes = { 'XDC Files': ['xdc'], 'All Files': ['*'] };
       dialogTitle = 'Export XDC Constraints';
     } else {
-      content = ExportService.exportToSDC(pins, currentPackage);
+      content = ExportService.exportToSDC(pinsToExport, currentPackage);
       filename = `${currentPackage?.device || 'fpga'}_pins.sdc`;
       fileExtension = 'text/plain';
       fileTypes = { 'SDC Files': ['sdc'], 'All Files': ['*'] };
@@ -491,9 +500,18 @@ const App: React.FC<AppProps> = () => {
   };
 
   const handleExportCSV = async () => {
-    if (pins.length === 0) return;
+    console.log('🔍 EXPORT DEBUG - handleExportCSV:');
+    console.log('- pins.length:', pins.length);
+    console.log('- filteredPins.length:', filteredPins.length);
     
-    const csvContent = ExportService.exportToCSV(pins);
+    // Use filteredPins instead of pins to fix Issue #27
+    const pinsToExport = filteredPins.length > 0 ? filteredPins : pins;
+    if (pinsToExport.length === 0) {
+      console.log('❌ No pins available for export');
+      return;
+    }
+    
+    const csvContent = ExportService.exportToCSV(pinsToExport);
     const defaultFilename = `${currentPackage?.device || 'fpga'}_pins.csv`;
     
     const saved = await saveFileInVSCode(
@@ -513,9 +531,18 @@ const App: React.FC<AppProps> = () => {
   };
 
   const handleExportReport = async () => {
-    if (pins.length === 0) return;
+    console.log('🔍 EXPORT DEBUG - handleExportReport:');
+    console.log('- pins.length:', pins.length);
+    console.log('- filteredPins.length:', filteredPins.length);
     
-    const reportContent = ExportService.exportReport(pins, currentPackage);
+    // Use filteredPins instead of pins to fix Issue #27
+    const pinsToExport = filteredPins.length > 0 ? filteredPins : pins;
+    if (pinsToExport.length === 0) {
+      console.log('❌ No pins available for export');
+      return;
+    }
+    
+    const reportContent = ExportService.exportReport(pinsToExport, currentPackage);
     const defaultFilename = `${currentPackage?.device || 'fpga'}_report.txt`;
     
     const saved = await saveFileInVSCode(
@@ -696,14 +723,14 @@ const App: React.FC<AppProps> = () => {
           <div style={{ position: 'relative' }} data-export-menu>
             <button 
               onClick={() => setExportMenuOpen(!exportMenuOpen)}
-              disabled={pins.length === 0}
+              disabled={filteredPins.length === 0 && pins.length === 0}
               style={{
                 padding: '8px 16px',
-                backgroundColor: pins.length > 0 ? '#4A90E2' : '#666',
+                backgroundColor: (filteredPins.length > 0 || pins.length > 0) ? '#4A90E2' : '#666',
                 border: 'none',
                 borderRadius: '4px',
                 color: 'white',
-                cursor: pins.length > 0 ? 'pointer' : 'not-allowed',
+                cursor: (filteredPins.length > 0 || pins.length > 0) ? 'pointer' : 'not-allowed',
                 fontSize: '14px',
                 display: 'flex',
                 alignItems: 'center',
@@ -714,7 +741,7 @@ const App: React.FC<AppProps> = () => {
               💾 Export {exportMenuOpen ? '▲' : '▼'}
             </button>
             
-            {exportMenuOpen && pins.length > 0 && (
+            {exportMenuOpen && (filteredPins.length > 0 || pins.length > 0) && (
               <div style={{
                 position: 'absolute',
                 top: '100%',
