@@ -36,13 +36,7 @@
   "icon": "images/icon.png",
   "activationEvents": [
     "onCommand:fpgaPinPlanner.openPlanner",
-    "onCommand:fpgaPinPlanner.openGUI",
-    "onCommand:fpgaPinPlanner.loadSampleData",
-    "onLanguage:csv",
-    "workspaceContains:**/*.csv",
-    "workspaceContains:**/*.xdc",
-    "workspaceContains:**/*.qsf",
-    "workspaceContains:**/*.sdc"
+    "onCommand:fpgaPinPlanner.loadSampleData"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -54,67 +48,6 @@
         "icon": "$(circuit-board)"
       },
       {
-        "command": "fpgaPinPlanner.importCSV",
-        "title": "Import CSV Pin Data",
-        "category": "FPGA"
-      },
-      {
-        "command": "fpgaPinPlanner.exportXDC",
-        "title": "Export XDC Constraints",
-        "category": "FPGA"
-      },
-      {
-        "command": "fpgaPinPlanner.exportSDC",
-        "title": "Export SDC Constraints",
-        "category": "FPGA"
-      },
-      {
-        "command": "fpgaPinPlanner.exportQSF",
-        "title": "Export QSF Constraints",
-        "category": "FPGA"
-      },
-      {
-        "command": "fpgaPinPlanner.validateConstraints",
-        "title": "Validate Pin Constraints",
-        "category": "FPGA"
-      },
-      {
-        "command": "fpgaPinPlanner.openGUI",
-        "title": "Open FPGA GUI",
-        "category": "FPGA",
-        "icon": "$(circuit-board)"
-      },
-      {
-        "command": "fpgaPinPlanner.openDebugConsole",
-        "title": "Open Debug Console",
-        "category": "FPGA",
-        "icon": "$(debug-console)"
-      },
-      {
-        "command": "fpgaPinPlanner.exportXDCWithDialog",
-        "title": "Export XDC with Dialog",
-        "category": "FPGA",
-        "icon": "$(export)"
-      },
-      {
-        "command": "fpgaPinPlanner.saveProjectWithDialog",
-        "title": "Save Project with Dialog",
-        "category": "FPGA",
-        "icon": "$(save)"
-      },
-      {
-        "command": "fpgaPinPlanner.importCSVWithDialog",
-        "title": "Import CSV with Dialog",
-        "category": "FPGA",
-        "icon": "$(folder-opened)"
-      },
-      {
-        "command": "fpgaPinPlanner.loadProjectWithDialog",
-        "title": "Load Project with Dialog",
-        "category": "FPGA",
-        "icon": "$(file-directory)"
-      },
-      {
         "command": "fpgaPinPlanner.loadSampleData",
         "title": "Load Sample Data",
         "category": "FPGA",
@@ -122,53 +55,9 @@
       }
     ],
     "menus": {
-      "explorer/context": [
-        {
-          "command": "fpgaPinPlanner.importCSV",
-          "when": "resourceExtname == .csv",
-          "group": "fpga"
-        }
-      ],
-      "editor/context": [
-        {
-          "command": "fpgaPinPlanner.openPlanner",
-          "when": "resourceExtname == .csv || resourceExtname == .xdc || resourceExtname == .qsf || resourceExtname == .sdc",
-          "group": "fpga"
-        }
-      ],
       "commandPalette": [
         {
           "command": "fpgaPinPlanner.openPlanner"
-        },
-        {
-          "command": "fpgaPinPlanner.importCSV"
-        },
-        {
-          "command": "fpgaPinPlanner.exportXDC"
-        },
-        {
-          "command": "fpgaPinPlanner.exportSDC"
-        },
-        {
-          "command": "fpgaPinPlanner.exportQSF"
-        },
-        {
-          "command": "fpgaPinPlanner.validateConstraints"
-        },
-        {
-          "command": "fpgaPinPlanner.openGUI"
-        },
-        {
-          "command": "fpgaPinPlanner.exportXDCWithDialog"
-        },
-        {
-          "command": "fpgaPinPlanner.saveProjectWithDialog"
-        },
-        {
-          "command": "fpgaPinPlanner.importCSVWithDialog"
-        },
-        {
-          "command": "fpgaPinPlanner.loadProjectWithDialog"
         },
         {
           "command": "fpgaPinPlanner.loadSampleData"
