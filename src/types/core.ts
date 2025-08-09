@@ -276,7 +276,7 @@ export interface ColumnConfig {
   width: number;
   editable?: boolean;
   render?: 'text' | 'datetime' | 'boolean' | 'custom';
-  customRender?: (value: any, pin: Pin) => React.ReactNode;
+  customRender?: (_value: any, _pin: Pin) => React.ReactNode;
   sortable?: boolean;
 }
 
@@ -285,8 +285,8 @@ export interface TabConfiguration {
   title: string;
   icon?: string;
   columns: ColumnConfig[];
-  filter?: (pin: Pin) => boolean;
-  sort?: (a: Pin, b: Pin) => number;
+  filter?: (_pin: Pin) => boolean;
+  sort?: (_a: Pin, _b: Pin) => number;
   description?: string;
   showSearch?: boolean;
   showFilters?: boolean;

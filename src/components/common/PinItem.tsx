@@ -5,8 +5,8 @@ import { DifferentialPairUtils } from '@/utils/differential-pair-utils';
 interface PinItemProps {
   pin: Pin;
   isSelected: boolean;
-  onSelect: (pinId: string) => void;
-  onAssignSignal: (pinId: string, signalName: string) => void;
+  onSelect: (_pinId: string) => void;
+  onAssignSignal: (_pinId: string, _signalName: string) => void;
   isPairPin?: boolean; // 差動ペアの対応ピンかどうか
   isDifferentialPairPartner?: boolean; // 選択されたピンの差動ペア相手かどうか
 }

@@ -149,21 +149,24 @@ export class UndoRedoService {
   // Get human-readable action description
   static getActionDescription(action: Action): string {
     switch (action.type) {
-      case 'PIN_ASSIGNMENT':
-        const { pinId, oldSignal: _oldSignal, newSignal } = action.data;
+      case 'PIN_ASSIGNMENT': {
+        const { pinId, newSignal } = action.data;
         if (newSignal) {
           return `Assigned "${newSignal}" to pin ${pinId}`;
         } else {
           return `Cleared assignment from pin ${pinId}`;
         }
+      }
       
-      case 'BULK_ASSIGNMENT':
+      case 'BULK_ASSIGNMENT': {
         const count = action.data.assignments.length;
         return `Bulk assignment to ${count} pins`;
+      }
       
-      case 'SELECTION_CHANGE':
+      case 'SELECTION_CHANGE': {
         const selected = action.data.newSelection.length;
         return `Selected ${selected} pin(s)`;
+      }
       
       case 'VIEW_CHANGE':
         return `Changed view settings`;

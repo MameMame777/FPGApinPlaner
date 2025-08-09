@@ -3,8 +3,8 @@ import { ValidationIssue, ValidationResult, ValidationSeverity } from '@/service
 
 interface ValidationPanelProps {
   validationResult: ValidationResult | null;
-  onIssueClick?: (issue: ValidationIssue) => void;
-  onPinHighlight?: (pinIds: string[]) => void;
+  onIssueClick?: (_issue: ValidationIssue) => void;
+  onPinHighlight?: (_pinIds: string[]) => void;
   className?: string;
 }
 

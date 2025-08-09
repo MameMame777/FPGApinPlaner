@@ -2,13 +2,13 @@ import React, { useState, useRef, useEffect, KeyboardEvent } from 'react';
 
 interface SelectableTableCellProps {
   value: string;
-  onSave: (newValue: string) => void;
+  onSave: (_newValue: string) => void;
   options: string[];
   editable?: boolean;
   placeholder?: string;
   className?: string;
   allowCustomValue?: boolean;
-  getDisplayValue?: (value: string) => string;
+  getDisplayValue?: (_value: string) => string;
 }
 
 export const SelectableTableCell: React.FC<SelectableTableCellProps> = ({
@@ -148,7 +148,7 @@ export const SelectableTableCell: React.FC<SelectableTableCellProps> = ({
 
 interface EditableTableCellProps {
   value: string;
-  onSave: (newValue: string) => void;
+  onSave: (_newValue: string) => void;
   editable?: boolean;
   placeholder?: string;
   maxLength?: number;
@@ -156,7 +156,7 @@ interface EditableTableCellProps {
   type?: 'text' | 'select';
   options?: string[];
   allowCustomValue?: boolean;
-  getDisplayValue?: (value: string) => string;
+  getDisplayValue?: (_value: string) => string;
 }
 
 export const EditableTableCell: React.FC<EditableTableCellProps> = ({

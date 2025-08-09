@@ -13,8 +13,8 @@ interface PinComponentProps {
   fontSize: number;
   smallFontSize: number;
   showDetails: boolean;
-  onPinClick: (pin: Pin) => void;
-  onPinDoubleClick: (pin: Pin) => void;
+  onPinClick: (_pin: Pin) => void;
+  onPinDoubleClick: (_pin: Pin) => void;
 }
 
 // Memoized pin component for better performance
