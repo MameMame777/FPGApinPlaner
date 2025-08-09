@@ -1,6 +1,6 @@
 {
   "name": "fpga-pin-planner",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Advanced FPGA Pin Assignment and Management Tool with Voltage/IO Standard Selection",
   "main": "dist-electron/main.js",
   "homepage": "./",
