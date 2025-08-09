@@ -70,6 +70,21 @@ const App: React.FC<AppProps> = () => {
     };
   }, []);
 
+  // Initialize VS Code API if available
+  useEffect(() => {
+    // Try to acquire VS Code API if in webview environment
+    if (typeof (window as any).acquireVsCodeApi !== 'undefined' && !((window as any).vscode)) {
+      console.log('🔧 Initializing VS Code API...');
+      try {
+        const vscode = (window as any).acquireVsCodeApi();
+        (window as any).vscode = vscode;
+        console.log('✅ VS Code API initialized successfully');
+      } catch (error) {
+        console.log('❌ Failed to initialize VS Code API:', error);
+      }
+    }
+  }, []);
+
   // Close export menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -377,41 +392,95 @@ const App: React.FC<AppProps> = () => {
 
   // VS Code API helper functions
   const isInVSCode = () => {
-    return typeof (window as any).vscode !== 'undefined';
+    // Check for VS Code webview environment
+    const hasVscode = typeof (window as any).vscode !== 'undefined';
+    const hasAcquireVsCodeApi = typeof (window as any).acquireVsCodeApi !== 'undefined';
+    const isWebview = window.location.protocol.includes('vscode-resource') || 
+                     window.location.protocol.includes('vscode-webview') ||
+                     window.navigator.userAgent.includes('Electron');
+    
+    console.log('🔍 VS Code environment check:', {
+      hasVscode,
+      hasAcquireVsCodeApi,
+      isWebview,
+      protocol: window.location.protocol,
+      userAgent: window.navigator.userAgent.substring(0, 100)
+    });
+    
+    return hasVscode || hasAcquireVsCodeApi || isWebview;
   };
 
   const saveFileInVSCode = async (content: string, defaultFilename: string, filters: Record<string, string[]>, saveLabel: string) => {
+    console.log('🔧 saveFileInVSCode called with:', { defaultFilename, saveLabel, filtersKeys: Object.keys(filters) });
+    
     if (!isInVSCode()) {
+      console.log('❌ Not in VS Code environment');
       return false;
     }
 
     try {
-      const vscode = (window as any).vscode;
+      // Get VS Code API object
+      let vscode = (window as any).vscode;
+      if (!vscode && typeof (window as any).acquireVsCodeApi !== 'undefined') {
+        console.log('🔧 Acquiring VS Code API...');
+        vscode = (window as any).acquireVsCodeApi();
+        (window as any).vscode = vscode; // Cache for future use
+      }
+      
+      console.log('🔧 VS Code API available:', !!vscode);
+      console.log('🔧 postMessage function:', typeof vscode?.postMessage);
+      
+      if (!vscode || typeof vscode.postMessage !== 'function') {
+        console.log('❌ VS Code API not properly available');
+        return false;
+      }
       
       // Step 1: Show save dialog
-      const uri = await new Promise((resolve) => {
+      console.log('📤 Sending showSaveDialog message...');
+      const uri = await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          window.removeEventListener('message', handler);
+          console.log('⏰ Save dialog timeout in App.tsx');
+          reject(new Error('Save dialog timeout'));
+        }, 30000);
+
         const handler = (event: MessageEvent) => {
+          console.log('📨 Received message in App.tsx:', event.data);
           if (event.data.command === 'saveDialogResult') {
+            clearTimeout(timeout);
             window.removeEventListener('message', handler);
+            console.log('✅ Save dialog result received in App.tsx:', event.data.result);
             resolve(event.data.result);
           }
         };
         window.addEventListener('message', handler);
         
-        vscode.postMessage({
+        const messageToSend = {
           command: 'showSaveDialog',
           options: {
             saveLabel: saveLabel,
             filters: filters
           }
-        });
+        };
+        
+        console.log('📤 Sending message:', messageToSend);
+        try {
+          vscode.postMessage(messageToSend);
+          console.log('✅ Message sent successfully from App.tsx');
+        } catch (error) {
+          console.error('❌ Failed to send message from App.tsx:', error);
+          reject(error);
+        }
       });
+
+      console.log('📁 Received URI from dialog:', uri);
 
       if (uri) {
         // URIオブジェクトから適切にパスを抽出
         let filePath: string | undefined;
         
         if (typeof uri === 'string') {
+          // VS Code拡張から直接fsPathが送信される場合
           filePath = uri;
         } else if (uri && typeof uri === 'object') {
           // URIオブジェクトの場合、安全にプロパティにアクセス
@@ -423,6 +492,8 @@ const App: React.FC<AppProps> = () => {
             filePath = uri.toString();
           }
         }
+        
+        console.log('📂 Extracted file path:', filePath);
         
         // ファイルパスの有効性をチェック
         if (!filePath || filePath === 'undefined' || filePath === '[object Object]') {
@@ -457,10 +528,12 @@ const App: React.FC<AppProps> = () => {
   };
 
   // Export handlers
-  const handleExportConstraints = (format: ConstraintFormat) => {
+  const handleExportConstraints = async (format: ConstraintFormat) => {
     console.log('🔍 EXPORT DEBUG - handleExportConstraints:');
+    console.log('- format:', format);
     console.log('- pins.length:', pins.length);
     console.log('- filteredPins.length:', filteredPins.length);
+    console.log('- currentPackage:', currentPackage?.device);
     
     // Use filteredPins instead of pins to fix Issue #27
     const pinsToExport = filteredPins.length > 0 ? filteredPins : pins;
@@ -469,6 +542,8 @@ const App: React.FC<AppProps> = () => {
       return;
     }
     
+    console.log('📋 Exporting', pinsToExport.length, 'pins in', format, 'format');
+    
     let content: string;
     let filename: string;
     let fileExtension: string;
@@ -476,12 +551,14 @@ const App: React.FC<AppProps> = () => {
     let dialogTitle: string;
     
     if (format === 'xdc') {
+      console.log('📄 Generating XDC content...');
       content = ExportService.exportToXDC(pinsToExport, currentPackage);
       filename = `${currentPackage?.device || 'fpga'}_pins.xdc`;
       fileExtension = 'text/plain';
       fileTypes = { 'XDC Files': ['xdc'], 'All Files': ['*'] };
       dialogTitle = 'Export XDC Constraints';
     } else {
+      console.log('📄 Generating SDC content...');
       content = ExportService.exportToSDC(pinsToExport, currentPackage);
       filename = `${currentPackage?.device || 'fpga'}_pins.sdc`;
       fileExtension = 'text/plain';
@@ -489,12 +566,23 @@ const App: React.FC<AppProps> = () => {
       dialogTitle = 'Export SDC Constraints';
     }
     
-    saveFileInVSCode(content, filename, fileTypes, dialogTitle).then(saved => {
-      if (!saved) {
-        // Fallback to browser download
-        ExportService.downloadFile(content, filename, fileExtension);
-      }
-    });
+    console.log('📄 Generated content length:', content.length);
+    console.log('📁 Default filename:', filename);
+    console.log('🎯 File types:', fileTypes);
+    console.log('🏷️ Dialog title:', dialogTitle);
+    
+    console.log('💾 Calling saveFileInVSCode...');
+    const saved = await saveFileInVSCode(content, filename, fileTypes, dialogTitle);
+    console.log('💾 saveFileInVSCode result:', saved);
+    
+    if (!saved) {
+      console.log('🌐 Falling back to browser download...');
+      // Fallback to browser download
+      ExportService.downloadFile(content, filename, fileExtension);
+      console.log('✅ Browser download initiated');
+    } else {
+      console.log('✅ VS Code save completed successfully');
+    }
   };
 
   const handleExportCSV = async () => {

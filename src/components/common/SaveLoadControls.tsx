@@ -62,6 +62,9 @@ const SaveLoadControls: React.FC<SaveLoadControlsProps> = () => {
         // VS Code environment - use save dialog
         try {
           const vscode = (window as any).vscode;
+          console.log('🔧 VS Code API available:', !!vscode);
+          console.log('🔧 VS Code postMessage function:', typeof vscode?.postMessage);
+          
           const deviceName = saveData.package.device.replace(/[^a-zA-Z0-9]/g, '_');
           const timestamp = new Date().toISOString().split('T')[0];
           const defaultFilename = `${deviceName}_project_${timestamp}.fpgaproj`;
@@ -70,12 +73,12 @@ const SaveLoadControls: React.FC<SaveLoadControlsProps> = () => {
           const uri = await new Promise((resolve, reject) => {
             const timeout = setTimeout(() => {
               window.removeEventListener('message', handler);
-              console.log('⏰ Save dialog timeout');
+              console.log('⏰ Save dialog timeout after 30 seconds');
               reject(new Error('Save dialog timeout'));
             }, 30000); // 30秒タイムアウト
 
             const handler = (event: MessageEvent) => {
-              console.log('📨 Received save dialog message:', event.data);
+              console.log('📨 Received message from VS Code:', event.data);
               if (event.data.command === 'saveDialogResult') {
                 clearTimeout(timeout);
                 window.removeEventListener('message', handler);
@@ -85,8 +88,7 @@ const SaveLoadControls: React.FC<SaveLoadControlsProps> = () => {
             };
             window.addEventListener('message', handler);
             
-            console.log('📤 Sending showSaveDialog message');
-            vscode.postMessage({
+            const messageToSend = {
               command: 'showSaveDialog',
               options: {
                 saveLabel: 'Save FPGA Project',
@@ -96,7 +98,16 @@ const SaveLoadControls: React.FC<SaveLoadControlsProps> = () => {
                   'All Files': ['*']
                 }
               }
-            });
+            };
+            
+            console.log('📤 Sending showSaveDialog message:', messageToSend);
+            try {
+              vscode.postMessage(messageToSend);
+              console.log('✅ Message sent successfully to VS Code');
+            } catch (error) {
+              console.error('❌ Failed to send message to VS Code:', error);
+              reject(error);
+            }
           });
 
           if (uri) {
@@ -105,6 +116,7 @@ const SaveLoadControls: React.FC<SaveLoadControlsProps> = () => {
             let filePath: string | undefined;
             
             if (typeof uri === 'string') {
+              // VS Code拡張から直接fsPathが送信される場合
               filePath = uri;
             } else if (uri && typeof uri === 'object') {
               const uriObj = uri as any;

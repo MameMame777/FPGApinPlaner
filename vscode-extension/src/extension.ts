@@ -138,22 +138,48 @@ export function activate(context: vscode.ExtensionContext) {
     const openPlannerCommand = vscode.commands.registerCommand(
         'fpgaPinPlanner.openPlanner',
         () => {
+            // If panel already exists, focus it instead of creating a new one
+            if (currentPanel) {
+                try {
+                    currentPanel.reveal(vscode.ViewColumn.One);
+                    console.log('📋 Revealed existing panel');
+                    return;
+                } catch (error) {
+                    console.log('🗑️ Existing panel is disposed, creating new one');
+                    currentPanel = undefined;
+                }
+            }
+
             // Create and show a new webview
-            const panel = vscode.window.createWebviewPanel(
+            currentPanel = vscode.window.createWebviewPanel(
                 'fpgaPinPlanner', // Identifies the type of the webview. Used internally
                 'FPGA Pin Planner', // Title of the panel displayed to the user
                 vscode.ViewColumn.One, // Editor column to show the new webview panel in.
                 {
-                    enableScripts: true // Enable javascript in the webview
+                    enableScripts: true, // Enable javascript in the webview
+                    retainContextWhenHidden: true // Keep context when hidden
                 }
             );
 
             // Set the webview's html content
-            panel.webview.html = getWebviewContent(panel.webview, context.extensionUri);
+            currentPanel.webview.html = getWebviewContent(currentPanel.webview, context.extensionUri);
 
-            // Handle messages from the webview
-            panel.webview.onDidReceiveMessage(
+            // Clean up when the panel is disposed
+            currentPanel.onDidDispose(() => {
+                console.log('🗑️ Panel disposed');
+                currentPanel = undefined;
+            }, null, context.subscriptions);
+
+            // Handle messages from the webview using currentPanel
+            currentPanel.webview.onDidReceiveMessage(
                 async message => {
+                    console.log('📨 Extension received message:', message.command, message);
+                    
+                    if (!currentPanel) {
+                        console.error('❌ currentPanel is undefined, cannot handle message');
+                        return;
+                    }
+
                     switch (message.command) {
                         case 'alert':
                             vscode.window.showInformationMessage(message.text);
@@ -161,47 +187,66 @@ export function activate(context: vscode.ExtensionContext) {
                         case 'showOpenDialog':
                             try {
                                 const result = await vscode.window.showOpenDialog(message.options);
-                                panel.webview.postMessage({
-                                    command: 'openDialogResult',
-                                    result: result
-                                });
+                                if (currentPanel) {
+                                    currentPanel.webview.postMessage({
+                                        command: 'openDialogResult',
+                                        result: result
+                                    });
+                                }
                             } catch (error) {
                                 console.error('Open dialog error:', error);
-                                panel.webview.postMessage({
-                                    command: 'openDialogResult',
-                                    result: undefined,
-                                    error: error
-                                });
+                                if (currentPanel) {
+                                    currentPanel.webview.postMessage({
+                                        command: 'openDialogResult',
+                                        result: undefined,
+                                        error: error
+                                    });
+                                }
                             }
                             return;
                         case 'showSaveDialog':
                             try {
+                                console.log('💾 Save dialog request:', message.options);
+                                
                                 const options = { ...message.options };
                                 if (options.defaultUri) {
                                     delete options.defaultUri;
                                 }
                                 
                                 const result = await vscode.window.showSaveDialog(options);
+                                console.log('💾 Save dialog result:', result);
                                 
                                 // URIを安全にシリアライズ - fsPathのみを送信
                                 let serializedResult = null;
-                                if (result && result.fsPath) {
-                                    serializedResult = {
-                                        fsPath: result.fsPath
-                                    };
+                                if (result) {
+                                    serializedResult = result.fsPath;
+                                    console.log('💾 Serialized fsPath:', serializedResult);
                                 }
                                 
-                                panel.webview.postMessage({
-                                    command: 'saveDialogResult', 
-                                    result: serializedResult
-                                });
+                                // Safe message posting with error handling
+                                try {
+                                    if (currentPanel) {
+                                        currentPanel.webview.postMessage({
+                                            command: 'saveDialogResult', 
+                                            result: serializedResult
+                                        });
+                                    }
+                                } catch (postError) {
+                                    console.error('❌ Failed to post save dialog result:', postError);
+                                }
                             } catch (error) {
                                 console.error('Save dialog error:', error);
-                                panel.webview.postMessage({
-                                    command: 'saveDialogResult',
-                                    result: undefined,
-                                    error: error
-                                });
+                                try {
+                                    if (currentPanel) {
+                                        currentPanel.webview.postMessage({
+                                            command: 'saveDialogResult',
+                                            result: undefined,
+                                            error: error
+                                        });
+                                    }
+                                } catch (postError) {
+                                    console.error('❌ Failed to post error message:', postError);
+                                }
                             }
                             return;
                         case 'saveFile':
@@ -211,17 +256,31 @@ export function activate(context: vscode.ExtensionContext) {
                                 }
                                 
                                 const success = await handleFileSave(message.filePath, message.content, message.filename);
-                                panel.webview.postMessage({
-                                    command: 'saveFileResult',
-                                    success: success
-                                });
+                                
+                                // Safe message posting
+                                try {
+                                    if (currentPanel) {
+                                        currentPanel.webview.postMessage({
+                                            command: 'saveFileResult',
+                                            success: success
+                                        });
+                                    }
+                                } catch (postError) {
+                                    console.error('❌ Failed to post save file result:', postError);
+                                }
                             } catch (error) {
                                 console.error('File save error:', error);
-                                panel.webview.postMessage({
-                                    command: 'saveFileResult',
-                                    success: false,
-                                    error: error
-                                });
+                                try {
+                                    if (currentPanel) {
+                                        currentPanel.webview.postMessage({
+                                            command: 'saveFileResult',
+                                            success: false,
+                                            error: error
+                                        });
+                                    }
+                                } catch (postError) {
+                                    console.error('❌ Failed to post save file error:', postError);
+                                }
                             }
                             return;
                     }
@@ -283,23 +342,24 @@ export function activate(context: vscode.ExtensionContext) {
                                 return;
                             case 'showSaveDialog':
                                 try {
+                                    console.log('💾 Sample command save dialog request:', message.options);
                                     const options = { ...message.options };
                                     if (options.defaultUri) {
                                         delete options.defaultUri;
                                     }
                                     
                                     const result = await vscode.window.showSaveDialog(options);
+                                    console.log('💾 Sample command save dialog result:', result);
                                     
                                     // URIを安全にシリアライズ - fsPathのみを送信
                                     let serializedResult = null;
-                                    if (result && result.fsPath) {
-                                        serializedResult = {
-                                            fsPath: result.fsPath
-                                        };
+                                    if (result) {
+                                        serializedResult = result.fsPath;
+                                        console.log('💾 Sample command serialized fsPath:', serializedResult);
                                     }
                                     
                                     currentPanel?.webview.postMessage({
-                                        command: 'saveDialogResult', 
+                                        command: 'saveDialogResult',
                                         result: serializedResult
                                     });
                                 } catch (error) {
