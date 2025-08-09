@@ -38,12 +38,12 @@ interface PackageCanvasProps {
   package: Package | null;
   pins: Pin[];
   selectedPins: Set<string>;
-  onPinSelect: (pinId: string) => void;
-  onPinDoubleClick: (pinId: string) => void;
+  onPinSelect: (_pinId: string) => void;
+  onPinDoubleClick: (_pinId: string) => void;
   zoom: number;
   rotation: number;
   isTopView: boolean;
-  onZoomChange?: (zoom: number) => void;
+  onZoomChange?: (_zoom: number) => void;
   resetTrigger?: number; // Counter to force reset even when zoom is already 100%
 }
 

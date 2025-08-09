@@ -86,10 +86,10 @@ export class BankStatsService {
       });
 
       const majorSignalTypes = Array.from(signalTypes.entries())
-        .filter(([_, count]) => count >= 2) // 2個以上使用されている信号タイプ
+        .filter(([, count]) => count >= 2) // 2個以上使用されている信号タイプ
         .sort((a, b) => b[1] - a[1])
         .slice(0, 3)
-        .map(([type, _]) => type);
+        .map(([type]) => type);
 
       const utilizationRate = bankPins.length > 0 ? (assignedPins.length / bankPins.length) * 100 : 0;
 

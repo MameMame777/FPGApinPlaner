@@ -6,7 +6,7 @@ export type ConstraintFormat = 'xdc' | 'sdc';
 interface ConstraintFormatSelectorProps {
   isOpen: boolean;
   onClose: () => void;
-  onExport: (format: ConstraintFormat) => void;
+  onExport: (_format: ConstraintFormat) => void;
   pins: any[];
   currentPackage: any;
 }

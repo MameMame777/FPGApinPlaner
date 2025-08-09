@@ -14,10 +14,10 @@ import {
 import { Pin, ColumnConfig } from '../../types';
 
 interface PinListTabsProps {
-  onPinSelect?: (pinId: string) => void;
+  onPinSelect?: (_pinId: string) => void;
 }
 
-export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect }) => {
+export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect: _onPinSelect }) => {
   const {
     pins,
     listView,
@@ -483,7 +483,7 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect }) => {
               selectedRows={listView.selectedRows}
               hoveredRowId={hoveredRowId}
               onRowSelection={handleRowSelection}
-              onPinSelect={onPinSelect}
+              onPinSelect={_onPinSelect}
               onHover={setHoveredRowId}
               renderCellContent={renderCellContent}
             />

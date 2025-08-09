@@ -3,7 +3,7 @@ import { CommentManager } from '../../services/comment-service';
 import { CommentTemplate, Pin } from '../../types';
 
 interface CommentTemplateSelectorProps {
-  onSelect: (templateId: string, variables: Record<string, string>) => void;
+  onSelect: (_templateId: string, _variables: Record<string, string>) => void;
   pin?: Pin;
   className?: string;
 }

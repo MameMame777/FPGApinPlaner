@@ -49,72 +49,72 @@ interface AppState {
 
 interface AppActions {
   // Project management
-  loadProject: (project: FPGAProject) => void;
-  createNewProject: (name: string, packageData: Package) => void;
+  loadProject: (_project: FPGAProject) => void;
+  createNewProject: (_name: string, _packageData: Package) => void;
   saveProject: () => void;
   
   // Package and pin management
-  loadPackage: (packageData: Package) => void;
-  updatePin: (pinId: string, updates: Partial<Pin>) => void;
-  updatePins: (updates: Map<string, Partial<Pin>>) => void;
-  assignSignal: (pinId: string, signalName: string) => void;
-  clearSignal: (pinId: string) => void;
+  loadPackage: (_packageData: Package) => void;
+  updatePin: (_pinId: string, _updates: Partial<Pin>) => void;
+  updatePins: (_updates: Map<string, Partial<Pin>>) => void;
+  assignSignal: (_pinId: string, _signalName: string) => void;
+  clearSignal: (_pinId: string) => void;
   
   // Selection management
-  selectPin: (pinId: string) => void;
-  selectPins: (pinIds: string[]) => void;
+  selectPin: (_pinId: string) => void;
+  selectPins: (_pinIds: string[]) => void;
   clearSelection: () => void;
-  togglePinSelection: (pinId: string) => void;
+  togglePinSelection: (_pinId: string) => void;
   
   // View management
-  setRotation: (rotation: number) => void;
+  setRotation: (_rotation: number) => void;
   toggleView: () => void;
-  setZoom: (zoom: number) => void;
+  setZoom: (_zoom: number) => void;
   resetZoom: () => void;
-  updateViewConfig: (config: Partial<ViewConfig>) => void;
+  updateViewConfig: (_config: Partial<ViewConfig>) => void;
   
   // List view management
-  setViewMode: (mode: ViewMode) => void;
-  setActiveTab: (tabId: string) => void;
-  setSearchQuery: (query: string) => void;
-  setCommentFilter: (filter: 'all' | 'with-comments' | 'without-comments') => void;
-  updateListViewState: (updates: Partial<ListViewState>) => void;
-  bulkUpdateComments: (pinIds: string[], comment: string) => void;
+  setViewMode: (_mode: ViewMode) => void;
+  setActiveTab: (_tabId: string) => void;
+  setSearchQuery: (_query: string) => void;
+  setCommentFilter: (_filter: 'all' | 'with-comments' | 'without-comments') => void;
+  updateListViewState: (_updates: Partial<ListViewState>) => void;
+  bulkUpdateComments: (_pinIds: string[], _comment: string) => void;
   
   // Pin color mode management
-  setPinColorMode: (mode: PinColorMode) => void;
+  setPinColorMode: (_mode: PinColorMode) => void;
   
   // Filter management
-  updateFilters: (filters: Partial<FilterState>) => void;
+  updateFilters: (_filters: Partial<FilterState>) => void;
   clearFilters: () => void;
   applyFilters: () => void;
-  setSortField: (field: SortField) => void;
-  setSortOrder: (order: SortOrder) => void;
+  setSortField: (_field: SortField) => void;
+  setSortOrder: (_order: SortOrder) => void;
   
   // Bank visibility management (Issue #19)
-  toggleBankVisibility: (bankId: string) => void;
-  setBankVisibility: (bankId: string, visible: boolean) => void;
+  toggleBankVisibility: (_bankId: string) => void;
+  setBankVisibility: (_bankId: string, _visible: boolean) => void;
   showAllBanks: () => void;
   
   // Differential pair management
-  assignDifferentialPair: (positiveId: string, negativeId: string, baseName: string) => void;
-  clearDifferentialPair: (pinId: string) => void;
+  assignDifferentialPair: (_positiveId: string, _negativeId: string, _baseName: string) => void;
+  clearDifferentialPair: (_pinId: string) => void;
   
   // Coordinate transformations
-  rotatePins: (degrees: number) => void;
+  rotatePins: (_degrees: number) => void;
   flipView: () => void;
   
   // Utility actions
-  setLoading: (loading: boolean) => void;
-  setError: (error: string | null) => void;
-  addRecentFile: (filePath: string) => void;
+  setLoading: (_loading: boolean) => void;
+  setError: (_error: string | null) => void;
+  addRecentFile: (_filePath: string) => void;
 
   // Undo/Redo actions
   undo: () => void;
   redo: () => void;
   updateUndoRedoState: () => void;
   clearHistory: () => void;
-  handleUndoRedoAction: (action: Action, operation: 'undo' | 'redo') => void;
+  handleUndoRedoAction: (_action: Action, _operation: 'undo' | 'redo') => void;
 }
 
 const initialViewConfig: ViewConfig = {
@@ -853,7 +853,7 @@ export const useAppStore = create<AppState & AppActions>()(
       const { type, data } = action;
       
       switch (type) {
-        case 'PIN_ASSIGNMENT':
+        case 'PIN_ASSIGNMENT': {
           const { pinId, oldSignal, newSignal } = data;
           const targetSignal = operation === 'undo' ? oldSignal : newSignal;
           set((state) => {
@@ -865,8 +865,9 @@ export const useAppStore = create<AppState & AppActions>()(
           });
           get().applyFilters();
           break;
+        }
 
-        case 'BULK_ASSIGNMENT':
+        case 'BULK_ASSIGNMENT': {
           const { assignments } = data;
           set((state) => {
             assignments.forEach(({ pinId, oldSignal, newSignal }: any) => {
@@ -880,22 +881,25 @@ export const useAppStore = create<AppState & AppActions>()(
           });
           get().applyFilters();
           break;
+        }
 
-        case 'SELECTION_CHANGE':
+        case 'SELECTION_CHANGE': {
           const { oldSelection, newSelection } = data;
           const targetSelection = operation === 'undo' ? oldSelection : newSelection;
           set((state) => {
             state.selectedPins = new Set(targetSelection);
           });
           break;
+        }
 
-        case 'VIEW_CHANGE':
+        case 'VIEW_CHANGE': {
           const { oldView, newView } = data;
           const targetView = operation === 'undo' ? oldView : newView;
           set((state) => {
             Object.assign(state.viewConfig, targetView);
           });
           break;
+        }
 
         default:
           console.warn(`Unhandled undo/redo action type: ${type}`);

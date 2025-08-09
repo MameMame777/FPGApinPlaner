@@ -7,10 +7,10 @@ interface VirtualizedPinListProps {
   columns: ColumnConfig[];
   selectedRows: Set<string>;
   hoveredRowId: string | null;
-  onRowSelection: (pinId: string, selected: boolean) => void;
-  onPinSelect?: (pinId: string) => void;
-  onHover: (pinId: string | null) => void;
-  renderCellContent: (pin: Pin, column: ColumnConfig) => React.ReactNode;
+  onRowSelection: (_pinId: string, _selected: boolean) => void;
+  onPinSelect?: (_pinId: string) => void;
+  onHover: (_pinId: string | null) => void;
+  renderCellContent: (_pin: Pin, _column: ColumnConfig) => React.ReactNode;
 }
 
 const ITEM_HEIGHT = 48; // Height of each row in pixels

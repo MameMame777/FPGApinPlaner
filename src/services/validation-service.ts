@@ -27,7 +27,7 @@ export interface ValidationResult {
 }
 
 export class ValidationService {
-  private static listeners: Set<(result: ValidationResult) => void> = new Set();
+  private static listeners: Set<(_result: ValidationResult) => void> = new Set();
 
   /**
    * バックグラウンドでプロジェクト検証を実行
@@ -573,14 +573,14 @@ export class ValidationService {
   /**
    * 検証結果リスナーを追加
    */
-  static addListener(callback: (result: ValidationResult) => void) {
+  static addListener(callback: (_result: ValidationResult) => void) {
     this.listeners.add(callback);
   }
 
   /**
    * 検証結果リスナーを削除
    */
-  static removeListener(callback: (result: ValidationResult) => void) {
+  static removeListener(callback: (_result: ValidationResult) => void) {
     this.listeners.delete(callback);
   }
 

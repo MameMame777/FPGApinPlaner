@@ -8,9 +8,9 @@ import { DifferentialPairService } from '../../services/differential-pair-servic
 
 interface DifferentialPairManagerProps {
   pins: Pin[];
-  onPairCreated?: (pair: DifferentialPairGroup) => void;
-  onPairDeleted?: (pairId: string) => void;
-  onPairUpdated?: (pair: DifferentialPairGroup) => void;
+  onPairCreated?: (_pair: DifferentialPairGroup) => void;
+  onPairDeleted?: (_pairId: string) => void;
+  onPairUpdated?: (_pair: DifferentialPairGroup) => void;
 }
 
 export const DifferentialPairManager: React.FC<DifferentialPairManagerProps> = ({

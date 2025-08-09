@@ -34,7 +34,7 @@ export class PerformanceService {
 
   // Debounced search for better performance
   static createDebouncedSearch<T>(
-    searchFn: (query: string) => T[],
+    searchFn: (_query: string) => T[],
     delay: number = 300
   ) {
     let timeoutId: NodeJS.Timeout;
@@ -189,7 +189,7 @@ export class PerformanceService {
   // Efficient filtering with early termination
   static createSmartFilter<T>(items: T[]) {
     return {
-      filter: (predicates: Array<(item: T) => boolean>, maxResults?: number) => {
+      filter: (predicates: Array<(_item: T) => boolean>, maxResults?: number) => {
         const results: T[] = [];
         
         for (const item of items) {
