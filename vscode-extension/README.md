@@ -49,12 +49,13 @@ npm run package
 ### Installation
 After building, install the generated `.vsix` file:
 ```bash
-code --install-extension fpga-pin-planner-1.0.5.vsix --force
+code --install-extension fpga-pin-planner-1.0.6.vsix --force
 ```
 
 ## Commands
 
-- `FPGA: Open Pin Planner` - Open the main pin planner interface
+- `FPGA: Open FPGA Pin Planner` - Open the main pin planner interface with WebView
+- `FPGA: Load Sample Data` - Load sample pin data for testing and demonstration
 
 ## Supported File Formats
 
@@ -96,7 +97,13 @@ Access extension settings via `File > Preferences > Settings` and search for "FP
 
 ## Release Notes
 
-### 1.0.5 (Latest)
+### 1.0.6 (Latest)
+- ✅ **Command Documentation Update**: Corrected Marketplace command descriptions
+- ✅ **Simplified Command Set**: Streamlined to essential commands only
+- ✅ **WebView Integration**: Focus on main pin planner interface and sample data loading
+- ✅ **Documentation Accuracy**: Updated all documentation to reflect current functionality
+
+### 1.0.5
 - ✅ **CI/CD Pipeline Enhancement**: Fixed GitHub Actions workflows for improved reliability
 - ✅ **Code Quality Improvements**: Achieved zero ESLint warnings with optimized configuration
 - ✅ **Test Suite Stability**: All 54 tests now passing consistently
