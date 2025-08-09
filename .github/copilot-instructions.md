@@ -5,13 +5,55 @@ This is a TypeScript-based FPGA Pin Planner GUI tool with VS Code extension supp
 
 ## Build Instructions
 
-### Main Application Build
+### 🚀 Automated Build Scripts (RECOMMENDED)
+**Always use these automated scripts to avoid manual build errors:**
+
+#### Full Clean Build + Install (Production)
+```bash
+# Recommended for releases and major changes
+npm run build:full
+```
+
+#### Quick Development Build
+```bash
+# For fast iterations during development
+npm run build:quick
+```
+
+#### Extension-Only Build
+```bash
+# When only extension code changed
+npm run build:extension-only
+```
+
+#### Manual Installation Only
+```bash
+# Install already built extension
+npm run install:extension
+```
+
+### 📂 Alternative Script Execution
+```bash
+# PowerShell direct execution
+./scripts/full-build-install.ps1
+
+# Batch file (double-click or command line)
+./scripts/full-build-install.cmd
+
+# Quick development build
+./scripts/quick-build.ps1
+```
+
+### ⚠️ Manual Build (NOT RECOMMENDED)
+Only use manual builds for debugging script issues:
+
+#### Main Application Build
 ```bash
 npm run build
 ```
 
-### VS Code Extension Build
-When building the VS Code extension, **always perform a clean build** to prevent old build artifacts from causing issues:
+#### VS Code Extension Build
+When building the VS Code extension manually, **always perform a clean build**:
 
 ```bash
 # Navigate to the extension directory
@@ -32,14 +74,13 @@ npm install
 npm run package
 ```
 
-**Important**: Always use clean builds for the extension to avoid:
+**Important**: Manual builds are error-prone. Always prefer automated scripts to avoid:
 - Stale TypeScript compilation artifacts
 - Cached module resolution issues
 - Mixed build environments
 - Inconsistent packaging results
 - **OLD WEBVIEW CONTENT** - The most common issue!
-- Complex implementation should be avoided. Simpler is better.
-- don't hesitate to ask for help if you encounter issues.
+- Forgotten build order (main app → extension)
 
 ### Critical Build Order
 1. **ALWAYS build main app first**: `npm run build` (in root directory)
@@ -47,9 +88,9 @@ npm run package
 3. The extension build automatically syncs the latest webview content
 
 ### Extension Installation
-After building, install the extension with:
+The automated scripts handle installation automatically. For manual installation:
 ```bash
-code --install-extension fpga-pin-planner-1.0.1.vsix --force
+code --install-extension fpga-pin-planner-1.0.x.vsix --force
 ```
 
 **Note**: Use `--force` flag to overwrite previous installations
@@ -82,15 +123,37 @@ The extension uses automated scripts to sync webview content:
 - `package`: Runs full build → vsce package
 
 ## Troubleshooting
+
+### 🔧 Automated Build Issues
+If automated scripts fail:
+```bash
+# Try clean build with verbose output
+npm run build:full
+
+# Or check individual steps
+npm run build        # Main app only
+npm run build:quick  # Quick rebuild
+```
+
+### 🐛 Manual Build Troubleshooting (Fallback)
 - **If extension behaves unexpectedly**: Check if main app was built first
 - **If new features don't appear**: Verify webview-dist contains latest assets
 - **If extension won't load**: Perform clean build and check for TypeScript errors
-- **If old behavior persists**: Manually delete webview-dist and rebuild
+- **If old behavior persists**: Use `npm run build:full` for complete clean build
 - Check for TypeScript compilation errors in both main app and extension
 - Verify that webview assets are properly bundled in the extension package
 
-### Common Issues
-1. **Forgot to build main app first** → Extension uses old webview content
-2. **Cached build artifacts** → Features don't update properly
-3. **Missing --force flag** → Old extension version still active
+### ⚠️ Common Issues
+1. **Forgot to build main app first** → Use automated scripts to avoid this
+2. **Cached build artifacts** → `npm run build:full` cleans everything
+3. **Missing --force flag** → Automated scripts include this flag
 4. **JSON syntax errors** → Extension fails to load
+5. **Old webview content** → Always use `npm run build:full` for clean builds
+
+### 📋 Build Script Benefits
+- ✅ **Automatic build order**: Main app → Extension
+- ✅ **Complete cleanup**: Removes all cached artifacts
+- ✅ **Webview sync**: Ensures latest content in extension
+- ✅ **Auto-installation**: Installs with --force flag
+- ✅ **Error prevention**: Eliminates manual step mistakes
+- ✅ **Time saving**: One command does everything

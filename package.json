@@ -20,7 +20,11 @@
     "electron:dist": "npm run build && electron-builder --publish=never",
     "release:patch": "node scripts/prepare-release.mjs patch",
     "release:minor": "node scripts/prepare-release.mjs minor",
-    "release:major": "node scripts/prepare-release.mjs major"
+    "release:major": "node scripts/prepare-release.mjs major",
+    "build:full": "pwsh -ExecutionPolicy Bypass -File scripts/full-build-install.ps1",
+    "build:quick": "pwsh -ExecutionPolicy Bypass -File scripts/quick-build.ps1",
+    "build:extension-only": "pwsh -ExecutionPolicy Bypass -File scripts/quick-build.ps1 -OnlyExtension",
+    "install:extension": "pwsh -ExecutionPolicy Bypass -File scripts/full-build-install.ps1 -SkipMainBuild -SkipExtensionBuild"
   },
   "keywords": [
     "fpga",

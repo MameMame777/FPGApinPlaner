@@ -3,7 +3,6 @@ import { useAppStore } from '@/stores/app-store';
 import { CSVReader } from '@/services/csv-reader';
 import { ExportService } from '@/services/export-service';
 import { PinItem } from '@/components/common/PinItem';
-import { SettingsPanel } from '@/components/common/SettingsPanel';
 import { ConstraintFormatSelector, ConstraintFormat } from '@/components/common/ConstraintFormatSelector';
 import { PinListTabs } from '@/components/common/PinListTabs';
 import PackageCanvas from '@/components/common/PackageCanvas';
@@ -24,7 +23,6 @@ const App: React.FC<AppProps> = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [lastViewerSelectedPin, setLastViewerSelectedPin] = useState<string | null>(null);
-  const [showSettings, setShowSettings] = useState(false);
   const [showConstraintSelector, setShowConstraintSelector] = useState(false);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [rightSidebarTab, setRightSidebarTab] = useState<'validation' | 'batch' | null>('validation');
@@ -818,22 +816,6 @@ const App: React.FC<AppProps> = () => {
               </div>
             )}
           </div>
-          
-          <button 
-            onClick={() => setShowSettings(true)}
-            style={{
-              padding: '8px 12px',
-              backgroundColor: '#333',
-              border: '1px solid #555',
-              borderRadius: '4px',
-              color: '#ccc',
-              cursor: 'pointer',
-              fontSize: '14px',
-            }}
-            title="Settings"
-          >
-            ⚙️
-          </button>
         </div>
       </header>
 
@@ -1409,12 +1391,6 @@ const App: React.FC<AppProps> = () => {
         </div>
       </footer>
       )}
-      
-      {/* Settings Panel */}
-      <SettingsPanel 
-        isOpen={showSettings} 
-        onClose={() => setShowSettings(false)} 
-      />
       
       {/* Constraint Format Selector */}
       <ConstraintFormatSelector
