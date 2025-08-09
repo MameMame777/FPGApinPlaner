@@ -3,7 +3,6 @@ import { useAppStore } from '@/stores/app-store';
 import { CSVReader } from '@/services/csv-reader';
 import { ExportService } from '@/services/export-service';
 import { PinItem } from '@/components/common/PinItem';
-import { SettingsPanel } from '@/components/common/SettingsPanel';
 import { ConstraintFormatSelector, ConstraintFormat } from '@/components/common/ConstraintFormatSelector';
 import { PinListTabs } from '@/components/common/PinListTabs';
 import PackageCanvas from '@/components/common/PackageCanvas';
@@ -24,7 +23,6 @@ const App: React.FC<AppProps> = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [lastViewerSelectedPin, setLastViewerSelectedPin] = useState<string | null>(null);
-  const [showSettings, setShowSettings] = useState(false);
   const [showConstraintSelector, setShowConstraintSelector] = useState(false);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [rightSidebarTab, setRightSidebarTab] = useState<'validation' | 'batch' | null>('validation');
@@ -70,6 +68,19 @@ const App: React.FC<AppProps> = () => {
     return () => {
       document.removeEventListener('showKeyboardHelp', handleShowKeyboardHelp);
     };
+  }, []);
+
+  // Initialize VS Code API if available
+  useEffect(() => {
+    // Try to acquire VS Code API if in webview environment
+    if (typeof (window as any).acquireVsCodeApi !== 'undefined' && !((window as any).vscode)) {
+      try {
+        const vscode = (window as any).acquireVsCodeApi();
+        (window as any).vscode = vscode;
+      } catch (error) {
+        console.error('Failed to initialize VS Code API:', error);
+      }
+    }
   }, []);
 
   // Close export menu when clicking outside
@@ -165,13 +176,11 @@ const App: React.FC<AppProps> = () => {
   // Handle VS Code messages
   useEffect(() => {
     const handleVSCodeMessage = (event: MessageEvent) => {
-      console.log('📥 Received message from VS Code:', event.data);
       const message = event.data;
       switch (message.command) {
         case 'loadProject':
           try {
             if (message.projectData) {
-              console.log('Loading project from VS Code:', message.projectData);
               // Convert the loaded data to the expected format using ProjectSaveService
               const projectData = message.projectData;
               if (projectData.package && projectData.pins) {
@@ -183,7 +192,6 @@ const App: React.FC<AppProps> = () => {
                 }));
                 const packageData = CSVReader.createPackageFromPins(pins, projectData.package.name || 'Loaded Project');
                 loadPackage(packageData);
-                console.log('✅ Project loaded successfully from VS Code');
               }
             }
           } catch (error) {
@@ -194,7 +202,6 @@ const App: React.FC<AppProps> = () => {
         case 'loadSampleData':
           (async () => {
             try {
-              console.log('Loading sample data from VS Code command');
               const sampleFile = loadSampleData();
               
               setIsImporting(true);
@@ -202,19 +209,15 @@ const App: React.FC<AppProps> = () => {
               setError(null);
               
               const result = await CSVReader.parseCSVFile(sampleFile);
-              console.log('📊 Sample data parse result:', result);
               
               if (result.success) {
-                console.log('✅ Sample data parsed successfully:', result.pins.length, 'pins found');
                 const packageData = CSVReader.createPackageFromPins(result.pins, sampleFile.name);
                 loadPackage(packageData);
-                console.log('✅ Sample data loaded successfully from VS Code command');
                 
                 if (result.warnings.length > 0) {
-                  console.warn('⚠️ Sample data import warnings:', result.warnings);
+                  console.warn('Sample data import warnings:', result.warnings);
                 }
               } else {
-                console.error('❌ Sample data parse failed:', result.errors);
                 setError(`Failed to load sample data: ${result.errors.join(', ')}`);
               }
             } catch (error) {
@@ -237,23 +240,18 @@ const App: React.FC<AppProps> = () => {
     });
     
     if (typeof (window as any).vscode !== 'undefined') {
-      console.log('✅ VS Code environment detected, setting up message listener');
       window.addEventListener('message', handleVSCodeMessage);
       
       // Notify extension that webview is ready
       setTimeout(() => {
-        console.log('📢 Notifying VS Code extension that webview is ready');
         (window as any).vscode.postMessage({
           command: 'webviewReady'
         });
       }, 500);
       
       return () => {
-        console.log('🧹 Cleaning up VS Code message listener');
         window.removeEventListener('message', handleVSCodeMessage);
       };
-    } else {
-      console.log('❌ Not in VS Code environment');
     }
     
     // Return cleanup function even if not in VS Code
@@ -282,29 +280,21 @@ const App: React.FC<AppProps> = () => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    console.log('📂 ファイルが選択されました:', file.name, file.size, 'bytes');
     setIsImporting(true);
     setLoading(true);
     setError(null);
 
     try {
-      const fileExtension = file.name.split('.').pop()?.toLowerCase();
-      console.log('🔄 ファイル解析を開始します... (', fileExtension, ')');
       const result = await CSVReader.parseCSVFile(file);
-      console.log('📊 ファイル解析結果:', result);
       
       if (result.success) {
-        console.log('✅ ファイル解析成功:', result.pins.length, 'pins found');
         const packageData = CSVReader.createPackageFromPins(result.pins, file.name);
-        console.log('📦 パッケージデータ作成:', packageData);
         loadPackage(packageData);
-        console.log('💾 ストアに読み込み完了');
         
         if (result.warnings.length > 0) {
-          console.warn('⚠️ Import warnings:', result.warnings);
+          console.warn('Import warnings:', result.warnings);
         }
       } else {
-        console.error('❌ ファイル解析失敗:', result.errors);
         setError(`Failed to import file: ${result.errors.join(', ')}`);
       }
     } catch (error) {
@@ -379,7 +369,14 @@ const App: React.FC<AppProps> = () => {
 
   // VS Code API helper functions
   const isInVSCode = () => {
-    return typeof (window as any).vscode !== 'undefined';
+    // Check for VS Code webview environment
+    const hasVscode = typeof (window as any).vscode !== 'undefined';
+    const hasAcquireVsCodeApi = typeof (window as any).acquireVsCodeApi !== 'undefined';
+    const isWebview = window.location.protocol.includes('vscode-resource') || 
+                     window.location.protocol.includes('vscode-webview') ||
+                     window.navigator.userAgent.includes('Electron');
+    
+    return hasVscode || hasAcquireVsCodeApi || isWebview;
   };
 
   const saveFileInVSCode = async (content: string, defaultFilename: string, filters: Record<string, string[]>, saveLabel: string) => {
@@ -388,25 +385,49 @@ const App: React.FC<AppProps> = () => {
     }
 
     try {
-      const vscode = (window as any).vscode;
+      // Get VS Code API object
+      let vscode = (window as any).vscode;
+      if (!vscode && typeof (window as any).acquireVsCodeApi !== 'undefined') {
+        vscode = (window as any).acquireVsCodeApi();
+        (window as any).vscode = vscode; // Cache for future use
+      }
+      
+      if (!vscode || typeof vscode.postMessage !== 'function') {
+        return false;
+      }
       
       // Step 1: Show save dialog
-      const uri = await new Promise((resolve) => {
+      const uri = await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          window.removeEventListener('message', handler);
+          reject(new Error('Save dialog timeout'));
+        }, 30000);
+
         const handler = (event: MessageEvent) => {
+          console.log('📨 Received message in App.tsx:', event.data);
           if (event.data.command === 'saveDialogResult') {
+            clearTimeout(timeout);
             window.removeEventListener('message', handler);
+            console.log('✅ Save dialog result received in App.tsx:', event.data.result);
             resolve(event.data.result);
           }
         };
         window.addEventListener('message', handler);
         
-        vscode.postMessage({
+        const messageToSend = {
           command: 'showSaveDialog',
           options: {
             saveLabel: saveLabel,
             filters: filters
           }
-        });
+        };
+        
+        try {
+          vscode.postMessage(messageToSend);
+        } catch (error) {
+          console.error('Failed to send message:', error);
+          reject(error);
+        }
       });
 
       if (uri) {
@@ -414,6 +435,7 @@ const App: React.FC<AppProps> = () => {
         let filePath: string | undefined;
         
         if (typeof uri === 'string') {
+          // VS Code拡張から直接fsPathが送信される場合
           filePath = uri;
         } else if (uri && typeof uri === 'object') {
           // URIオブジェクトの場合、安全にプロパティにアクセス
@@ -459,8 +481,12 @@ const App: React.FC<AppProps> = () => {
   };
 
   // Export handlers
-  const handleExportConstraints = (format: ConstraintFormat) => {
-    if (pins.length === 0) return;
+  const handleExportConstraints = async (format: ConstraintFormat) => {
+    // Use filteredPins instead of pins to fix Issue #27
+    const pinsToExport = filteredPins.length > 0 ? filteredPins : pins;
+    if (pinsToExport.length === 0) {
+      return;
+    }
     
     let content: string;
     let filename: string;
@@ -469,31 +495,40 @@ const App: React.FC<AppProps> = () => {
     let dialogTitle: string;
     
     if (format === 'xdc') {
-      content = ExportService.exportToXDC(pins, currentPackage);
+      content = ExportService.exportToXDC(pinsToExport, currentPackage);
       filename = `${currentPackage?.device || 'fpga'}_pins.xdc`;
       fileExtension = 'text/plain';
       fileTypes = { 'XDC Files': ['xdc'], 'All Files': ['*'] };
       dialogTitle = 'Export XDC Constraints';
     } else {
-      content = ExportService.exportToSDC(pins, currentPackage);
+      content = ExportService.exportToSDC(pinsToExport, currentPackage);
       filename = `${currentPackage?.device || 'fpga'}_pins.sdc`;
       fileExtension = 'text/plain';
       fileTypes = { 'SDC Files': ['sdc'], 'All Files': ['*'] };
       dialogTitle = 'Export SDC Constraints';
     }
     
-    saveFileInVSCode(content, filename, fileTypes, dialogTitle).then(saved => {
-      if (!saved) {
-        // Fallback to browser download
-        ExportService.downloadFile(content, filename, fileExtension);
-      }
-    });
+    const saved = await saveFileInVSCode(content, filename, fileTypes, dialogTitle);
+    
+    if (!saved) {
+      // Fallback to browser download
+      ExportService.downloadFile(content, filename, fileExtension);
+    }
   };
 
   const handleExportCSV = async () => {
-    if (pins.length === 0) return;
+    console.log('🔍 EXPORT DEBUG - handleExportCSV:');
+    console.log('- pins.length:', pins.length);
+    console.log('- filteredPins.length:', filteredPins.length);
     
-    const csvContent = ExportService.exportToCSV(pins);
+    // Use filteredPins instead of pins to fix Issue #27
+    const pinsToExport = filteredPins.length > 0 ? filteredPins : pins;
+    if (pinsToExport.length === 0) {
+      console.log('❌ No pins available for export');
+      return;
+    }
+    
+    const csvContent = ExportService.exportToCSV(pinsToExport);
     const defaultFilename = `${currentPackage?.device || 'fpga'}_pins.csv`;
     
     const saved = await saveFileInVSCode(
@@ -513,9 +548,18 @@ const App: React.FC<AppProps> = () => {
   };
 
   const handleExportReport = async () => {
-    if (pins.length === 0) return;
+    console.log('🔍 EXPORT DEBUG - handleExportReport:');
+    console.log('- pins.length:', pins.length);
+    console.log('- filteredPins.length:', filteredPins.length);
     
-    const reportContent = ExportService.exportReport(pins, currentPackage);
+    // Use filteredPins instead of pins to fix Issue #27
+    const pinsToExport = filteredPins.length > 0 ? filteredPins : pins;
+    if (pinsToExport.length === 0) {
+      console.log('❌ No pins available for export');
+      return;
+    }
+    
+    const reportContent = ExportService.exportReport(pinsToExport, currentPackage);
     const defaultFilename = `${currentPackage?.device || 'fpga'}_report.txt`;
     
     const saved = await saveFileInVSCode(
@@ -696,14 +740,14 @@ const App: React.FC<AppProps> = () => {
           <div style={{ position: 'relative' }} data-export-menu>
             <button 
               onClick={() => setExportMenuOpen(!exportMenuOpen)}
-              disabled={pins.length === 0}
+              disabled={filteredPins.length === 0 && pins.length === 0}
               style={{
                 padding: '8px 16px',
-                backgroundColor: pins.length > 0 ? '#4A90E2' : '#666',
+                backgroundColor: (filteredPins.length > 0 || pins.length > 0) ? '#4A90E2' : '#666',
                 border: 'none',
                 borderRadius: '4px',
                 color: 'white',
-                cursor: pins.length > 0 ? 'pointer' : 'not-allowed',
+                cursor: (filteredPins.length > 0 || pins.length > 0) ? 'pointer' : 'not-allowed',
                 fontSize: '14px',
                 display: 'flex',
                 alignItems: 'center',
@@ -714,7 +758,7 @@ const App: React.FC<AppProps> = () => {
               💾 Export {exportMenuOpen ? '▲' : '▼'}
             </button>
             
-            {exportMenuOpen && pins.length > 0 && (
+            {exportMenuOpen && (filteredPins.length > 0 || pins.length > 0) && (
               <div style={{
                 position: 'absolute',
                 top: '100%',
@@ -791,22 +835,6 @@ const App: React.FC<AppProps> = () => {
               </div>
             )}
           </div>
-          
-          <button 
-            onClick={() => setShowSettings(true)}
-            style={{
-              padding: '8px 12px',
-              backgroundColor: '#333',
-              border: '1px solid #555',
-              borderRadius: '4px',
-              color: '#ccc',
-              cursor: 'pointer',
-              fontSize: '14px',
-            }}
-            title="Settings"
-          >
-            ⚙️
-          </button>
         </div>
       </header>
 
@@ -1382,12 +1410,6 @@ const App: React.FC<AppProps> = () => {
         </div>
       </footer>
       )}
-      
-      {/* Settings Panel */}
-      <SettingsPanel 
-        isOpen={showSettings} 
-        onClose={() => setShowSettings(false)} 
-      />
       
       {/* Constraint Format Selector */}
       <ConstraintFormatSelector

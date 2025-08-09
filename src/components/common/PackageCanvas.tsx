@@ -59,7 +59,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
   onZoomChange,
   resetTrigger = 0
 }) => {
-  const { togglePinSelection, selectPins, visibleBanks, toggleBankVisibility, showAllBanks, pins: allPins } = useAppStore();
+  const { togglePinSelection, selectPins, visibleBanks, toggleBankVisibility, showAllBanks } = useAppStore();
   const stageRef = useRef<any>(null);
   const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null); // For debouncing resize - Issue #14
   const [stageSize, setStageSize] = useState({ width: 800, height: 600 });
@@ -454,6 +454,11 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
 
   // Get differential pair highlight color
   const getDifferentialHighlightColor = (pin: Pin, allPins: Pin[], selectedPins: Set<string>) => {
+    // Check if DifferentialPairUtils has the method, provide fallback if not
+    if (!DifferentialPairUtils || typeof DifferentialPairUtils.isDifferentialPin !== 'function') {
+      return null; // Fallback if utility not available
+    }
+    
     if (!DifferentialPairUtils.isDifferentialPin(pin)) {
       return null; // 差動ピンでない場合はハイライトしない
     }
@@ -481,6 +486,11 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
 
   // Check if pin has differential pair (for subtle indication)
   const hasDifferentialPair = (pin: Pin, allPins: Pin[]) => {
+    // Check if DifferentialPairUtils has the method, provide fallback if not
+    if (!DifferentialPairUtils || typeof DifferentialPairUtils.isDifferentialPin !== 'function') {
+      return false; // Fallback if utility not available
+    }
+    
     if (!DifferentialPairUtils.isDifferentialPin(pin)) {
       return false;
     }
@@ -1327,26 +1337,6 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
           <Stage
         ref={(ref) => {
           stageRef.current = ref;
-          // Force size update when Stage is mounted (especially for VS Code webview)
-          if (ref) {
-            setTimeout(() => {
-              const container = ref.container();
-              if (container) {
-                const rect = container.getBoundingClientRect();
-                const newSize = {
-                  width: Math.max(400, rect.width),
-                  height: Math.max(300, rect.height)
-                };
-                setStageSize(prevSize => {
-                  if (prevSize.width !== newSize.width || prevSize.height !== newSize.height) {
-                    console.log('📐 Stage mounted - Canvas size updated:', newSize);
-                    return newSize;
-                  }
-                  return prevSize;
-                });
-              }
-            }, 50); // Quick update on mount
-          }
         }}
         width={Math.max(100, stageSize.width)} // Full container width for maximum viewer area
         height={Math.max(100, stageSize.height)} // Full container height to eliminate footer area
@@ -1504,7 +1494,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
             const tileSize = Math.max(20, baseTileSize * viewport.scale);
             
             // LOD system for performance
-            const shouldRenderDetails = LODSystem.shouldRenderPinDetails(viewport.scale);
+            const shouldRenderDetails = viewport.scale >= 0.7; // Pin details at high zoom
             const shouldRenderPinNames = LODSystem.shouldRenderText(viewport.scale, 'pin');
             const shouldRenderSignalNames = LODSystem.shouldRenderText(viewport.scale, 'signal');
             const fontMultiplier = LODSystem.getAdaptiveTextSize(viewport.scale, 12) / 12;
@@ -1517,7 +1507,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
             
             return pinsToRender.map(pin => {
               const pos = transformPosition(pin);
-              const isSelected = selectedPins.has(pin.id);
+              const isSelected = selectedPins && selectedPins.has ? selectedPins.has(pin.id) : false;
               const bankColor = getBankColor(pin);
               const circleColor = getPinTypeColor(pin);
               // Enhanced font sizing for better pin review on large screens
@@ -1702,8 +1692,8 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
               if (processedPairs.has(pin.id)) return;
               
               // Check if this pin is part of a differential pair
-              if (DifferentialPairUtils.isDifferentialPin(pin)) {
-                const pairPin = DifferentialPairUtils.findPairPin(pin, pins);
+              if (DifferentialPairUtils && typeof DifferentialPairUtils.isDifferentialPin === 'function' && DifferentialPairUtils.isDifferentialPin(pin)) {
+                const pairPin = DifferentialPairUtils.findPairPin && DifferentialPairUtils.findPairPin(pin, pins);
                 
                 // Only draw line if both pins are visible or if either is selected
                 const isPairVisible = pairPin && visiblePins.includes(pairPin);
@@ -1852,7 +1842,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
             const baseTileSize = 88; // Base tile size
             const tileSize = Math.max(20, baseTileSize * viewport.scale);
             
-            return pins.filter(pin => selectedPins.has(pin.id)).map(pin => {
+            return pins.filter(pin => selectedPins && selectedPins.has ? selectedPins.has(pin.id) : false).map(pin => {
               const pos = transformPosition(pin);
               
               return (
@@ -1936,7 +1926,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
               );
             })()}
             {(() => {
-              const uniqueBanks = [...new Set(allPins.map(pin => pin.bank).filter(Boolean))]
+              const uniqueBanks = [...new Set(visiblePins.map(pin => pin.bank).filter(Boolean))]
                 .sort((a, b) => {
                   const aNum = parseInt(a!);
                   const bNum = parseInt(b!);
@@ -1944,7 +1934,8 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                 }); // Dynamic bank generation - no limit
               
               return uniqueBanks.map((bank, index) => {
-                const isBankVisible = visibleBanks.size === 0 || visibleBanks.has(bank!);
+                const isBankVisible = (visibleBanks && visibleBanks.size !== undefined) ? 
+                  (visibleBanks.size === 0 || visibleBanks.has(bank!)) : true;
                 
                 return (
                   <Group key={bank} y={20 + index * 18} x={27}>

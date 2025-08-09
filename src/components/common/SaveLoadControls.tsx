@@ -45,7 +45,6 @@ const SaveLoadControls: React.FC<SaveLoadControlsProps> = () => {
   };
 
   const handleSave = async () => {
-    console.log('💾 handleSave called');
     try {
       setIsLoading(true);
       
@@ -55,30 +54,32 @@ const SaveLoadControls: React.FC<SaveLoadControlsProps> = () => {
 
       const currentState = getCurrentAppState();
       const saveData = ProjectSaveService.createSaveData(currentState);
-      console.log('📦 Save data created:', saveData);
       
       if (isInVSCode()) {
-        console.log('🔧 VS Code environment detected');
         // VS Code environment - use save dialog
         try {
           const vscode = (window as any).vscode;
+          
           const deviceName = saveData.package.device.replace(/[^a-zA-Z0-9]/g, '_');
           const timestamp = new Date().toISOString().split('T')[0];
           const defaultFilename = `${deviceName}_project_${timestamp}.fpgaproj`;
-          console.log('📁 Default filename:', defaultFilename);
           
-          const uri = await new Promise((resolve) => {
+          const uri = await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+              window.removeEventListener('message', handler);
+              reject(new Error('Save dialog timeout'));
+            }, 30000); // 30秒タイムアウト
+
             const handler = (event: MessageEvent) => {
-              console.log('📨 Received save dialog message:', event.data);
               if (event.data.command === 'saveDialogResult') {
+                clearTimeout(timeout);
                 window.removeEventListener('message', handler);
                 resolve(event.data.result);
               }
             };
             window.addEventListener('message', handler);
             
-            console.log('📤 Sending showSaveDialog message');
-            vscode.postMessage({
+            const messageToSend = {
               command: 'showSaveDialog',
               options: {
                 saveLabel: 'Save FPGA Project',
@@ -87,17 +88,23 @@ const SaveLoadControls: React.FC<SaveLoadControlsProps> = () => {
                   'JSON Files': ['json'],
                   'All Files': ['*']
                 }
-                // defaultUriを削除 - エラーの原因
               }
-            });
+            };
+            
+            try {
+              vscode.postMessage(messageToSend);
+            } catch (error) {
+              console.error('Failed to send message to VS Code:', error);
+              reject(error);
+            }
           });
 
           if (uri) {
-            console.log('📁 Save location selected:', uri);
             // URIオブジェクトから安全にパスを取得
             let filePath: string | undefined;
             
             if (typeof uri === 'string') {
+              // VS Code拡張から直接fsPathが送信される場合
               filePath = uri;
             } else if (uri && typeof uri === 'object') {
               const uriObj = uri as any;
@@ -108,19 +115,15 @@ const SaveLoadControls: React.FC<SaveLoadControlsProps> = () => {
               }
             }
             
-            console.log('📂 Extracted file path:', filePath);
-            
             if (!filePath) {
               throw new Error('Failed to extract file path from URI');
             }
             
             // Send file content to VS Code for saving and wait for result
             const jsonString = JSON.stringify(saveData, null, 2);
-            console.log('💾 Sending file save request');
             
             const saveSuccess = await new Promise<boolean>((resolve) => {
               const saveHandler = (event: MessageEvent) => {
-                console.log('📨 Received save result:', event.data);
                 if (event.data.command === 'saveFileResult') {
                   window.removeEventListener('message', saveHandler);
                   resolve(event.data.success);
@@ -136,14 +139,14 @@ const SaveLoadControls: React.FC<SaveLoadControlsProps> = () => {
               });
             });
             
-            console.log('✅ Save result:', saveSuccess);
             if (saveSuccess) {
               showNotification('✅ Project saved successfully!');
             } else {
               throw new Error('File save operation failed');
             }
           } else {
-            console.log('❌ No save location selected');
+            // No save location selected - might be cancelled
+            return;
           }
         } catch (error) {
           console.error('VS Code save failed:', error);
@@ -174,15 +177,9 @@ const SaveLoadControls: React.FC<SaveLoadControlsProps> = () => {
       const saveData = await ProjectSaveService.loadFromFile(file);
       const project = ProjectSaveService.restoreProject(saveData);
       
-      console.log('Loading project:', project.name);
-      console.log('Package device:', project.packageData?.device);
-      console.log('Pin assignments count:', project.pinAssignments.length);
       
       // loadProjectアクションで一括更新
       loadProject(project);
-      
-      // ロード完了通知（デバッグログは簡素化）
-      console.log('✅ Project loaded successfully');
       
       showNotification(`✅ Project loaded: ${saveData.metadata.description}`);
       

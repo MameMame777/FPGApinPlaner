@@ -1,14 +1,20 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import PackageCanvas from '@/components/common/PackageCanvas';
-import { Package, Pin } from '@/types';
+import PackageCanvas from '../../src/components/common/PackageCanvas';
+import { Package, Pin } from '../../src/types';
 
 describe('PackageCanvas Rotation Tests', () => {
   const mockPackage: Package = {
+    id: 'test-package',
     name: 'Test Package',
     device: 'TestDevice',
     packageType: 'TestType',
-    pinCount: 4
+    dimensions: {
+      rows: 2,
+      cols: 2
+    },
+    pins: [],
+    totalPins: 4
   };
 
   const mockPins: Pin[] = [
@@ -16,85 +22,66 @@ describe('PackageCanvas Rotation Tests', () => {
       id: 'A1',
       pinNumber: 'A1',
       pinName: 'TestPin1',
+      signalName: '',
+      direction: 'InOut',
+      pinType: 'IO',
+      voltage: '3.3',
+      packagePin: 'A1',
       position: { x: 0, y: 0 },
       gridPosition: { row: 'A', col: 1 },
-      bank: '1',
-      type: 'IO',
-      signalName: '',
-      ioStandard: '',
-      driveStrength: '',
-      slewRate: '',
-      inputDelay: 0,
-      outputDelay: 0,
-      clockDomain: '',
-      differentialPair: '',
-      comments: '',
-      voltage: 3.3
+      isAssigned: false,
+      bank: '1'
     },
     {
       id: 'A2',
       pinNumber: 'A2', 
       pinName: 'TestPin2',
+      signalName: '',
+      direction: 'InOut',
+      pinType: 'IO',
+      voltage: '3.3',
+      packagePin: 'A2',
       position: { x: 88, y: 0 },
       gridPosition: { row: 'A', col: 2 },
-      bank: '1',
-      type: 'IO',
-      signalName: '',
-      ioStandard: '',
-      driveStrength: '',
-      slewRate: '',
-      inputDelay: 0,
-      outputDelay: 0,
-      clockDomain: '',
-      differentialPair: '',
-      comments: '',
-      voltage: 3.3
+      isAssigned: false,
+      bank: '1'
     },
     {
       id: 'B1',
       pinNumber: 'B1',
-      pinName: 'TestPin3', 
+      pinName: 'TestPin3',
+      signalName: '',
+      direction: 'InOut',
+      pinType: 'IO',
+      voltage: '3.3',
+      packagePin: 'B1',
       position: { x: 0, y: 88 },
       gridPosition: { row: 'B', col: 1 },
-      bank: '2',
-      type: 'IO',
-      signalName: '',
-      ioStandard: '',
-      driveStrength: '',
-      slewRate: '',
-      inputDelay: 0,
-      outputDelay: 0,
-      clockDomain: '',
-      differentialPair: '',
-      comments: '',
-      voltage: 3.3
+      isAssigned: false,
+      bank: '2'
     },
     {
       id: 'B2',
       pinNumber: 'B2',
       pinName: 'TestPin4',
+      signalName: '',
+      direction: 'InOut',
+      pinType: 'IO',
+      voltage: '3.3',
+      packagePin: 'B2',
       position: { x: 88, y: 88 },
       gridPosition: { row: 'B', col: 2 },
-      bank: '2', 
-      type: 'IO',
-      signalName: '',
-      ioStandard: '',
-      driveStrength: '',
-      slewRate: '',
-      inputDelay: 0,
-      outputDelay: 0,
-      clockDomain: '',
-      differentialPair: '',
-      comments: '',
-      voltage: 3.3
+      isAssigned: false,
+      bank: '2'
     }
   ];
 
   const defaultProps = {
     package: mockPackage,
     pins: mockPins,
-    selectedPins: [],
+    selectedPins: new Set<string>(),
     onPinSelect: () => {},
+    onPinDoubleClick: () => {},
     zoom: 1,
     isTopView: true,
     rotation: 0
@@ -116,7 +103,7 @@ describe('PackageCanvas Rotation Tests', () => {
       
       // Grid labels should be present and in expected positions
       // Note: Since we're using Konva canvas, we'll test the component renders without errors
-      expect(screen.getByRole('img')).toBeInTheDocument(); // Konva canvas creates a canvas element
+      expect(document.querySelector('canvas')).toBeInTheDocument(); // Konva creates a canvas element
     });
 
     it('should maintain grid label positions during 90 degree rotation', () => {
@@ -128,7 +115,7 @@ describe('PackageCanvas Rotation Tests', () => {
       );
       
       // Component should render without errors at 90 degrees
-      expect(screen.getByRole('img')).toBeInTheDocument();
+      expect(document.querySelector('canvas')).toBeInTheDocument();
     });
 
     it('should maintain grid label positions during 180 degree rotation', () => {
@@ -139,7 +126,7 @@ describe('PackageCanvas Rotation Tests', () => {
         />
       );
       
-      expect(screen.getByRole('img')).toBeInTheDocument();
+      expect(document.querySelector('canvas')).toBeInTheDocument();
     });
 
     it('should maintain grid label positions during 270 degree rotation', () => {
@@ -150,7 +137,7 @@ describe('PackageCanvas Rotation Tests', () => {
         />
       );
       
-      expect(screen.getByRole('img')).toBeInTheDocument();
+      expect(document.querySelector('canvas')).toBeInTheDocument();
     });
   });
 
@@ -167,7 +154,7 @@ describe('PackageCanvas Rotation Tests', () => {
         );
         
         // Package label should be visible (fixed position implementation)
-        expect(screen.getByRole('img')).toBeInTheDocument();
+        expect(document.querySelector('canvas')).toBeInTheDocument();
         
         unmount();
       });
@@ -185,7 +172,7 @@ describe('PackageCanvas Rotation Tests', () => {
       );
       
       // Verify initial render
-      expect(screen.getByRole('img')).toBeInTheDocument();
+      expect(document.querySelector('canvas')).toBeInTheDocument();
       
       // Re-render with rotation
       rerender(
@@ -196,7 +183,7 @@ describe('PackageCanvas Rotation Tests', () => {
       );
       
       // Should still render successfully with rotated pins
-      expect(screen.getByRole('img')).toBeInTheDocument();
+      expect(document.querySelector('canvas')).toBeInTheDocument();
     });
   });
 
@@ -211,7 +198,7 @@ describe('PackageCanvas Rotation Tests', () => {
       
       // The canvas should render with rotation info
       // Since Konva renders to canvas, we test the component structure
-      expect(screen.getByRole('img')).toBeInTheDocument();
+      expect(document.querySelector('canvas')).toBeInTheDocument();
     });
   });
 });
