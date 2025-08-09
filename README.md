@@ -109,8 +109,8 @@ FPGAピンアサインメントの直感的なGUIインターフェースです�
 
 ![ピン編集画面](docs/picture/GUI2.png)
 
-### Bank分析・統計ビュー
-CSVデータに基づく自動Bank統計とパフォーマンス分析です。
+### Bank分析
+CSVデータに基づくピンリスト表示です。
 
 ![Bank統計画面](docs/picture/GUI3.png)
 
