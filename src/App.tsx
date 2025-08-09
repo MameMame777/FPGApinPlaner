@@ -74,13 +74,11 @@ const App: React.FC<AppProps> = () => {
   useEffect(() => {
     // Try to acquire VS Code API if in webview environment
     if (typeof (window as any).acquireVsCodeApi !== 'undefined' && !((window as any).vscode)) {
-      console.log('🔧 Initializing VS Code API...');
       try {
         const vscode = (window as any).acquireVsCodeApi();
         (window as any).vscode = vscode;
-        console.log('✅ VS Code API initialized successfully');
       } catch (error) {
-        console.log('❌ Failed to initialize VS Code API:', error);
+        console.error('Failed to initialize VS Code API:', error);
       }
     }
   }, []);
@@ -178,13 +176,11 @@ const App: React.FC<AppProps> = () => {
   // Handle VS Code messages
   useEffect(() => {
     const handleVSCodeMessage = (event: MessageEvent) => {
-      console.log('📥 Received message from VS Code:', event.data);
       const message = event.data;
       switch (message.command) {
         case 'loadProject':
           try {
             if (message.projectData) {
-              console.log('Loading project from VS Code:', message.projectData);
               // Convert the loaded data to the expected format using ProjectSaveService
               const projectData = message.projectData;
               if (projectData.package && projectData.pins) {
@@ -196,7 +192,6 @@ const App: React.FC<AppProps> = () => {
                 }));
                 const packageData = CSVReader.createPackageFromPins(pins, projectData.package.name || 'Loaded Project');
                 loadPackage(packageData);
-                console.log('✅ Project loaded successfully from VS Code');
               }
             }
           } catch (error) {
@@ -207,7 +202,6 @@ const App: React.FC<AppProps> = () => {
         case 'loadSampleData':
           (async () => {
             try {
-              console.log('Loading sample data from VS Code command');
               const sampleFile = loadSampleData();
               
               setIsImporting(true);
@@ -215,19 +209,15 @@ const App: React.FC<AppProps> = () => {
               setError(null);
               
               const result = await CSVReader.parseCSVFile(sampleFile);
-              console.log('📊 Sample data parse result:', result);
               
               if (result.success) {
-                console.log('✅ Sample data parsed successfully:', result.pins.length, 'pins found');
                 const packageData = CSVReader.createPackageFromPins(result.pins, sampleFile.name);
                 loadPackage(packageData);
-                console.log('✅ Sample data loaded successfully from VS Code command');
                 
                 if (result.warnings.length > 0) {
-                  console.warn('⚠️ Sample data import warnings:', result.warnings);
+                  console.warn('Sample data import warnings:', result.warnings);
                 }
               } else {
-                console.error('❌ Sample data parse failed:', result.errors);
                 setError(`Failed to load sample data: ${result.errors.join(', ')}`);
               }
             } catch (error) {
@@ -250,23 +240,18 @@ const App: React.FC<AppProps> = () => {
     });
     
     if (typeof (window as any).vscode !== 'undefined') {
-      console.log('✅ VS Code environment detected, setting up message listener');
       window.addEventListener('message', handleVSCodeMessage);
       
       // Notify extension that webview is ready
       setTimeout(() => {
-        console.log('📢 Notifying VS Code extension that webview is ready');
         (window as any).vscode.postMessage({
           command: 'webviewReady'
         });
       }, 500);
       
       return () => {
-        console.log('🧹 Cleaning up VS Code message listener');
         window.removeEventListener('message', handleVSCodeMessage);
       };
-    } else {
-      console.log('❌ Not in VS Code environment');
     }
     
     // Return cleanup function even if not in VS Code
@@ -295,29 +280,21 @@ const App: React.FC<AppProps> = () => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    console.log('📂 ファイルが選択されました:', file.name, file.size, 'bytes');
     setIsImporting(true);
     setLoading(true);
     setError(null);
 
     try {
-      const fileExtension = file.name.split('.').pop()?.toLowerCase();
-      console.log('🔄 ファイル解析を開始します... (', fileExtension, ')');
       const result = await CSVReader.parseCSVFile(file);
-      console.log('📊 ファイル解析結果:', result);
       
       if (result.success) {
-        console.log('✅ ファイル解析成功:', result.pins.length, 'pins found');
         const packageData = CSVReader.createPackageFromPins(result.pins, file.name);
-        console.log('📦 パッケージデータ作成:', packageData);
         loadPackage(packageData);
-        console.log('💾 ストアに読み込み完了');
         
         if (result.warnings.length > 0) {
-          console.warn('⚠️ Import warnings:', result.warnings);
+          console.warn('Import warnings:', result.warnings);
         }
       } else {
-        console.error('❌ ファイル解析失敗:', result.errors);
         setError(`Failed to import file: ${result.errors.join(', ')}`);
       }
     } catch (error) {
@@ -399,22 +376,11 @@ const App: React.FC<AppProps> = () => {
                      window.location.protocol.includes('vscode-webview') ||
                      window.navigator.userAgent.includes('Electron');
     
-    console.log('🔍 VS Code environment check:', {
-      hasVscode,
-      hasAcquireVsCodeApi,
-      isWebview,
-      protocol: window.location.protocol,
-      userAgent: window.navigator.userAgent.substring(0, 100)
-    });
-    
     return hasVscode || hasAcquireVsCodeApi || isWebview;
   };
 
   const saveFileInVSCode = async (content: string, defaultFilename: string, filters: Record<string, string[]>, saveLabel: string) => {
-    console.log('🔧 saveFileInVSCode called with:', { defaultFilename, saveLabel, filtersKeys: Object.keys(filters) });
-    
     if (!isInVSCode()) {
-      console.log('❌ Not in VS Code environment');
       return false;
     }
 
@@ -422,25 +388,18 @@ const App: React.FC<AppProps> = () => {
       // Get VS Code API object
       let vscode = (window as any).vscode;
       if (!vscode && typeof (window as any).acquireVsCodeApi !== 'undefined') {
-        console.log('🔧 Acquiring VS Code API...');
         vscode = (window as any).acquireVsCodeApi();
         (window as any).vscode = vscode; // Cache for future use
       }
       
-      console.log('🔧 VS Code API available:', !!vscode);
-      console.log('🔧 postMessage function:', typeof vscode?.postMessage);
-      
       if (!vscode || typeof vscode.postMessage !== 'function') {
-        console.log('❌ VS Code API not properly available');
         return false;
       }
       
       // Step 1: Show save dialog
-      console.log('📤 Sending showSaveDialog message...');
       const uri = await new Promise((resolve, reject) => {
         const timeout = setTimeout(() => {
           window.removeEventListener('message', handler);
-          console.log('⏰ Save dialog timeout in App.tsx');
           reject(new Error('Save dialog timeout'));
         }, 30000);
 
@@ -463,17 +422,13 @@ const App: React.FC<AppProps> = () => {
           }
         };
         
-        console.log('📤 Sending message:', messageToSend);
         try {
           vscode.postMessage(messageToSend);
-          console.log('✅ Message sent successfully from App.tsx');
         } catch (error) {
-          console.error('❌ Failed to send message from App.tsx:', error);
+          console.error('Failed to send message:', error);
           reject(error);
         }
       });
-
-      console.log('📁 Received URI from dialog:', uri);
 
       if (uri) {
         // URIオブジェクトから適切にパスを抽出
@@ -492,8 +447,6 @@ const App: React.FC<AppProps> = () => {
             filePath = uri.toString();
           }
         }
-        
-        console.log('📂 Extracted file path:', filePath);
         
         // ファイルパスの有効性をチェック
         if (!filePath || filePath === 'undefined' || filePath === '[object Object]') {
@@ -529,20 +482,11 @@ const App: React.FC<AppProps> = () => {
 
   // Export handlers
   const handleExportConstraints = async (format: ConstraintFormat) => {
-    console.log('🔍 EXPORT DEBUG - handleExportConstraints:');
-    console.log('- format:', format);
-    console.log('- pins.length:', pins.length);
-    console.log('- filteredPins.length:', filteredPins.length);
-    console.log('- currentPackage:', currentPackage?.device);
-    
     // Use filteredPins instead of pins to fix Issue #27
     const pinsToExport = filteredPins.length > 0 ? filteredPins : pins;
     if (pinsToExport.length === 0) {
-      console.log('❌ No pins available for export');
       return;
     }
-    
-    console.log('📋 Exporting', pinsToExport.length, 'pins in', format, 'format');
     
     let content: string;
     let filename: string;
@@ -551,14 +495,12 @@ const App: React.FC<AppProps> = () => {
     let dialogTitle: string;
     
     if (format === 'xdc') {
-      console.log('📄 Generating XDC content...');
       content = ExportService.exportToXDC(pinsToExport, currentPackage);
       filename = `${currentPackage?.device || 'fpga'}_pins.xdc`;
       fileExtension = 'text/plain';
       fileTypes = { 'XDC Files': ['xdc'], 'All Files': ['*'] };
       dialogTitle = 'Export XDC Constraints';
     } else {
-      console.log('📄 Generating SDC content...');
       content = ExportService.exportToSDC(pinsToExport, currentPackage);
       filename = `${currentPackage?.device || 'fpga'}_pins.sdc`;
       fileExtension = 'text/plain';
@@ -566,22 +508,11 @@ const App: React.FC<AppProps> = () => {
       dialogTitle = 'Export SDC Constraints';
     }
     
-    console.log('📄 Generated content length:', content.length);
-    console.log('📁 Default filename:', filename);
-    console.log('🎯 File types:', fileTypes);
-    console.log('🏷️ Dialog title:', dialogTitle);
-    
-    console.log('💾 Calling saveFileInVSCode...');
     const saved = await saveFileInVSCode(content, filename, fileTypes, dialogTitle);
-    console.log('💾 saveFileInVSCode result:', saved);
     
     if (!saved) {
-      console.log('🌐 Falling back to browser download...');
       // Fallback to browser download
       ExportService.downloadFile(content, filename, fileExtension);
-      console.log('✅ Browser download initiated');
-    } else {
-      console.log('✅ VS Code save completed successfully');
     }
   };
 
