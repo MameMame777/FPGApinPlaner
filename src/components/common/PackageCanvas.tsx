@@ -62,7 +62,10 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
   const { togglePinSelection, selectPins, visibleBanks, toggleBankVisibility, showAllBanks } = useAppStore();
   const stageRef = useRef<any>(null);
   const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null); // For debouncing resize - Issue #14
-  const [stageSize, setStageSize] = useState({ width: 800, height: 600 });
+  const [stageSize, setStageSize] = useState({ 
+    width: window.innerWidth, 
+    height: window.innerHeight - 32 // ヘッダーバー高さを考慮
+  });
   
   // Last selected pin for shift-click range selection
   const [lastSelectedPinId, setLastSelectedPinId] = useState<string | null>(null);
@@ -101,11 +104,17 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
     // Calculate current viewport bounds (zero margins for maximum viewer area - Issue #14)
     const canvasWidth = stageSize.width; // Use full viewer area - no margins
     const canvasHeight = stageSize.height; // Use full viewer area - no margins
+    
+    // ビューポート境界により大きなバッファを追加
+    const bufferRatio = 0.2; // 20%のバッファを追加
+    const widthBuffer = canvasWidth * bufferRatio / viewport.scale;
+    const heightBuffer = canvasHeight * bufferRatio / viewport.scale;
+    
     const viewportBounds = {
-      x: -viewport.x / viewport.scale - canvasWidth / (2 * viewport.scale),
-      y: -viewport.y / viewport.scale - canvasHeight / (2 * viewport.scale),
-      width: canvasWidth / viewport.scale,
-      height: canvasHeight / viewport.scale,
+      x: -viewport.x / viewport.scale - canvasWidth / (2 * viewport.scale) - widthBuffer,
+      y: -viewport.y / viewport.scale - canvasHeight / (2 * viewport.scale) - heightBuffer,
+      width: canvasWidth / viewport.scale + widthBuffer * 2,
+      height: canvasHeight / viewport.scale + heightBuffer * 2,
       scale: viewport.scale
     };
     
@@ -139,13 +148,13 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
     
     // Use case 1: Detail view (high zoom) - show all pins in focused area + selected pins
     if (viewport.scale > 0.6) {
-      const margin = 200 / viewport.scale; // Adaptive margin based on zoom
+      const margin = 300 / viewport.scale; // マージンを1.5倍に拡大
       const extendedBounds = {
         ...viewportBounds,
-        x: viewportBounds.x - margin,
-        y: viewportBounds.y - margin * 1.5, // Extra margin for upper rows (U, V, W)
-        width: viewportBounds.width + margin * 2,
-        height: viewportBounds.height + margin * 2.5 // Extra height for upper rows
+        x: viewportBounds.x - margin * 1.5, // 横方向マージンも拡大
+        y: viewportBounds.y - margin * 3, // 上方向マージンをさらに拡大
+        width: viewportBounds.width + margin * 3, // 横幅マージンを拡大
+        height: viewportBounds.height + margin * 6 // 縦方向マージンを大幅拡大
       };
       
       // Always include selected pins regardless of viewport
@@ -162,6 +171,11 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
       selectedPinObjects.forEach(pin => allVisiblePins.set(pin.id, pin));
       
       const result = Array.from(allVisiblePins.values());
+      
+      // デバッグ情報を出力
+      console.log(`🔍 高ズーム時カリング: ${result.length}/${pins.length} pins visible (scale: ${viewport.scale.toFixed(2)})`);
+      console.log(`📐 Extended bounds:`, extendedBounds);
+      
       PerformanceService.endRenderMeasurement('viewport-culling');
       return result;
     }
@@ -216,12 +230,12 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
       // Medium zoom: hybrid approach - viewport-aware sampling for focus areas
       else if (viewport.scale <= 0.6) {
         // Calculate visible area with generous margins for context, extra for upper rows
-        const margin = 300 / viewport.scale;
+        const margin = 400 / viewport.scale; // マージンを拡大
         const focusArea = {
-          x: viewportBounds.x - margin,
-          y: viewportBounds.y - margin * 1.5, // Extra margin for upper rows (U, V, W)
-          width: viewportBounds.width + margin * 2,
-          height: viewportBounds.height + margin * 2.5 // Extra height for upper rows
+          x: viewportBounds.x - margin * 1.5, // 横方向マージンを拡大
+          y: viewportBounds.y - margin * 2.5, // 上方向マージンを大幅拡大
+          width: viewportBounds.width + margin * 3, // 横幅マージンを拡大
+          height: viewportBounds.height + margin * 5 // 縦方向マージンを大幅拡大
         };
         
         // Always include all selected pins
@@ -329,17 +343,25 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
     const updateCanvasSize = () => {
       const container = stageRef.current?.container();
       if (container) {
-        const rect = container.getBoundingClientRect();
-        // Maximum viewer area utilization: use full available space to eliminate footer area
+        // ヘッダーバー(32px)を除いた実際のcanvasエリアサイズを計算
+        const headerHeight = 32; // HeaderBarの高さ
         const newSize = {
-          width: Math.max(400, rect.width), // Use full container width
-          height: Math.max(300, rect.height) // Use full container height to eliminate footer
+          width: window.innerWidth, // 画面幅の100%
+          height: window.innerHeight - headerHeight // ヘッダーを除いた高さ
         };
         
         // Only update if size actually changed to prevent unnecessary re-renders
         setStageSize(prevSize => {
           if (prevSize.width !== newSize.width || prevSize.height !== newSize.height) {
-            console.log('📐 Canvas size updated for dynamic maximization:', newSize);
+            console.log('📐 Canvas size updated for dynamic maximization (excluding header):', newSize);
+            
+            // Stageのサイズもリアルタイムで更新
+            if (stageRef.current) {
+              stageRef.current.width(newSize.width);
+              stageRef.current.height(newSize.height);
+              stageRef.current.getLayer().batchDraw();
+            }
+            
             return newSize;
           }
           return prevSize;
@@ -362,10 +384,16 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
           clearTimeout(resizeTimeoutRef.current);
         }
         resizeTimeoutRef.current = setTimeout(() => {
-          updateCanvasSize();      }, 16); // ~60fps
+          updateCanvasSize();        }, 16); // ~60fps
       });
 
       resizeObserver.observe(container);
+      
+      // ウィンドウリサイズイベントも監視
+      const handleWindowResize = () => {
+        updateCanvasSize();
+      };
+      window.addEventListener('resize', handleWindowResize);
       
       return () => {
         clearTimeout(timeoutId);
@@ -373,6 +401,7 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
           clearTimeout(resizeTimeoutRef.current);
         }
         resizeObserver.disconnect();
+        window.removeEventListener('resize', handleWindowResize);
       };
     }
     
@@ -1338,8 +1367,8 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
         ref={(ref) => {
           stageRef.current = ref;
         }}
-        width={Math.max(100, stageSize.width)} // Full container width for maximum viewer area
-        height={Math.max(100, stageSize.height)} // Full container height to eliminate footer area
+        width={window.innerWidth} // 画面幅の100%を使用
+        height={window.innerHeight} // 画面高さの100%を使用
         x={0} // Use full container area
         y={0} // Use full container area
         onClick={handleStageClick}
