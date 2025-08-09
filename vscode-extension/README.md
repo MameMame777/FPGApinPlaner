@@ -49,24 +49,21 @@ npm run package
 ### Installation
 After building, install the generated `.vsix` file:
 ```bash
-code --install-extension fpga-pin-planner-1.0.2.vsix --force
+code --install-extension fpga-pin-planner-1.0.5.vsix --force
 ```
 
 ## Commands
 
 - `FPGA: Open Pin Planner` - Open the main pin planner interface
-- `FPGA: Import CSV Pin Data` - Import pin assignments from CSV files
-- `FPGA: Export XDC Constraints` - Export Xilinx Design Constraints (XDC)
-- `FPGA: Export SDC Constraints` - Export Synopsys Design Constraints (SDC)
-- `FPGA: Export QSF Constraints` - Export Quartus Settings File (QSF)
-- `FPGA: Validate Pin Constraints` - Validate pin assignments and detect issues
 
 ## Supported File Formats
 
 ### Import
+
 - **CSV**: Pin number, signal name, direction, voltage, I/O standard, package, bank, comments
 
 ### Export
+
 - **XDC**: Xilinx Design Constraints for Vivado
 - **SDC**: Synopsys Design Constraints for various tools
 - **QSF**: Quartus Settings File for Intel Quartus Prime
@@ -99,7 +96,20 @@ Access extension settings via `File > Preferences > Settings` and search for "FP
 
 ## Release Notes
 
-### 1.0.2 (Latest)
+### 1.0.5 (Latest)
+- ✅ **CI/CD Pipeline Enhancement**: Fixed GitHub Actions workflows for improved reliability
+- ✅ **Code Quality Improvements**: Achieved zero ESLint warnings with optimized configuration
+- ✅ **Test Suite Stability**: All 54 tests now passing consistently
+- ✅ **Build Process Optimization**: Enhanced automated build scripts with proper sequencing
+- ✅ **Webview Assets**: Updated webview distribution with latest build artifacts
+
+### 1.0.3
+- ✅ **Core Updates**: Applied latest user modifications and improvements
+- ✅ **Code Enhancements**: Updated service modules and core application logic
+- ✅ **Documentation**: Updated README and configuration files
+- ✅ **Build Optimization**: Refreshed build process with latest changes
+
+### 1.0.2
 - ✅ **Performance Optimization**: Removed BGM audio functionality for improved stability
 - ✅ **Code Refactoring**: Streamlined codebase and eliminated unused components
 - ✅ **Enhanced UI**: Cleaner interface with better user experience
