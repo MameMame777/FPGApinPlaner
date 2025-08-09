@@ -177,13 +177,7 @@ http://localhost:5173/
 | コマンド | 説明 |
 |----------|------|
 | `FPGA: Open FPGA Pin Planner` | メインアプリケーションを起動 |
-| `FPGA: Open FPGA GUI` | GUI画面を開く |
 | `FPGA: Load Sample Data` | サンプルデータを自動読み込み |
-| `FPGA: Import CSV Pin Data` | CSVファイルを読み込み |
-| `FPGA: Export XDC Constraints` | XDC形式でエクスポート |
-| `FPGA: Export SDC Constraints` | SDC形式でエクスポート |
-| `FPGA: Export QSF Constraints` | QSF形式でエクスポート |
-| `FPGA: Validate Pin Constraints` | ピン制約の検証実行 |
 
 ### キーボードショートカット
 
