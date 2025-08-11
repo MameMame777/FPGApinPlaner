@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { useAppStore } from '@/stores/app-store';
 import { CSVReader } from '@/services/csv-reader';
 import { ExportService } from '@/services/export-service';
+import { ProjectSaveService } from '@/services/project-save-service';
 import { PinItem } from '@/components/common/PinItem';
 import { ConstraintFormatSelector, ConstraintFormat } from '@/components/common/ConstraintFormatSelector';
 import { PinListTabs } from '@/components/common/PinListTabs';
@@ -177,21 +178,101 @@ const App: React.FC<AppProps> = () => {
   useEffect(() => {
     const handleVSCodeMessage = (event: MessageEvent) => {
       const message = event.data;
-      switch (message.command) {
+      console.log('📨 App.tsx received VS Code message:', message.command || message.type, message);
+      
+      switch (message.command || message.type) {
+        case 'update':
+          // Handle file content update from VS Code custom editor
+          try {
+            console.log('📄 App.tsx received update message:', {
+              hasText: !!message.text,
+              textLength: message.text ? message.text.length : 0,
+              filePath: message.filePath
+            });
+            
+            if (message.text && message.filePath) {
+              console.log('📄 Received .fpgaproj file content:', message.filePath);
+              
+              // Parse the .fpgaproj file content (JSON format)
+              const saveData = JSON.parse(message.text);
+              console.log('📄 Parsed save data:', {
+                hasPackage: !!saveData.package,
+                hasPins: !!saveData.pins,
+                pinsCount: saveData.pins ? saveData.pins.length : 0
+              });
+              
+              if (saveData.package && saveData.pins) {
+                // Use ProjectSaveService to properly restore the project data
+                const project = ProjectSaveService.restoreProject(saveData);
+                if (project.packageData) {
+                  console.log('📄 Restored project:', {
+                    packageName: project.packageData.name,
+                    pinsCount: project.packageData.pins.length
+                  });
+                  loadPackage(project.packageData);
+                  setError(null); // Clear any previous errors
+                  console.log('✅ Successfully loaded .fpgaproj file');
+                } else {
+                  throw new Error('Failed to restore package data from save file');
+                }
+              } else {
+                throw new Error('Invalid file format: missing package or pins data');
+              }
+            } else {
+              console.warn('📄 Update message missing text or filePath');
+            }
+          } catch (error) {
+            console.error('Failed to parse .fpgaproj file:', error);
+            setError(`Failed to load .fpgaproj file: ${error}`);
+          }
+          break;
+        case 'loadFileContent':
+          // Handle file content loaded from VS Code open dialog
+          try {
+            if (message.error) {
+              throw new Error(message.error);
+            }
+            
+            if (message.content && message.filePath) {
+              console.log('📂 Received file content from VS Code:', message.filePath);
+              
+              // Parse the file content (JSON format for .fpgaproj files)
+              const saveData = JSON.parse(message.content);
+              
+              if (saveData.package && saveData.pins) {
+                // Use ProjectSaveService to properly restore the project data
+                const project = ProjectSaveService.restoreProject(saveData);
+                if (project.packageData) {
+                  loadPackage(project.packageData);
+                  setError(null); // Clear any previous errors
+                  console.log('✅ Successfully loaded file via VS Code open dialog');
+                } else {
+                  throw new Error('Failed to restore package data from save file');
+                }
+              } else {
+                throw new Error('Invalid file format: missing package or pins data');
+              }
+            }
+          } catch (error) {
+            console.error('Failed to load file content:', error);
+            setError(`Failed to load file: ${error}`);
+          }
+          break;
         case 'loadProject':
           try {
             if (message.projectData) {
-              // Convert the loaded data to the expected format using ProjectSaveService
-              const projectData = message.projectData;
-              if (projectData.package && projectData.pins) {
-                // Use createPackageFromPins to create proper Package object
-                const pins = projectData.pins.map((pin: any) => ({
-                  ...pin,
-                  isAssigned: Boolean(pin.assignedSignalName),
-                  signalName: pin.assignedSignalName || ''
-                }));
-                const packageData = CSVReader.createPackageFromPins(pins, projectData.package.name || 'Loaded Project');
-                loadPackage(packageData);
+              // Use ProjectSaveService to properly restore the project data
+              const saveData = message.projectData;
+              if (saveData.package && saveData.pins) {
+                const project = ProjectSaveService.restoreProject(saveData);
+                if (project.packageData) {
+                  loadPackage(project.packageData);
+                  setError(null); // Clear any previous errors
+                } else {
+                  throw new Error('Failed to restore package data from save file');
+                }
+              } else {
+                throw new Error('Invalid project data format');
               }
             }
           } catch (error) {

@@ -5,6 +5,180 @@ import * as path from 'path';
 // Global panel reference
 let currentPanel: vscode.WebviewPanel | undefined;
 
+/**
+ * Custom Editor Provider for .fpgaproj files
+ */
+class FpgaProjectEditorProvider implements vscode.CustomTextEditorProvider {
+    public static register(context: vscode.ExtensionContext): vscode.Disposable {
+        const provider = new FpgaProjectEditorProvider(context);
+        const providerRegistration = vscode.window.registerCustomEditorProvider(
+            'fpgaPinPlanner.fpgaProjectEditor',
+            provider
+        );
+        return providerRegistration;
+    }
+
+    constructor(
+        private readonly context: vscode.ExtensionContext
+    ) { }
+
+    /**
+     * Called when our custom editor is opened.
+     */
+    public async resolveCustomTextEditor(
+        document: vscode.TextDocument,
+        webviewPanel: vscode.WebviewPanel,
+        _token: vscode.CancellationToken
+    ): Promise<void> {
+        // Setup initial content for the webview
+        webviewPanel.webview.options = {
+            enableScripts: true
+        };
+        webviewPanel.webview.html = this.getHtmlForWebview(webviewPanel.webview);
+
+        // Update the global panel reference
+        currentPanel = webviewPanel;
+
+        function updateWebview() {
+            const content = document.getText();
+            const filePath = document.uri.fsPath;
+            console.log('📄 Custom Editor updateWebview called:', filePath);
+            console.log('📄 File content length:', content.length);
+            
+            webviewPanel.webview.postMessage({
+                type: 'update',
+                text: content,
+                filePath: filePath
+            });
+        }
+
+        // Hook up event handlers so that we can synchronize the webview with the text document.
+        const changeDocumentSubscription = vscode.workspace.onDidChangeTextDocument(e => {
+            if (e.document.uri.toString() === document.uri.toString()) {
+                updateWebview();
+            }
+        });
+
+        // Make sure we get rid of the listener when our editor is closed.
+        webviewPanel.onDidDispose(() => {
+            changeDocumentSubscription.dispose();
+            if (currentPanel === webviewPanel) {
+                currentPanel = undefined;
+            }
+        });
+
+        // Receive message from the webview.
+        webviewPanel.webview.onDidReceiveMessage(async message => {
+            console.log('📨 Custom Editor received message:', message.command, message);
+            
+            switch (message.command) {
+                case 'webviewReady':
+                    // Webview is ready, send initial content
+                    console.log('📄 Webview ready, sending initial content');
+                    updateWebview();
+                    return;
+                case 'alert':
+                    vscode.window.showInformationMessage(message.text);
+                    return;
+                case 'showOpenDialog':
+                    try {
+                        const result = await vscode.window.showOpenDialog(message.options);
+                        webviewPanel.webview.postMessage({
+                            command: 'openDialogResult',
+                            result: result
+                        });
+                        
+                        // If a file was selected, automatically read and load its content
+                        if (result && result.length > 0) {
+                            const selectedFile = result[0];
+                            console.log('📂 Custom Editor reading selected file:', selectedFile.fsPath);
+                            
+                            try {
+                                const fileContent = await vscode.workspace.fs.readFile(selectedFile);
+                                const textContent = Buffer.from(fileContent).toString('utf8');
+                                
+                                // Send file content to webview for loading
+                                webviewPanel.webview.postMessage({
+                                    command: 'loadFileContent',
+                                    filePath: selectedFile.fsPath,
+                                    content: textContent
+                                });
+                                
+                                console.log('✅ Custom Editor file content sent to webview');
+                            } catch (readError) {
+                                console.error('❌ Custom Editor failed to read file:', readError);
+                                webviewPanel.webview.postMessage({
+                                    command: 'loadFileContent',
+                                    filePath: selectedFile.fsPath,
+                                    error: `Failed to read file: ${readError}`
+                                });
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Open dialog error:', error);
+                        webviewPanel.webview.postMessage({
+                            command: 'openDialogResult',
+                            result: undefined,
+                            error: error
+                        });
+                    }
+                    return;
+                case 'showSaveDialog':
+                    try {
+                        const options = message.options || {};
+                        const result = await vscode.window.showSaveDialog(options);
+                        console.log('💾 Custom Editor save dialog result:', result);
+                        
+                        let serializedResult = null;
+                        if (result) {
+                            serializedResult = result.fsPath;
+                            console.log('💾 Custom Editor serialized fsPath:', serializedResult);
+                        }
+                        
+                        webviewPanel.webview.postMessage({
+                            command: 'saveDialogResult',
+                            result: serializedResult
+                        });
+                    } catch (error) {
+                        console.error('Save dialog error:', error);
+                        webviewPanel.webview.postMessage({
+                            command: 'saveDialogResult',
+                            result: undefined,
+                            error: error
+                        });
+                    }
+                    return;
+                case 'saveFile':
+                    try {
+                        const success = await handleFileSave(message.filePath, message.content, message.filename);
+                        webviewPanel.webview.postMessage({
+                            command: 'saveFileResult',
+                            success: success
+                        });
+                    } catch (error) {
+                        console.error('File save error:', error);
+                        webviewPanel.webview.postMessage({
+                            command: 'saveFileResult',
+                            success: false,
+                            error: error
+                        });
+                    }
+                    return;
+            }
+        });
+
+        // Send initial content when webview is ready
+        console.log('📄 Custom Editor initialized, waiting for webview ready signal');
+    }
+
+    /**
+     * Get the static html used for the editor webviews.
+     */
+    private getHtmlForWebview(webview: vscode.Webview): string {
+        return getWebviewContent(webview, this.context.extensionUri);
+    }
+}
+
 // Helper function to handle file save requests from webview
 async function handleFileSave(filePath: string, content: string, filename: string): Promise<boolean> {
     try {
@@ -192,6 +366,33 @@ export function activate(context: vscode.ExtensionContext) {
                                         command: 'openDialogResult',
                                         result: result
                                     });
+                                    
+                                    // If a file was selected, automatically read and load its content
+                                    if (result && result.length > 0) {
+                                        const selectedFile = result[0];
+                                        console.log('📂 Reading selected file:', selectedFile.fsPath);
+                                        
+                                        try {
+                                            const fileContent = await vscode.workspace.fs.readFile(selectedFile);
+                                            const textContent = Buffer.from(fileContent).toString('utf8');
+                                            
+                                            // Send file content to webview for loading
+                                            currentPanel.webview.postMessage({
+                                                command: 'loadFileContent',
+                                                filePath: selectedFile.fsPath,
+                                                content: textContent
+                                            });
+                                            
+                                            console.log('✅ File content sent to webview');
+                                        } catch (readError) {
+                                            console.error('❌ Failed to read file:', readError);
+                                            currentPanel.webview.postMessage({
+                                                command: 'loadFileContent',
+                                                filePath: selectedFile.fsPath,
+                                                error: `Failed to read file: ${readError}`
+                                            });
+                                        }
+                                    }
                                 }
                             } catch (error) {
                                 console.error('Open dialog error:', error);
@@ -409,7 +610,8 @@ export function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(
         openPlannerCommand,
-        loadSampleDataCommand
+        loadSampleDataCommand,
+        FpgaProjectEditorProvider.register(context)
     );
 }
 

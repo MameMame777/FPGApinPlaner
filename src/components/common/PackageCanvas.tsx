@@ -120,6 +120,12 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
     
     // Rotation-aware culling function
     const isPointInBounds = (pin: Pin, bounds: any) => {
+      // Check if position exists before destructuring
+      if (!pin.position) {
+        console.warn('📦 Pin missing position:', pin.pinName || pin.pinNumber);
+        return false; // Skip pins without position
+      }
+      
       // Apply same transformation as transformPosition but without viewport scaling
       let { x, y } = pin.position;
       

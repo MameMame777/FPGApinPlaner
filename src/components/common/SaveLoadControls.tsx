@@ -167,29 +167,70 @@ const SaveLoadControls: React.FC<SaveLoadControlsProps> = () => {
     }
   };
 
-  const handleLoad = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const handleLoad = async (event?: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('🔍 handleLoad called, isInVSCode:', isInVSCode());
+    
+    if (isInVSCode()) {
+      // VS Code environment - use open dialog
+      try {
+        setIsLoading(true);
+        const vscode = (window as any).vscode;
+        console.log('📨 Sending showOpenDialog message to VS Code');
+        
+        // Simply send the open dialog request
+        // The actual loading will be handled by App.tsx's message handler
+        vscode.postMessage({
+          command: 'showOpenDialog',
+          options: {
+            openLabel: 'Open FPGA Project',
+            canSelectFiles: true,
+            canSelectMany: false,
+            filters: {
+              'FPGA Project Files': ['fpgaproj'],
+              'JSON Files': ['json'],
+              'All Files': ['*']
+            }
+          }
+        });
+        
+        console.log('✅ Message sent to VS Code extension');
+        
+        // Don't wait for the result here, let App.tsx handle it
+        // Just show a loading state temporarily
+        setTimeout(() => {
+          setIsLoading(false);
+        }, 1000);
+        
+      } catch (error) {
+        console.error('VS Code open failed:', error);
+        showNotification(`❌ Open failed: ${error}`, 5000);
+        setIsLoading(false);
+      }
+    } else {
+      console.log('📂 Browser environment - using file input');
+      // Browser environment - use file input
+      const file = event?.target.files?.[0];
+      if (!file) return;
 
-    try {
-      setIsLoading(true);
-      
-      const saveData = await ProjectSaveService.loadFromFile(file);
-      const project = ProjectSaveService.restoreProject(saveData);
-      
-      
-      // loadProjectアクションで一括更新
-      loadProject(project);
-      
-      showNotification(`✅ Project loaded: ${saveData.metadata.description}`);
-      
-      // Reset input for re-loading same file
-      event.target.value = '';
-    } catch (error) {
-      console.error('Load failed:', error);
-      showNotification(`❌ Load failed: ${error}`, 5000);
-    } finally {
-      setIsLoading(false);
+      try {
+        setIsLoading(true);
+        
+        const saveData = await ProjectSaveService.loadFromFile(file);
+        const project = ProjectSaveService.restoreProject(saveData);
+        
+        // loadProjectアクションで一括更新
+        loadProject(project);
+        
+        showNotification(`✅ Project loaded: ${saveData.metadata.description}`);
+        
+        // Reset input for re-loading same file
+        if (event) event.target.value = '';
+      } catch (error) {
+        console.error('Load failed:', error);
+        showNotification(`❌ Load failed: ${error}`, 5000);
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -289,7 +330,13 @@ const SaveLoadControls: React.FC<SaveLoadControlsProps> = () => {
       
       {/* Load button */}
       <button
-        onClick={() => fileInputRef.current?.click()}
+        onClick={() => {
+          if (isInVSCode()) {
+            handleLoad(); // Call handleLoad directly in VS Code environment
+          } else {
+            fileInputRef.current?.click(); // Use file input in browser environment
+          }
+        }}
         disabled={isLoading}
         title="Load Project (📁)"
         style={{
@@ -353,6 +400,17 @@ const SaveLoadControls: React.FC<SaveLoadControlsProps> = () => {
         >
           {notification}
         </div>
+      )}
+      
+      {/* Hidden file input for browser environment */}
+      {!isInVSCode() && (
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".fpgaproj,.json"
+          onChange={handleLoad}
+          style={{ display: 'none' }}
+        />
       )}
     </div>
   );

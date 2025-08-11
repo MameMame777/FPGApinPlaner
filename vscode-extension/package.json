@@ -36,7 +36,8 @@
   "icon": "images/icon.png",
   "activationEvents": [
     "onCommand:fpgaPinPlanner.openPlanner",
-    "onCommand:fpgaPinPlanner.loadSampleData"
+    "onCommand:fpgaPinPlanner.loadSampleData",
+    "onCustomEditor:fpgaPinPlanner.fpgaProjectEditor"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -64,6 +65,18 @@
         }
       ]
     },
+    "customEditors": [
+      {
+        "viewType": "fpgaPinPlanner.fpgaProjectEditor",
+        "displayName": "FPGA Pin Planner",
+        "selector": [
+          {
+            "filenamePattern": "*.fpgaproj"
+          }
+        ],
+        "priority": "default"
+      }
+    ],
     "webviews": [
       {
         "viewType": "fpgaPinPlanner.mainView",
