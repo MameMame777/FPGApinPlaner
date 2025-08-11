@@ -178,40 +178,21 @@ const App: React.FC<AppProps> = () => {
   useEffect(() => {
     const handleVSCodeMessage = (event: MessageEvent) => {
       const message = event.data;
-      console.log('📨 App.tsx received VS Code message:', message.command || message.type, message);
       
       switch (message.command || message.type) {
         case 'update':
           // Handle file content update from VS Code custom editor
           try {
-            console.log('📄 App.tsx received update message:', {
-              hasText: !!message.text,
-              textLength: message.text ? message.text.length : 0,
-              filePath: message.filePath
-            });
-            
             if (message.text && message.filePath) {
-              console.log('📄 Received .fpgaproj file content:', message.filePath);
-              
               // Parse the .fpgaproj file content (JSON format)
               const saveData = JSON.parse(message.text);
-              console.log('📄 Parsed save data:', {
-                hasPackage: !!saveData.package,
-                hasPins: !!saveData.pins,
-                pinsCount: saveData.pins ? saveData.pins.length : 0
-              });
               
               if (saveData.package && saveData.pins) {
                 // Use ProjectSaveService to properly restore the project data
                 const project = ProjectSaveService.restoreProject(saveData);
                 if (project.packageData) {
-                  console.log('📄 Restored project:', {
-                    packageName: project.packageData.name,
-                    pinsCount: project.packageData.pins.length
-                  });
                   loadPackage(project.packageData);
                   setError(null); // Clear any previous errors
-                  console.log('✅ Successfully loaded .fpgaproj file');
                 } else {
                   throw new Error('Failed to restore package data from save file');
                 }
@@ -234,8 +215,6 @@ const App: React.FC<AppProps> = () => {
             }
             
             if (message.content && message.filePath) {
-              console.log('📂 Received file content from VS Code:', message.filePath);
-              
               // Parse the file content (JSON format for .fpgaproj files)
               const saveData = JSON.parse(message.content);
               
@@ -245,7 +224,6 @@ const App: React.FC<AppProps> = () => {
                 if (project.packageData) {
                   loadPackage(project.packageData);
                   setError(null); // Clear any previous errors
-                  console.log('✅ Successfully loaded file via VS Code open dialog');
                 } else {
                   throw new Error('Failed to restore package data from save file');
                 }
@@ -314,12 +292,6 @@ const App: React.FC<AppProps> = () => {
     };
 
     // Check if we're in VS Code environment
-    console.log('🔍 Checking VS Code environment:', {
-      hasVscode: typeof (window as any).vscode !== 'undefined',
-      windowKeys: Object.keys(window),
-      userAgent: navigator.userAgent
-    });
-    
     if (typeof (window as any).vscode !== 'undefined') {
       window.addEventListener('message', handleVSCodeMessage);
       
@@ -485,11 +457,9 @@ const App: React.FC<AppProps> = () => {
         }, 30000);
 
         const handler = (event: MessageEvent) => {
-          console.log('📨 Received message in App.tsx:', event.data);
           if (event.data.command === 'saveDialogResult') {
             clearTimeout(timeout);
             window.removeEventListener('message', handler);
-            console.log('✅ Save dialog result received in App.tsx:', event.data.result);
             resolve(event.data.result);
           }
         };
@@ -598,14 +568,9 @@ const App: React.FC<AppProps> = () => {
   };
 
   const handleExportCSV = async () => {
-    console.log('🔍 EXPORT DEBUG - handleExportCSV:');
-    console.log('- pins.length:', pins.length);
-    console.log('- filteredPins.length:', filteredPins.length);
-    
     // Use filteredPins instead of pins to fix Issue #27
     const pinsToExport = filteredPins.length > 0 ? filteredPins : pins;
     if (pinsToExport.length === 0) {
-      console.log('❌ No pins available for export');
       return;
     }
     
@@ -629,14 +594,9 @@ const App: React.FC<AppProps> = () => {
   };
 
   const handleExportReport = async () => {
-    console.log('🔍 EXPORT DEBUG - handleExportReport:');
-    console.log('- pins.length:', pins.length);
-    console.log('- filteredPins.length:', filteredPins.length);
-    
     // Use filteredPins instead of pins to fix Issue #27
     const pinsToExport = filteredPins.length > 0 ? filteredPins : pins;
     if (pinsToExport.length === 0) {
-      console.log('❌ No pins available for export');
       return;
     }
     
@@ -1453,7 +1413,6 @@ const App: React.FC<AppProps> = () => {
                       onIssueClick={(issue: ValidationIssue) => {
                         // Highlight pins
                         if (issue.affectedPins && issue.affectedPins.length > 0) {
-                          console.log('Pins to highlight:', issue.affectedPins);
                           // TODO: Add pin highlighting functionality to PackageCanvas
                         }
                       }}

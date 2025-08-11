@@ -42,8 +42,6 @@ class FpgaProjectEditorProvider implements vscode.CustomTextEditorProvider {
         function updateWebview() {
             const content = document.getText();
             const filePath = document.uri.fsPath;
-            console.log('📄 Custom Editor updateWebview called:', filePath);
-            console.log('📄 File content length:', content.length);
             
             webviewPanel.webview.postMessage({
                 type: 'update',
@@ -69,12 +67,9 @@ class FpgaProjectEditorProvider implements vscode.CustomTextEditorProvider {
 
         // Receive message from the webview.
         webviewPanel.webview.onDidReceiveMessage(async message => {
-            console.log('📨 Custom Editor received message:', message.command, message);
-            
             switch (message.command) {
                 case 'webviewReady':
                     // Webview is ready, send initial content
-                    console.log('📄 Webview ready, sending initial content');
                     updateWebview();
                     return;
                 case 'alert':
@@ -91,7 +86,6 @@ class FpgaProjectEditorProvider implements vscode.CustomTextEditorProvider {
                         // If a file was selected, automatically read and load its content
                         if (result && result.length > 0) {
                             const selectedFile = result[0];
-                            console.log('📂 Custom Editor reading selected file:', selectedFile.fsPath);
                             
                             try {
                                 const fileContent = await vscode.workspace.fs.readFile(selectedFile);
@@ -103,8 +97,6 @@ class FpgaProjectEditorProvider implements vscode.CustomTextEditorProvider {
                                     filePath: selectedFile.fsPath,
                                     content: textContent
                                 });
-                                
-                                console.log('✅ Custom Editor file content sent to webview');
                             } catch (readError) {
                                 console.error('❌ Custom Editor failed to read file:', readError);
                                 webviewPanel.webview.postMessage({
@@ -127,12 +119,10 @@ class FpgaProjectEditorProvider implements vscode.CustomTextEditorProvider {
                     try {
                         const options = message.options || {};
                         const result = await vscode.window.showSaveDialog(options);
-                        console.log('💾 Custom Editor save dialog result:', result);
                         
                         let serializedResult = null;
                         if (result) {
                             serializedResult = result.fsPath;
-                            console.log('💾 Custom Editor serialized fsPath:', serializedResult);
                         }
                         
                         webviewPanel.webview.postMessage({
@@ -168,7 +158,6 @@ class FpgaProjectEditorProvider implements vscode.CustomTextEditorProvider {
         });
 
         // Send initial content when webview is ready
-        console.log('📄 Custom Editor initialized, waiting for webview ready signal');
     }
 
     /**
@@ -211,13 +200,10 @@ async function handleFileSave(filePath: string, content: string, filename: strin
             }
             
             fileUri = vscode.Uri.file(normalizedPath);
-            console.log('📂 Final file path:', fileUri.fsPath);
         } catch (parseError) {
             console.error('❌ Path parsing error:', parseError);
             throw new Error(`Failed to parse file path: ${filePath}`);
         }
-
-        console.log('💾 Saving file to:', fileUri.fsPath);
         
         // Write file using VS Code workspace API
         const contentBuffer = Buffer.from(content, 'utf8');
@@ -226,7 +212,6 @@ async function handleFileSave(filePath: string, content: string, filename: strin
         // Show success message
         vscode.window.showInformationMessage(`✅ File saved: ${path.basename(fileUri.fsPath)}`);
         
-        console.log('✅ File saved successfully:', fileUri.fsPath);
         return true;
     } catch (error) {
         console.error('❌ File save failed:', error);
@@ -236,25 +221,18 @@ async function handleFileSave(filePath: string, content: string, filename: strin
 }
 
 function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): string {
-    console.log('🔧 Building webview content...');
-    console.log('📁 Extension URI:', extensionUri.toString());
-    
     // Webview-distフォルダのURI
     const webviewDistUri = vscode.Uri.joinPath(extensionUri, 'webview-dist');
-    console.log('📁 Webview-dist URI:', webviewDistUri.toString());
     
     // Assetsフォルダのパス確認
     const assetsUri = vscode.Uri.joinPath(webviewDistUri, 'assets');
-    console.log('📁 Assets URI:', assetsUri.toString());
     
     // AssetsフォルダのfsPathをチェック
     const assetsPath = assetsUri.fsPath;
-    console.log('📁 Assets path:', assetsPath);
     
     try {
         // Assetsフォルダ内のファイル一覧を取得
         const files = fs.readdirSync(assetsPath);
-        console.log('📄 Available files:', files);
         
         // CSSファイルとJSファイルを検索
         const cssFile = files.find(file => file.endsWith('.css'));
@@ -264,15 +242,9 @@ function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): s
             throw new Error(`Missing assets: CSS=${cssFile}, JS=${jsFile}`);
         }
         
-        console.log('✅ Found CSS file:', cssFile);
-        console.log('✅ Found JS file:', jsFile);
-        
         // WebviewリソースURIを生成
         const cssUri = webview.asWebviewUri(vscode.Uri.joinPath(assetsUri, cssFile));
         const jsUri = webview.asWebviewUri(vscode.Uri.joinPath(assetsUri, jsFile));
-        
-        console.log('🎨 CSS URI:', cssUri.toString());
-        console.log('⚡ JS URI:', jsUri.toString());
         
         return `<!DOCTYPE html>
 <html lang="ja">
