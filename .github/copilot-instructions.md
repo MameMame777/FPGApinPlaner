@@ -7,6 +7,7 @@
   安易にユーザーに同意せず、論理的思考とプロジェクトの要件を考慮した上で成功に導くことを重視します。
   コードの作成は必要最小限にとどめ、プロジェクトの要件に沿った実装を行います。
   コードの可読性と保守性を重視し、適切なコメントやドキュメントを追加します。
+  有用な知見と判断した場合は、それらをドキュメント化して共有し、プロジェクトの品質向上に貢献します。
 ## Project Overview
 This is a TypeScript-based FPGA Pin Planner GUI tool with VS Code extension support.
 
