@@ -2,7 +2,50 @@
 
 All notable changes to the "FPGA Pin Planner" extension will be documented in this file.
 
-## [1.0.5] - 2025-08-09
+## [1.0.9] - 2025-08-12
+
+### ✨ Added
+
+- **I/O Configuration GUI (Issue #34)**: Complete I/O management interface
+  - Dual-dropdown layout for voltage and I/O standard selection
+  - Real-time voltage/standard compatibility validation
+  - Collapsible advanced settings panel with enhanced UX
+  - Improved placeholder text and visual indicators
+
+- **Extended I/O Standards Support**: Expanded from 23 to 38 I/O standards
+  - High-Speed: LVDS_18, LVDS_25, LVDS_33, LVDS_E_25, LVPECL_25, LVPECL_33
+  - DDR Memory: DDR3_1_35V, DDR3_1_5V, DDR4_1_2V, DDR5_1_1V, MOBILE_DDR_1_8V
+  - Display: TMDS_33
+  - Bus: PCI33_3, PCI66_3, PCIX_3
+  - Plus 7 additional specialized standards
+
+- **Advanced List Mode Enhancements**
+  - Column header sorting with visual indicators (▲▼↕)
+  - Enhanced bulk editing for Direction, Voltage, and I/O Standard
+  - Advanced BANK filtering with Show All/Hide All functionality
+  - Clear Selection button for improved workflow
+
+### 🐛 Fixed
+
+- **Bulk Edit Apply Comment**: Resolved non-functional Apply Comment button
+- **POWER/GROUND Validation**: Excluded POWER and GROUND pins from duplicate signal validation
+- **BANK Filtering**: Fixed BANK filtering not working properly in List mode
+- **State Synchronization**: Resolved filtering inconsistencies between components
+
+### 🔧 Technical Improvements
+
+- Enhanced PinItem component with I/O configuration interface
+- Improved VirtualizedPinList with sorting capabilities
+- Updated validation service with type-aware duplicate checking
+- Optimized state management and virtual list rendering
+- Enhanced component architecture and state management patterns
+
+## [1.0.8] - 2025-08-11
+
+### Changed
+
+- 🔧 **Core Foundation**: Enhanced I/O configuration foundation for v1.0.9 development
+- 📊 **List Mode Preparation**: Initial List mode improvements and structure enhancements
 
 ### Changed
 

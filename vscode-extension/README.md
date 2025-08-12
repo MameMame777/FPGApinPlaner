@@ -49,13 +49,34 @@ npm run package
 ### Installation
 After building, install the generated `.vsix` file:
 ```bash
-code --install-extension fpga-pin-planner-1.0.6.vsix --force
+code --install-extension fpga-pin-planner-1.0.9.vsix --force
 ```
 
 ## Commands
 
 - `FPGA: Open FPGA Pin Planner` - Open the main pin planner interface with WebView
 - `FPGA: Load Sample Data` - Load sample pin data for testing and demonstration
+
+## New in v1.0.9
+
+### ✨ I/O Configuration GUI (Issue #34)
+- **Dual-Dropdown Layout**: Intuitive voltage and I/O standard selection
+- **Real-Time Validation**: Automatic compatibility checking between voltage and I/O standards
+- **Collapsible Advanced Settings**: Expandable panel for detailed pin configuration
+- **Enhanced Visual Feedback**: Improved placeholder text and visual indicators
+
+### 📊 Extended I/O Standards Support (38 Total)
+- **High-Speed Standards**: LVDS_18, LVDS_25, LVDS_33, LVDS_E_25, LVPECL_25, LVPECL_33
+- **DDR Memory Standards**: DDR3_1_35V, DDR3_1_5V, DDR4_1_2V, DDR5_1_1V, MOBILE_DDR_1_8V
+- **Display Standards**: TMDS_33
+- **Bus Standards**: PCI33_3, PCI66_3, PCIX_3
+- **Plus 7 additional specialized standards**
+
+### 🔧 Advanced List Mode
+- **Column Header Sorting**: Click any column header to sort with visual indicators (▲▼↕)
+- **Enhanced Bulk Editing**: Comprehensive bulk assignment for Direction, Voltage, and I/O Standard
+- **Advanced BANK Filtering**: Interactive toggle buttons with Show All/Hide All functionality
+- **Improved Workflow**: Clear Selection button and better state management
 
 ## Supported File Formats
 
@@ -97,45 +118,19 @@ Access extension settings via `File > Preferences > Settings` and search for "FP
 
 ## Release Notes
 
-### 1.0.6 (Latest)
-- ✅ **Command Documentation Update**: Corrected Marketplace command descriptions
-- ✅ **Simplified Command Set**: Streamlined to essential commands only
-- ✅ **WebView Integration**: Focus on main pin planner interface and sample data loading
-- ✅ **Documentation Accuracy**: Updated all documentation to reflect current functionality
+### 1.0.9 (Latest)
 
-### 1.0.5
-- ✅ **CI/CD Pipeline Enhancement**: Fixed GitHub Actions workflows for improved reliability
-- ✅ **Code Quality Improvements**: Achieved zero ESLint warnings with optimized configuration
-- ✅ **Test Suite Stability**: All 54 tests now passing consistently
-- ✅ **Build Process Optimization**: Enhanced automated build scripts with proper sequencing
-- ✅ **Webview Assets**: Updated webview distribution with latest build artifacts
+- ✨ **I/O Configuration GUI**: Complete I/O management interface with dual-dropdown layout
+- 📊 **Extended I/O Standards**: Support for 38 I/O standards including LVDS, DDR, TMDS, PCI
+- 🔧 **Advanced List Mode**: Column header sorting with visual indicators
+- 🛠️ **Enhanced Bulk Editing**: Comprehensive bulk assignment for Direction, Voltage, I/O Standard
+- 🔍 **Advanced BANK Filtering**: Interactive toggle buttons with Show All/Hide All
+- 🐛 **Bug Fixes**: Fixed Apply Comment button, POWER/GROUND validation exclusion
+- ⚡ **Performance**: Optimized state management and virtual list rendering
 
-### 1.0.3
-- ✅ **Core Updates**: Applied latest user modifications and improvements
-- ✅ **Code Enhancements**: Updated service modules and core application logic
-- ✅ **Documentation**: Updated README and configuration files
-- ✅ **Build Optimization**: Refreshed build process with latest changes
+### 1.0.8
 
-### 1.0.2
-- ✅ **Performance Optimization**: Removed BGM audio functionality for improved stability
-- ✅ **Code Refactoring**: Streamlined codebase and eliminated unused components
-- ✅ **Enhanced UI**: Cleaner interface with better user experience
-- ✅ **Bug Fixes**: Resolved audio playback loop issues and improved overall reliability
-
-### 1.0.1
-- ✅ **Resizable UI Panels**: Added drag-to-resize functionality for left and right sidebars
-- ✅ **Dynamic Bank Groups**: CSV-based automatic bank statistics generation
-- ✅ **Improved Canvas Legend**: Parallel display of Bank Groups and Pin Types
-- ✅ **Differential Pair Enhancement**: Auto-sorting and visual indicators
-- ✅ **Clean Build System**: Automated build scripts for consistent packaging
-
-### 1.0.0
-- Initial release
-- Basic pin management interface
-- CSV import functionality
-- XDC, SDC, and QSF export support
-- Pin constraint validation
-- Context menu integration
+- 🔧 **Core Foundation**: Enhanced I/O configuration foundation and List mode improvements
 
 ## Contributing
 
