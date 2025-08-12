@@ -782,7 +782,7 @@ export const useAppStore = create<AppState & AppActions>()(
         Object.assign(state.listView, updates);
       }),
 
-    bulkUpdateComments: (pinIds, comment) =>
+    bulkUpdateComments: (pinIds, comment) => {
       set((state) => {
         const timestamp = new Date();
         pinIds.forEach(pinId => {
@@ -795,7 +795,10 @@ export const useAppStore = create<AppState & AppActions>()(
         });
         // Clear selection after bulk update
         state.listView.selectedRows.clear();
-      }),
+      });
+      // フィルタを再適用して表示を更新
+      get().applyFilters();
+    },
 
     // Pin color mode management
     setPinColorMode: (mode) =>
