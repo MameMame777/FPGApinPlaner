@@ -112,6 +112,7 @@ const App: React.FC<AppProps> = () => {
     loadPackage,
     selectPin,
     assignSignal,
+    updatePin,
     updateFilters,
     setError,
     setLoading,
@@ -1072,6 +1073,7 @@ const App: React.FC<AppProps> = () => {
                         isSelected={selectedPins.has(pin.id)}
                         onSelect={handleListPinSelect}
                         onAssignSignal={assignSignal}
+                        onUpdatePin={updatePin}
                         isPairPin={false}
                         isDifferentialPairPartner={isDifferentialPairPartner}
                       />

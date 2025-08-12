@@ -261,7 +261,7 @@ export const useAppStore = create<AppState & AppActions>()(
         });
       }),
 
-    updatePin: (pinId, updates) =>
+    updatePin: (pinId, updates) => {
       set((state) => {
         const pin = state.pins.find(p => p.id === pinId);
         if (pin) {
@@ -270,7 +270,11 @@ export const useAppStore = create<AppState & AppActions>()(
             pin.isAssigned = updates.signalName !== '';
           }
         }
-      }),
+      });
+      
+      // Apply filters after state update to ensure UI reflects changes
+      get().applyFilters();
+    },
 
     updatePins: (updates) =>
       set((state) => {

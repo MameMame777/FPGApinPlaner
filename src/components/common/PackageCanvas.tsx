@@ -1710,6 +1710,76 @@ const PackageCanvas: React.FC<PackageCanvasProps> = ({
                       />
                     </>
                   )}
+
+                  {/* I/O Information - Direction and Standard */}
+                  {!['POWER', 'GROUND', 'NC'].includes(pin.pinType) && shouldRenderSignalNames && tileSize > 40 && (
+                    <>
+                      {/* I/O Direction - only show if not empty */}
+                      {pin.direction && pin.direction.trim() !== '' && (
+                        <>
+                          <Rect
+                            x={pos.x - (pin.direction.length * (smallFontSize * 0.6) / 2) - 4}
+                            y={pos.y + fontSize / 2 + 3 + (pin.signalName ? smallFontSize * 2 + 6 : smallFontSize + 4)}
+                            width={pin.direction.length * (smallFontSize * 0.6) + 8}
+                            height={smallFontSize + 3}
+                            fill="rgba(100, 149, 237, 0.8)"
+                            cornerRadius={2}
+                            listening={false}
+                          />
+                          <Text
+                            x={pos.x}
+                            y={pos.y + fontSize / 2 + 3 + (pin.signalName ? smallFontSize * 2 + 8 : smallFontSize + 6)}
+                            text={pin.direction}
+                            fontSize={smallFontSize * 0.8}
+                            fill="#FFF"
+                            align="center"
+                            onClick={(e) => handlePinClick(e, pin)}
+                            onDblClick={(e) => handlePinDoubleClick(e, pin)}
+                            style={{ cursor: 'pointer' }}
+                            fontStyle="bold"
+                            offsetX={pin.direction.length * (smallFontSize * 0.6) / 4}
+                            listening={false}
+                          />
+                        </>
+                      )}
+
+                      {/* I/O Standard - only show if set and not empty */}
+                      {(pin.attributes?.['IO_Standard'] || pin.ioType) && 
+                       (pin.attributes?.['IO_Standard'] || pin.ioType || '').trim() !== '' && (
+                        <>
+                          <Rect
+                            x={pos.x - ((pin.attributes?.['IO_Standard'] || pin.ioType || 'AUTO').length * (smallFontSize * 0.5) / 2) - 3}
+                            y={pos.y + fontSize / 2 + 3 + (pin.signalName ? 
+                                (pin.direction && pin.direction.trim() !== '' ? smallFontSize * 3 + 12 : smallFontSize * 2 + 6) : 
+                                (pin.direction && pin.direction.trim() !== '' ? smallFontSize * 2 + 8 : smallFontSize + 4))}
+                            width={(pin.attributes?.['IO_Standard'] || pin.ioType || 'AUTO').length * (smallFontSize * 0.5) + 6}
+                            height={smallFontSize * 0.9 + 2}
+                            fill="rgba(76, 175, 80, 0.8)"
+                            cornerRadius={2}
+                            listening={false}
+                          />
+                          <Text
+                            x={pos.x}
+                            y={pos.y + fontSize / 2 + 3 + (pin.signalName ? 
+                                (pin.direction && pin.direction.trim() !== '' ? smallFontSize * 3 + 13 : smallFontSize * 2 + 7) : 
+                                (pin.direction && pin.direction.trim() !== '' ? smallFontSize * 2 + 9 : smallFontSize + 5))}
+                            text={(pin.attributes?.['IO_Standard'] || pin.ioType || 'AUTO').length > 8 ? 
+                                  (pin.attributes?.['IO_Standard'] || pin.ioType || 'AUTO').substring(0, 8) + '...' : 
+                                  (pin.attributes?.['IO_Standard'] || pin.ioType || 'AUTO')}
+                            fontSize={smallFontSize * 0.7}
+                            fill="#FFF"
+                            align="center"
+                            onClick={(e) => handlePinClick(e, pin)}
+                            onDblClick={(e) => handlePinDoubleClick(e, pin)}
+                            style={{ cursor: 'pointer' }}
+                            fontStyle="bold"
+                            offsetX={(pin.attributes?.['IO_Standard'] || pin.ioType || 'AUTO').length * (smallFontSize * 0.5) / 4}
+                            listening={false}
+                          />
+                        </>
+                      )}
+                    </>
+                  )}
                 </Group>
               );
             });
