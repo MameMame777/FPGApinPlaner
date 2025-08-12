@@ -11,6 +11,7 @@ export interface GridPosition {
 }
 
 export type PinDirection = 
+  | ''             // 未設定
   | 'Input' 
   | 'Output' 
   | 'InOut' 

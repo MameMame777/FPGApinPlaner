@@ -78,6 +78,12 @@ export class ValidationService {
     pins.forEach(pin => {
       if (pin.signalName && pin.signalName.trim() !== '') {
         const signalName = pin.signalName.trim();
+        
+        // POWERとGROUNDピンは同一名の信号アサインを許可
+        if (pin.pinType === 'POWER' || pin.pinType === 'GROUND') {
+          return; // POWER/GROUNDピンはスキップ
+        }
+        
         if (!signalMap.has(signalName)) {
           signalMap.set(signalName, []);
         }
@@ -92,7 +98,7 @@ export class ValidationService {
           id: `conflict_${signalName}_${Date.now()}`,
           type: 'pin_conflict',
           severity: 'error',
-          title: `Duplicate assignment for signal "${signalName}"`,
+          title: `Pin Conflict`,
           description: `Signal "${signalName}" is assigned to ${assignedPins.length} pins.`,
           affectedPins: assignedPins.map(p => p.id),
           suggestion: 'Each signal should be assigned to only one pin.',

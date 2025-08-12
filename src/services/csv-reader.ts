@@ -626,7 +626,7 @@ export class CSVReader {
   }
 
   private static parseDirection(directionStr: string | undefined): Pin['direction'] {
-    if (!directionStr) return 'InOut';
+    if (!directionStr || directionStr.trim() === '') return '';
     
     const dir = directionStr.toLowerCase().trim();
     if (dir.includes('input') || dir.includes('in')) return 'Input';
@@ -637,7 +637,7 @@ export class CSVReader {
     if (dir.includes('clock') || dir.includes('clk')) return 'Clock';
     if (dir.includes('reset') || dir.includes('rst')) return 'Reset';
     
-    return 'InOut';
+    return '';
   }
 
   private static determinePinType(pinName: string): Pin['pinType'] {

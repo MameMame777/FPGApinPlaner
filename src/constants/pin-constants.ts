@@ -26,27 +26,41 @@ export const IO_STANDARDS = [
   'LVTTL',      // 3.3V LVTTL
   
   // Differential Standards
-  'LVDS_25',    // Low Voltage Differential Signaling
+  'LVDS_18',    // Low Voltage Differential Signaling 1.8V
+  'LVDS_25',    // Low Voltage Differential Signaling 2.5V
   'RSDS_25',    // Reduced Swing Differential Signaling
   'BLVDS_25',   // Bus Low Voltage Differential Signaling
   'MINI_LVDS_25', // Mini Low Voltage Differential Signaling
+  'PPDS_25',    // Point-to-Point Differential Signaling
+  'TMDS_33',    // Transition Minimized Differential Signaling (HDMI/DisplayPort)
   
   // High Performance Standards
   'SSTL135',    // Stub Series Terminated Logic 1.35V
   'SSTL15',     // Stub Series Terminated Logic 1.5V
   'SSTL18_I',   // Stub Series Terminated Logic 1.8V Class I
   'SSTL18_II',  // Stub Series Terminated Logic 1.8V Class II
+  'SSTL2_I',    // Stub Series Terminated Logic 2.5V Class I
+  'SSTL2_II',   // Stub Series Terminated Logic 2.5V Class II
+  'SSTL3_I',    // Stub Series Terminated Logic 3.3V Class I
+  'SSTL3_II',   // Stub Series Terminated Logic 3.3V Class II
   
   // Memory Standards
   'POD10',      // Pseudo Open Drain 1.0V
   'POD12',      // Pseudo Open Drain 1.2V
   'POD135',     // Pseudo Open Drain 1.35V
+  'POD15',      // Pseudo Open Drain 1.5V
+  'DDR3',       // DDR3 Memory Interface
+  'DDR4',       // DDR4 Memory Interface
+  'DDR5',       // DDR5 Memory Interface
   
   // Special Standards
   'HSTL_I',     // High Speed Transceiver Logic Class I
   'HSTL_II',    // High Speed Transceiver Logic Class II
   'HSTL_I_18',  // High Speed Transceiver Logic 1.8V Class I
   'HSTL_II_18', // High Speed Transceiver Logic 1.8V Class II
+  'PCI',        // PCI Interface Standard
+  'PCIX',       // PCI Extended Interface Standard
+  'GTL_PLUS',   // Gunning Transceiver Logic Plus
   
   // Auto-detect based on voltage
   'AUTO'        // Automatically determine based on voltage
@@ -67,11 +81,11 @@ export const DEFAULT_IO_STANDARD_MAP: Record<string, string> = {
 export const COMPATIBLE_IO_STANDARDS: Record<string, string[]> = {
   '1.0V': ['POD10'],
   '1.2V': ['LVCMOS12', 'POD12', 'SSTL135'],
-  '1.5V': ['LVCMOS15', 'SSTL15', 'HSTL_I', 'HSTL_II'],
-  '1.8V': ['LVCMOS18', 'SSTL18_I', 'SSTL18_II', 'HSTL_I_18', 'HSTL_II_18'],
-  '2.5V': ['LVCMOS25', 'LVDS_25', 'RSDS_25', 'BLVDS_25', 'MINI_LVDS_25'],
-  '3.3V': ['LVCMOS33', 'LVTTL'],
-  '5.0V': ['LVTTL']
+  '1.5V': ['LVCMOS15', 'SSTL15', 'HSTL_I', 'HSTL_II', 'POD15'],
+  '1.8V': ['LVCMOS18', 'SSTL18_I', 'SSTL18_II', 'HSTL_I_18', 'HSTL_II_18', 'LVDS_18'],
+  '2.5V': ['LVCMOS25', 'LVDS_25', 'RSDS_25', 'BLVDS_25', 'MINI_LVDS_25', 'PPDS_25', 'SSTL2_I', 'SSTL2_II'],
+  '3.3V': ['LVCMOS33', 'LVTTL', 'TMDS_33', 'SSTL3_I', 'SSTL3_II', 'PCI', 'PCIX'],
+  '5.0V': ['LVTTL', 'GTL_PLUS']
 };
 
 // Drive strength options (in mA)
@@ -130,18 +144,32 @@ export function getVoltageFromIOStandard(ioStandard: string): string {
     'POD10': '1.0V',
     'POD12': '1.2V',
     'POD135': '1.35V',
+    'POD15': '1.5V',
     'SSTL135': '1.35V',
     'SSTL15': '1.5V',
     'SSTL18_I': '1.8V',
     'SSTL18_II': '1.8V',
+    'SSTL2_I': '2.5V',
+    'SSTL2_II': '2.5V',
+    'SSTL3_I': '3.3V',
+    'SSTL3_II': '3.3V',
     'HSTL_I': '1.5V',
     'HSTL_II': '1.5V',
     'HSTL_I_18': '1.8V',
     'HSTL_II_18': '1.8V',
+    'LVDS_18': '1.8V',
     'LVDS_25': '2.5V',
     'RSDS_25': '2.5V',
     'BLVDS_25': '2.5V',
-    'MINI_LVDS_25': '2.5V'
+    'MINI_LVDS_25': '2.5V',
+    'PPDS_25': '2.5V',
+    'TMDS_33': '3.3V',
+    'DDR3': '1.5V',
+    'DDR4': '1.2V',
+    'DDR5': '1.1V',
+    'PCI': '3.3V',
+    'PCIX': '3.3V',
+    'GTL_PLUS': '1.5V'
   };
   
   return voltageMap[ioStandard] || '3.3V';

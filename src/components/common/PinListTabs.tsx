@@ -20,13 +20,16 @@ interface PinListTabsProps {
 export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect: _onPinSelect }) => {
   const {
     pins,
+    filteredPins: globalFilteredPins,
     listView,
+    visibleBanks,
     setActiveTab,
     setSearchQuery,
     setCommentFilter,
     updatePin,
     updateListViewState,
-    bulkUpdateComments
+    bulkUpdateComments,
+    toggleBankVisibility
   } = useAppStore();
 
   const [bulkComment, setBulkComment] = useState('');
@@ -52,7 +55,8 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect: _onPinSel
   };
 
   const filteredPins = useMemo(() => {
-    let result = pins;
+    // Start with globally filtered pins (includes BANK filtering from visibleBanks)
+    let result = globalFilteredPins;
 
     // Apply tab-specific filter
     if (activeTabConfig.filter) {
@@ -100,7 +104,7 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect: _onPinSel
     }
 
     return result;
-  }, [pins, activeTabConfig, listView.searchQuery, listView.commentFilter, listView.sortColumn, listView.sortDirection]);
+  }, [globalFilteredPins, activeTabConfig, listView.searchQuery, listView.commentFilter, listView.sortColumn, listView.sortDirection]);
 
   const renderCellContent = (pin: Pin, column: ColumnConfig) => {
     const value = getColumnValue(pin, column.key);
@@ -217,10 +221,28 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect: _onPinSel
 
   const handleBulkCommentApply = () => {
     if (bulkComment.trim() && listView.selectedRows.size > 0) {
-      bulkUpdateComments(Array.from(listView.selectedRows), bulkComment);
+      const selectedPins = Array.from(listView.selectedRows);
+      selectedPins.forEach(pinId => {
+        updatePin(pinId, { 
+          comment: bulkComment,
+          commentTimestamp: new Date(),
+          commentAuthor: 'current_user'
+        });
+      });
       setBulkComment('');
       setShowBulkEditor(false);
     }
+  };
+
+  const handleColumnSort = (columnKey: string) => {
+    const newDirection = listView.sortColumn === columnKey && listView.sortDirection === 'asc' 
+      ? 'desc' 
+      : 'asc';
+    
+    updateListViewState({
+      sortColumn: columnKey,
+      sortDirection: newDirection
+    });
   };
 
   return (
@@ -325,37 +347,90 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect: _onPinSel
           {filteredPins.length} pins
         </div>
 
-        {/* BANK Color Legend */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        {/* BANK Color Legend with Toggle Functionality */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           <span style={{ color: '#cccccc', fontSize: '12px' }}>BANKs:</span>
-          {Array.from(new Set(filteredPins.map(p => p.bank).filter(Boolean)))
+          
+          {/* Show All Banks Button */}
+          <button
+            onClick={() => {
+              const allBanks = Array.from(new Set(pins.map(p => p.bank).filter(Boolean)));
+              if (visibleBanks.size === 0) {
+                // If all banks are visible, hide all
+                allBanks.forEach(bank => toggleBankVisibility(bank!));
+              } else {
+                // Show all banks
+                allBanks.forEach(bank => {
+                  if (!visibleBanks.has(bank!)) {
+                    toggleBankVisibility(bank!);
+                  }
+                });
+              }
+            }}
+            style={{
+              padding: '2px 8px',
+              borderRadius: '3px',
+              backgroundColor: visibleBanks.size === 0 ? '#007acc' : '#444444',
+              border: '1px solid #555',
+              cursor: 'pointer',
+              fontSize: '10px',
+              color: visibleBanks.size === 0 ? '#ffffff' : '#cccccc',
+              fontWeight: 'bold',
+            }}
+            title={visibleBanks.size === 0 ? 'Hide All Banks' : 'Show All Banks'}
+          >
+            {visibleBanks.size === 0 ? 'ALL' : 'SHOW ALL'}
+          </button>
+
+          {Array.from(new Set(pins.map(p => p.bank).filter(Boolean)))
             .sort((a, b) => {
               const aNum = parseInt(a!);
               const bNum = parseInt(b!);
               return isNaN(aNum) || isNaN(bNum) ? a!.localeCompare(b!) : aNum - bNum;
             }) // Dynamic bank display - no limit
-            .map(bank => (
-              <div
-                key={bank}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  padding: '2px 6px',
-                  borderRadius: '3px',
-                  backgroundColor: getBankBackgroundColor(bank, false, false),
-                  border: '1px solid #555'
-                }}
-              >
-                <span style={{ fontSize: '11px', color: '#ffffff' }}>{bank}</span>
-              </div>
-            ))
+            .map(bank => {
+              const isVisible = visibleBanks.size === 0 || visibleBanks.has(bank!);
+              return (
+                <button
+                  key={bank}
+                  onClick={() => toggleBankVisibility(bank!)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '2px 6px',
+                    borderRadius: '3px',
+                    backgroundColor: isVisible 
+                      ? getBankBackgroundColor(bank, false, false)
+                      : '#444444',
+                    border: isVisible 
+                      ? '1px solid #555' 
+                      : '1px solid #666',
+                    cursor: 'pointer',
+                    opacity: isVisible ? 1.0 : 0.5,
+                    transition: 'opacity 0.2s ease, background-color 0.2s ease',
+                  }}
+                  title={isVisible ? `Hide Bank ${bank}` : `Show Bank ${bank}`}
+                >
+                  <span style={{ 
+                    fontSize: '11px', 
+                    color: isVisible ? '#ffffff' : '#999',
+                    fontWeight: isVisible ? 'normal' : 'bold'
+                  }}>
+                    {bank}
+                  </span>
+                  {!isVisible && (
+                    <span style={{ fontSize: '8px', color: '#888' }}>✕</span>
+                  )}
+                </button>
+              );
+            })
           }
         </div>
 
         {/* Bulk actions */}
         {listView.selectedRows.size > 0 && (
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '14px', color: '#cccccc' }}>
               {listView.selectedRows.size} selected
             </span>
@@ -365,13 +440,13 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect: _onPinSel
                 padding: '6px 12px',
                 border: '1px solid #007acc',
                 borderRadius: '4px',
-                backgroundColor: '#007acc',
+                backgroundColor: showBulkEditor ? '#005a9e' : '#007acc',
                 color: 'white',
                 fontSize: '12px',
                 cursor: 'pointer'
               }}
             >
-              Bulk Comment
+              {showBulkEditor ? 'Close Bulk Edit' : 'Bulk Edit'}
             </button>
             <button
               onClick={() => bulkUpdateComments(Array.from(listView.selectedRows), '')}
@@ -387,66 +462,204 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect: _onPinSel
             >
               Clear Comments
             </button>
+            <button
+              onClick={() => {
+                updateListViewState({ selectedRows: new Set() });
+              }}
+              style={{
+                padding: '6px 12px',
+                border: '1px solid #6c757d',
+                borderRadius: '4px',
+                backgroundColor: '#6c757d',
+                color: 'white',
+                fontSize: '12px',
+                cursor: 'pointer'
+              }}
+            >
+              Clear Selection
+            </button>
           </div>
         )}
         </div>
       )}
 
-      {/* Bulk Comment Editor - カスタムコンポーネントの場合は表示しない */}
+      {/* Enhanced Bulk Editor - カスタムコンポーネントの場合は表示しない */}
       {!activeTabConfig.isCustomComponent && showBulkEditor && (
         <div style={{ 
           padding: '16px', 
           backgroundColor: '#1a1a1a', 
-          borderBottom: '1px solid #444',
-          display: 'flex',
-          gap: '8px',
-          alignItems: 'center'
+          borderBottom: '1px solid #444'
         }}>
-          <input
-            type="text"
-            placeholder="Enter comment for selected pins..."
-            value={bulkComment}
-            onChange={(e) => setBulkComment(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleBulkCommentApply()}
-            style={{
-              flex: 1,
-              padding: '8px 12px',
-              border: '1px solid #555',
-              borderRadius: '4px',
-              fontSize: '14px',
-              backgroundColor: '#333',
-              color: '#ffffff'
-            }}
-          />
-          <button
-            onClick={handleBulkCommentApply}
-            disabled={!bulkComment.trim()}
-            style={{
-              padding: '8px 16px',
-              border: 'none',
-              borderRadius: '4px',
-              backgroundColor: bulkComment.trim() ? '#28a745' : '#ccc',
-              color: 'white',
-              fontSize: '14px',
-              cursor: bulkComment.trim() ? 'pointer' : 'not-allowed'
-            }}
-          >
-            Apply
-          </button>
-          <button
-            onClick={() => setShowBulkEditor(false)}
-            style={{
-              padding: '8px 16px',
-              border: '1px solid #6c757d',
-              borderRadius: '4px',
-              backgroundColor: '#333',
-              color: '#cccccc',
-              fontSize: '14px',
-              cursor: 'pointer'
-            }}
-          >
-            Cancel
-          </button>
+          <div style={{ marginBottom: '12px' }}>
+            <h4 style={{ margin: '0 0 8px 0', color: '#ffffff', fontSize: '14px' }}>
+              Bulk Edit ({listView.selectedRows.size} pins selected)
+            </h4>
+          </div>
+          
+          {/* Comment Section */}
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', marginBottom: '4px', color: '#cccccc', fontSize: '12px' }}>
+              Comment
+            </label>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <input
+                type="text"
+                placeholder="Enter comment for selected pins..."
+                value={bulkComment}
+                onChange={(e) => setBulkComment(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleBulkCommentApply()}
+                style={{
+                  flex: 1,
+                  padding: '8px 12px',
+                  border: '1px solid #555',
+                  borderRadius: '4px',
+                  fontSize: '14px',
+                  backgroundColor: '#333',
+                  color: '#ffffff'
+                }}
+              />
+              <button
+                onClick={handleBulkCommentApply}
+                disabled={!bulkComment.trim()}
+                style={{
+                  padding: '8px 16px',
+                  border: 'none',
+                  borderRadius: '4px',
+                  backgroundColor: bulkComment.trim() ? '#28a745' : '#666',
+                  color: 'white',
+                  fontSize: '12px',
+                  cursor: bulkComment.trim() ? 'pointer' : 'not-allowed'
+                }}
+              >
+                Apply Comment
+              </button>
+            </div>
+          </div>
+
+          {/* I/O Settings Section */}
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', marginBottom: '8px', color: '#cccccc', fontSize: '12px' }}>
+              I/O Settings (leave empty to skip)
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '8px' }}>
+              {/* Direction */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '2px', color: '#999', fontSize: '10px' }}>
+                  Direction
+                </label>
+                <select
+                  style={{
+                    width: '100%',
+                    padding: '4px 8px',
+                    border: '1px solid #555',
+                    borderRadius: '3px',
+                    backgroundColor: '#333',
+                    color: '#ffffff',
+                    fontSize: '11px'
+                  }}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      const selectedPins = Array.from(listView.selectedRows);
+                      selectedPins.forEach(pinId => {
+                        updatePin(pinId, { direction: e.target.value as any });
+                      });
+                    }
+                  }}
+                >
+                  <option value="">-- Select Direction --</option>
+                  <option value="Input">Input</option>
+                  <option value="Output">Output</option>
+                  <option value="InOut">InOut</option>
+                  <option value="Clock">Clock</option>
+                  <option value="Reset">Reset</option>
+                </select>
+              </div>
+
+              {/* Voltage */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '2px', color: '#999', fontSize: '10px' }}>
+                  Voltage
+                </label>
+                <select
+                  style={{
+                    width: '100%',
+                    padding: '4px 8px',
+                    border: '1px solid #555',
+                    borderRadius: '3px',
+                    backgroundColor: '#333',
+                    color: '#ffffff',
+                    fontSize: '11px'
+                  }}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      const selectedPins = Array.from(listView.selectedRows);
+                      selectedPins.forEach(pinId => {
+                        updatePin(pinId, { voltage: e.target.value });
+                      });
+                    }
+                  }}
+                >
+                  <option value="">-- Select Voltage --</option>
+                  {VOLTAGE_LEVELS.map(voltage => (
+                    <option key={voltage} value={voltage}>{voltage}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* I/O Standard */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '2px', color: '#999', fontSize: '10px' }}>
+                  I/O Standard
+                </label>
+                <select
+                  style={{
+                    width: '100%',
+                    padding: '4px 8px',
+                    border: '1px solid #555',
+                    borderRadius: '3px',
+                    backgroundColor: '#333',
+                    color: '#ffffff',
+                    fontSize: '11px'
+                  }}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      const selectedPins = Array.from(listView.selectedRows);
+                      selectedPins.forEach(pinId => {
+                        updatePin(pinId, { 
+                          attributes: { IO_Standard: e.target.value },
+                          ioType: e.target.value 
+                        });
+                      });
+                    }
+                  }}
+                >
+                  <option value="">-- Select Standard --</option>
+                  <option value="AUTO">AUTO</option>
+                  {IO_STANDARDS.filter(std => std !== 'AUTO').map(standard => (
+                    <option key={standard} value={standard}>{standard}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+            <button
+              onClick={() => setShowBulkEditor(false)}
+              style={{
+                padding: '8px 16px',
+                border: '1px solid #6c757d',
+                borderRadius: '4px',
+                backgroundColor: '#333',
+                color: '#cccccc',
+                fontSize: '12px',
+                cursor: 'pointer'
+              }}
+            >
+              Close
+            </button>
+          </div>
         </div>
       )}
 
@@ -482,9 +695,12 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect: _onPinSel
               columns={activeTabConfig.columns}
               selectedRows={listView.selectedRows}
               hoveredRowId={hoveredRowId}
+              sortColumn={listView.sortColumn}
+              sortDirection={listView.sortDirection}
               onRowSelection={handleRowSelection}
               onPinSelect={_onPinSelect}
               onHover={setHoveredRowId}
+              onColumnSort={handleColumnSort}
               renderCellContent={renderCellContent}
             />
           ) : (

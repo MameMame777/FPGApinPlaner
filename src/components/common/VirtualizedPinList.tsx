@@ -7,9 +7,12 @@ interface VirtualizedPinListProps {
   columns: ColumnConfig[];
   selectedRows: Set<string>;
   hoveredRowId: string | null;
+  sortColumn?: string;
+  sortDirection: 'asc' | 'desc';
   onRowSelection: (_pinId: string, _selected: boolean) => void;
   onPinSelect?: (_pinId: string) => void;
   onHover: (_pinId: string | null) => void;
+  onColumnSort?: (_column: string) => void;
   renderCellContent: (_pin: Pin, _column: ColumnConfig) => React.ReactNode;
 }
 
@@ -21,9 +24,12 @@ export const VirtualizedPinList: React.FC<VirtualizedPinListProps> = ({
   columns,
   selectedRows,
   hoveredRowId,
+  sortColumn,
+  sortDirection,
   onRowSelection,
   onPinSelect,
   onHover,
+  onColumnSort,
   renderCellContent,
 }) => {
   const [scrollTop, setScrollTop] = useState(0);
@@ -134,23 +140,53 @@ export const VirtualizedPinList: React.FC<VirtualizedPinListProps> = ({
                   }}
                 />
               </th>
-              {columns.map(column => (
-                <th
-                  key={column.key}
-                  style={{
-                    width: `${column.width}px`,
-                    padding: '12px 8px',
-                    borderBottom: '2px solid #444',
-                    textAlign: 'left',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    color: '#ffffff',
-                    backgroundColor: '#2a2a2a'
-                  }}
-                >
-                  {column.title}
-                </th>
-              ))}
+              {columns.map(column => {
+                const isCurrentSort = sortColumn === column.key;
+                const canSort = column.sortable !== false; // デフォルトでソート可能
+                
+                return (
+                  <th
+                    key={column.key}
+                    style={{
+                      width: `${column.width}px`,
+                      padding: '12px 8px',
+                      borderBottom: '2px solid #444',
+                      textAlign: 'left',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      color: '#ffffff',
+                      backgroundColor: '#2a2a2a',
+                      cursor: canSort ? 'pointer' : 'default',
+                      userSelect: 'none',
+                      position: 'relative'
+                    }}
+                    onClick={() => {
+                      if (canSort && onColumnSort) {
+                        onColumnSort(column.key);
+                      }
+                    }}
+                    title={canSort ? `Click to sort by ${column.title}` : undefined}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span>{column.title}</span>
+                      {canSort && (
+                        <span style={{ 
+                          marginLeft: '4px', 
+                          fontSize: '12px',
+                          opacity: isCurrentSort ? 1 : 0.3,
+                          transition: 'opacity 0.2s ease'
+                        }}>
+                          {isCurrentSort ? (
+                            sortDirection === 'asc' ? '▲' : '▼'
+                          ) : (
+                            '↕'
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  </th>
+                );
+              })}
             </tr>
           </thead>
         </table>
