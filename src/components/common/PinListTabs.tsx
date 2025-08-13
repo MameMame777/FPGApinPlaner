@@ -12,6 +12,7 @@ import {
   getDefaultIOStandard 
 } from '../../constants/pin-constants';
 import { Pin, ColumnConfig } from '../../types';
+import { debug, DebugCategory } from '../../utils/debug';
 
 interface PinListTabsProps {
   onPinSelect?: (_pinId: string) => void;
@@ -33,6 +34,7 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect: _onPinSel
   } = useAppStore();
 
   const [bulkComment, setBulkComment] = useState('');
+  const [bulkSignal, setBulkSignal] = useState('');
   const [showBulkEditor, setShowBulkEditor] = useState(false);
   const [hoveredRowId, setHoveredRowId] = useState<string | null>(null);
 
@@ -219,6 +221,29 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect: _onPinSel
     updateListViewState({ selectedRows: newSelection });
   };
 
+  const handleRangeSelection = (fromIndex: number, toIndex: number) => {
+    console.log('📋 handleRangeSelection called:', { fromIndex, toIndex, filteredPinsLength: filteredPins.length });
+    
+    // For range selection, we should extend the current selection, not replace it
+    const newSelection = new Set(listView.selectedRows);
+    const start = Math.min(fromIndex, toIndex);
+    const end = Math.max(fromIndex, toIndex);
+    
+    console.log('📋 Range calculation:', { start, end, currentSelection: newSelection.size });
+    
+    // Add all pins in the range to selection
+    const selectedPinIds: string[] = [];
+    for (let i = start; i <= end && i < filteredPins.length; i++) {
+      const pinId = filteredPins[i].id;
+      newSelection.add(pinId);
+      selectedPinIds.push(pinId);
+      console.log(`📋 Adding pin ${i}: ${pinId}`);
+    }
+    
+    console.log('📋 Final selection size:', newSelection.size, 'Selected pins:', selectedPinIds);
+    updateListViewState({ selectedRows: newSelection });
+  };
+
   const handleBulkCommentApply = () => {
     if (bulkComment.trim() && listView.selectedRows.size > 0) {
       const selectedPins = Array.from(listView.selectedRows);
@@ -231,6 +256,31 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect: _onPinSel
       });
       setBulkComment('');
       setShowBulkEditor(false);
+    }
+  };
+
+  const handleBulkSignalApply = () => {
+    if (bulkSignal.trim() && listView.selectedRows.size > 0) {
+      const selectedPins = Array.from(listView.selectedRows);
+      selectedPins.forEach(pinId => {
+        updatePin(pinId, { 
+          signalName: bulkSignal.trim()
+        });
+      });
+      setBulkSignal('');
+      debug.log(DebugCategory.BULK_EDIT, `Applied signal "${bulkSignal.trim()}" to ${selectedPins.length} pins`);
+    }
+  };
+
+  const handleBulkSignalClear = () => {
+    if (listView.selectedRows.size > 0) {
+      const selectedPins = Array.from(listView.selectedRows);
+      selectedPins.forEach(pinId => {
+        updatePin(pinId, { 
+          signalName: ''
+        });
+      });
+      debug.log(DebugCategory.BULK_EDIT, `Cleared signals from ${selectedPins.length} pins`);
     }
   };
 
@@ -536,6 +586,60 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect: _onPinSel
             </div>
           </div>
 
+          {/* Signal Section */}
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', marginBottom: '4px', color: '#cccccc', fontSize: '12px' }}>
+              Signal Name
+            </label>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <input
+                type="text"
+                placeholder="Enter signal name for selected pins..."
+                value={bulkSignal}
+                onChange={(e) => setBulkSignal(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleBulkSignalApply()}
+                style={{
+                  flex: 1,
+                  padding: '8px 12px',
+                  border: '1px solid #555',
+                  borderRadius: '4px',
+                  fontSize: '14px',
+                  backgroundColor: '#333',
+                  color: '#ffffff'
+                }}
+              />
+              <button
+                onClick={handleBulkSignalApply}
+                disabled={!bulkSignal.trim()}
+                style={{
+                  padding: '8px 16px',
+                  border: 'none',
+                  borderRadius: '4px',
+                  backgroundColor: bulkSignal.trim() ? '#007bff' : '#666',
+                  color: 'white',
+                  fontSize: '12px',
+                  cursor: bulkSignal.trim() ? 'pointer' : 'not-allowed'
+                }}
+              >
+                Apply Signal
+              </button>
+              <button
+                onClick={handleBulkSignalClear}
+                style={{
+                  padding: '8px 16px',
+                  border: '1px solid #dc3545',
+                  borderRadius: '4px',
+                  backgroundColor: 'transparent',
+                  color: '#dc3545',
+                  fontSize: '12px',
+                  cursor: 'pointer'
+                }}
+              >
+                Clear Signals
+              </button>
+            </div>
+          </div>
+
           {/* I/O Settings Section */}
           <div style={{ marginBottom: '16px' }}>
             <label style={{ display: 'block', marginBottom: '8px', color: '#cccccc', fontSize: '12px' }}>
@@ -690,19 +794,27 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect: _onPinSel
         ) : (
           // 通常のリスト表示
           filteredPins.length > 0 ? (
-            <VirtualizedPinList
-              pins={filteredPins}
-              columns={activeTabConfig.columns}
-              selectedRows={listView.selectedRows}
-              hoveredRowId={hoveredRowId}
-              sortColumn={listView.sortColumn}
-              sortDirection={listView.sortDirection}
-              onRowSelection={handleRowSelection}
-              onPinSelect={_onPinSelect}
-              onHover={setHoveredRowId}
-              onColumnSort={handleColumnSort}
-              renderCellContent={renderCellContent}
-            />
+            <>
+              {console.log('🎯 Rendering VirtualizedPinList with', { 
+                pinsCount: filteredPins.length, 
+                selectedRowsCount: listView.selectedRows.size,
+                activeTab: activeTabConfig.id 
+              })}
+              <VirtualizedPinList
+                pins={filteredPins}
+                columns={activeTabConfig.columns}
+                selectedRows={listView.selectedRows}
+                hoveredRowId={hoveredRowId}
+                sortColumn={listView.sortColumn}
+                sortDirection={listView.sortDirection}
+                onRowSelection={handleRowSelection}
+                onPinSelect={_onPinSelect}
+                onRangeSelect={handleRangeSelection}
+                onHover={setHoveredRowId}
+                onColumnSort={handleColumnSort}
+                renderCellContent={renderCellContent}
+              />
+            </>
           ) : (
             <div style={{ 
               padding: '40px', 

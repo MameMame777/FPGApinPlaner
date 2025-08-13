@@ -16,10 +16,6 @@ jobs:
     name: Build VS Code Extension
     runs-on: ubuntu-latest
     
-    defaults:
-      run:
-        working-directory: vscode-extension
-    
     steps:
     - name: 📥 Checkout code
       uses: actions/checkout@v4
@@ -35,21 +31,31 @@ jobs:
       with:
         node-version: '20.x'
         cache: 'npm'
-        cache-dependency-path: vscode-extension/package-lock.json
+        cache-dependency-path: package-lock.json
         
-    - name: 📦 Install dependencies
+    - name: 📦 Install main app dependencies
       run: npm ci
       
-    - name: 🔍 Type check
+    - name: 🏗️ Build main application first
+      run: npm run build
+      
+    - name: 📦 Install extension dependencies
+      working-directory: vscode-extension
+      run: npm ci
+      
+    - name: 🔍 Type check extension
+      working-directory: vscode-extension
       run: npm run compile
       
     - name: 🧪 Run tests
+      working-directory: vscode-extension
       run: |
         # Skip tests for now as no test files exist
         echo "Skipping tests - no test files found"
       continue-on-error: true
       
     - name: 📦 Package extension
+      working-directory: vscode-extension
       run: |
         npm install -g @vscode/vsce
         vsce package
@@ -62,6 +68,7 @@ jobs:
         retention-days: 7
         
     - name: 📝 Extension info
+      working-directory: vscode-extension
       run: |
         echo "## 🧩 VS Code拡張機能ビルド完了" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
@@ -79,10 +86,6 @@ jobs:
     needs: build-extension
     if: github.ref == 'refs/heads/master' && contains(github.event.head_commit.message, 'release:')
     
-    defaults:
-      run:
-        working-directory: vscode-extension
-    
     steps:
     - name: 📥 Checkout code
       uses: actions/checkout@v4
@@ -97,12 +100,20 @@ jobs:
       with:
         node-version: '20.x'
         cache: 'npm'
-        cache-dependency-path: vscode-extension/package-lock.json
+        cache-dependency-path: package-lock.json
         
-    - name: 📦 Install dependencies
+    - name: 📦 Install main app dependencies
+      run: npm ci
+      
+    - name: 🏗️ Build main application first
+      run: npm run build
+        
+    - name: 📦 Install extension dependencies
+      working-directory: vscode-extension
       run: npm ci
       
     - name: 🚀 Publish to Marketplace
+      working-directory: vscode-extension
       run: |
         npm install -g @vscode/vsce
         vsce publish

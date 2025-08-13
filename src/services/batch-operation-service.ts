@@ -29,8 +29,8 @@ export interface VoltageIOConfig {
   voltage?: string;          // "3.3V", "1.8V", etc.
   ioStandard?: string;       // "LVCMOS33", "LVCMOS18", etc.
   autoDetectIO?: boolean;    // Auto-detect I/O standard based on voltage
-  driveStrength?: number;    // 2, 4, 6, 8, 12, 16, 20, 24 (mA)
-  slewRate?: 'SLOW' | 'FAST';
+  driveStrength?: string;    // "2", "4", "6", "8", "12", "16", "20", "24" (mA) or "---DriveStrength---" for default
+  slewRate?: 'SLOW' | 'FAST' | '---SlewRate---'; // Slew rate or '---SlewRate---' for default
   termination?: string;      // "NONE", "UNTUNED_SPLIT_40", etc.
 }
 

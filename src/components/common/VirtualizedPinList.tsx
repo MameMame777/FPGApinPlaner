@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Pin, ColumnConfig } from '../../types';
 import { getBankBackgroundColor } from '../../utils/ui-utils';
+import { debugIf, DebugCategory } from '../../utils/debug';
 
 interface VirtualizedPinListProps {
   pins: Pin[];
@@ -11,6 +12,7 @@ interface VirtualizedPinListProps {
   sortDirection: 'asc' | 'desc';
   onRowSelection: (_pinId: string, _selected: boolean) => void;
   onPinSelect?: (_pinId: string) => void;
+  onRangeSelect?: (_fromIndex: number, _toIndex: number) => void;
   onHover: (_pinId: string | null) => void;
   onColumnSort?: (_column: string) => void;
   renderCellContent: (_pin: Pin, _column: ColumnConfig) => React.ReactNode;
@@ -28,12 +30,14 @@ export const VirtualizedPinList: React.FC<VirtualizedPinListProps> = ({
   sortDirection,
   onRowSelection,
   onPinSelect,
+  onRangeSelect,
   onHover,
   onColumnSort,
   renderCellContent,
 }) => {
   const [scrollTop, setScrollTop] = useState(0);
   const [containerHeight, setContainerHeight] = useState(400);
+  const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollElementRef = useRef<HTMLDivElement>(null);
 
@@ -50,6 +54,43 @@ export const VirtualizedPinList: React.FC<VirtualizedPinListProps> = ({
       visibleCount: end - adjustedStart
     };
   }, [scrollTop, containerHeight, pins.length]);
+
+  // Handle checkbox click with range selection support
+  const handleCheckboxClick = useCallback((pin: Pin, index: number, event: React.ChangeEvent<HTMLInputElement>) => {
+    const isChecked = event.target.checked;
+    
+    // Check if Shift key was held during the click
+    const wasShiftPressed = (event.nativeEvent as MouseEvent)?.shiftKey;
+    
+    debugIf('CHECKBOX', DebugCategory.CHECKBOX, 'Checkbox clicked', { 
+      pinId: pin.id, 
+      index, 
+      isChecked,
+      shiftKey: wasShiftPressed,
+      lastClickedIndex,
+      onRangeSelect: !!onRangeSelect
+    });
+
+    if (wasShiftPressed && lastClickedIndex !== null && onRangeSelect) {
+      // Range selection with Shift+checkbox click
+      const fromIndex = Math.min(lastClickedIndex, index);
+      const toIndex = Math.max(lastClickedIndex, index);
+      debugIf('RANGE', DebugCategory.RANGE, 'Checkbox range selection', { fromIndex, toIndex, lastClickedIndex, currentIndex: index });
+      onRangeSelect(fromIndex, toIndex);
+      setLastClickedIndex(index);
+    } else {
+      // Individual checkbox toggle
+      debugIf('CHECKBOX', DebugCategory.CHECKBOX, 'Individual checkbox toggle', { pinId: pin.id, isChecked });
+      onRowSelection(pin.id, isChecked);
+      setLastClickedIndex(index);
+    }
+  }, [lastClickedIndex, onRangeSelect, onRowSelection, setLastClickedIndex]);
+
+  // Handle row click for 3D view pin selection
+  const handleRowClick = useCallback((pin: Pin) => {
+    debugIf('SELECTION', DebugCategory.SELECTION, 'Row click - 3D view selection', { pinId: pin.id });
+    onPinSelect?.(pin.id);
+  }, [onPinSelect]);
 
   // Get visible pins
   const visiblePins = useMemo(() => {
@@ -218,7 +259,8 @@ export const VirtualizedPinList: React.FC<VirtualizedPinListProps> = ({
           >
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <tbody>
-                {visiblePins.map((pin) => {
+                {visiblePins.map((pin, visibleIndex) => {
+                  const actualIndex = visibleRange.start + visibleIndex;
                   const isHovered = hoveredRowId === pin.id;
                   const backgroundColor = getBankBackgroundColor(pin.bank, selectedRows.has(pin.id), isHovered);
                   
@@ -232,7 +274,7 @@ export const VirtualizedPinList: React.FC<VirtualizedPinListProps> = ({
                         color: '#ffffff',
                         height: `${ITEM_HEIGHT}px`,
                       }}
-                      onClick={() => onPinSelect?.(pin.id)}
+                      onClick={() => handleRowClick(pin)}
                       onMouseEnter={() => onHover(pin.id)}
                       onMouseLeave={() => onHover(null)}
                     >
@@ -245,7 +287,7 @@ export const VirtualizedPinList: React.FC<VirtualizedPinListProps> = ({
                         <input
                           type="checkbox"
                           checked={selectedRows.has(pin.id)}
-                          onChange={(e) => onRowSelection(pin.id, e.target.checked)}
+                          onChange={(e) => handleCheckboxClick(pin, actualIndex, e)}
                           onClick={(e) => e.stopPropagation()}
                         />
                       </td>

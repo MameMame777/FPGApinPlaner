@@ -489,7 +489,7 @@ export class DifferentialPairService {
       constraints.push(`# Maximum skew: ${pair.constraints.maxSkew}ps`);
     }
 
-    if (pair.constraints?.slewRate) {
+    if (pair.constraints?.slewRate && pair.constraints.slewRate !== '---SlewRate---') {
       constraints.push(`set_property SLEW ${pair.constraints.slewRate} [get_ports {${pair.name}_p ${pair.name}_n}]`);
     }
 

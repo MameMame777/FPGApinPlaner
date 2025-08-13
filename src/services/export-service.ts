@@ -1,5 +1,6 @@
 // Export service for generating various output formats
 import { Pin, Package } from '@/types';
+import { getDefaultIOStandard } from '@/constants/pin-constants';
 
 export class ExportService {
   /**
@@ -25,17 +26,33 @@ export class ExportService {
       // Pin location constraint
       lines.push(`set_property PACKAGE_PIN ${pin.pinNumber} [get_ports ${pin.signalName}]`);
       
-      // I/O standard constraint (if available)
-      if (pin.voltage) {
-        const iostandard = pin.voltage === '3.3V' ? 'LVCMOS33' : 
-                          pin.voltage === '1.8V' ? 'LVCMOS18' :
-                          pin.voltage === '2.5V' ? 'LVCMOS25' : 'LVCMOS33';
+      // I/O standard constraint (check user-selected first, then fall back to voltage-based default)
+      const userIOStandard = pin.attributes?.['IO_Standard'] || pin.ioType;
+      if (userIOStandard && userIOStandard !== 'AUTO') {
+        lines.push(`set_property IOSTANDARD ${userIOStandard} [get_ports ${pin.signalName}]`);
+      } else if (pin.voltage) {
+        const iostandard = getDefaultIOStandard(pin.voltage);
         lines.push(`set_property IOSTANDARD ${iostandard} [get_ports ${pin.signalName}]`);
       }
       
-      // Drive strength for outputs (if direction is available)
-      if (pin.direction === 'Output' || pin.direction === 'InOut') {
-        lines.push(`set_property DRIVE 12 [get_ports ${pin.signalName}]`);
+      // Drive strength for outputs only (not for inputs)
+      const driveStrength = pin.attributes?.['Drive_Strength'];
+      if (driveStrength && driveStrength !== '---DriveStrength---') {
+        // Only apply DRIVE property to Output and InOut pins, never to Input pins
+        if (pin.direction === 'Output' || pin.direction === 'InOut') {
+          lines.push(`set_property DRIVE ${driveStrength} [get_ports ${pin.signalName}]`);
+        }
+        // Note: Input pins don't need DRIVE property as they don't drive signals
+      }
+      
+      // Slew rate for outputs only (if specified and not default)
+      const slewRate = pin.attributes?.['Slew_Rate'];
+      if (slewRate && slewRate !== '---SlewRate---') {
+        // Only apply SLEW property to Output and InOut pins, never to Input pins
+        if (pin.direction === 'Output' || pin.direction === 'InOut') {
+          lines.push(`set_property SLEW ${slewRate} [get_ports ${pin.signalName}]`);
+        }
+        // Note: Input pins don't need SLEW property as they don't drive signals
       }
       
       return lines.join('\n');

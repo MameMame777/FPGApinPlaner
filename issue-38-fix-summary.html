@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Issue #38 Fix - Drive電流とSlewRate未設定オプション</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-case { margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
+        .new-feature { color: #4CAF50; font-weight: bold; }
+        .code-example { background-color: #f5f5f5; padding: 10px; border-radius: 3px; margin: 10px 0; }
+        .before-after { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .before, .after { padding: 10px; border-radius: 5px; }
+        .before { background-color: #ffebee; }
+        .after { background-color: #e8f5e8; }
+    </style>
+</head>
+<body>
+    <h1>Issue #38 対応完了 - Drive電流とSlewRate未設定オプション追加</h1>
+    
+    <div class="test-case">
+        <h2>📝 実装内容</h2>
+        <p>Drive電流とSlewRateの設定に<span class="new-feature">「------」未設定(デフォルト)</span>オプションを追加しました。</p>
+        
+        <h3>変更されたファイル:</h3>
+        <ul>
+            <li><code>src/constants/pin-constants.ts</code> - 定数配列に「------」を追加</li>
+            <li><code>src/components/common/PinItem.tsx</code> - UI表示とデフォルト値変更</li>
+            <li><code>src/services/export-service.ts</code> - エクスポート時の条件分岐追加</li>
+            <li><code>src/types/core.ts</code> - 型定義を更新</li>
+            <li><code>src/services/batch-operation-service.ts</code> - バッチ操作対応</li>
+            <li><code>src/components/common/BatchOperationPanel.tsx</code> - UI更新</li>
+        </ul>
+    </div>
+
+    <div class="test-case">
+        <h2>🔧 Drive電流の変更内容</h2>
+        
+        <div class="before-after">
+            <div class="before">
+                <h4>修正前</h4>
+                <div class="code-example">
+                    <strong>定数:</strong><br>
+                    DRIVE_STRENGTHS = [2, 4, 6, 8, 12, 16, 20, 24]<br><br>
+                    <strong>デフォルト値:</strong><br>
+                    pin.attributes?.['Drive_Strength'] || '12'<br><br>
+                    <strong>XDC出力:</strong><br>
+                    set_property DRIVE 12 [get_ports signal_name]
+                </div>
+            </div>
+            
+            <div class="after">
+                <h4>修正後</h4>
+                <div class="code-example">
+                    <strong>定数:</strong><br>
+                    DRIVE_STRENGTHS = ['------', '2', '4', '6', '8', '12', '16', '20', '24']<br><br>
+                    <strong>デフォルト値:</strong><br>
+                    pin.attributes?.['Drive_Strength'] || '------'<br><br>
+                    <strong>XDC出力:</strong><br>
+                    (「------」の場合は出力しない)
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="test-case">
+        <h2>⚡ SlewRateの変更内容</h2>
+        
+        <div class="before-after">
+            <div class="before">
+                <h4>修正前</h4>
+                <div class="code-example">
+                    <strong>定数:</strong><br>
+                    SLEW_RATES = ['SLOW', 'FAST']<br><br>
+                    <strong>デフォルト値:</strong><br>
+                    pin.attributes?.['Slew_Rate'] || 'FAST'<br><br>
+                    <strong>XDC出力:</strong><br>
+                    常に何らかの値が出力される
+                </div>
+            </div>
+            
+            <div class="after">
+                <h4>修正後</h4>
+                <div class="code-example">
+                    <strong>定数:</strong><br>
+                    SLEW_RATES = ['------', 'SLOW', 'FAST']<br><br>
+                    <strong>デフォルト値:</strong><br>
+                    pin.attributes?.['Slew_Rate'] || '------'<br><br>
+                    <strong>XDC出力:</strong><br>
+                    (「------」の場合は出力しない)
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="test-case">
+        <h2>📤 エクスポート処理の改善</h2>
+        <p>XDCファイル生成時に、「------」が設定されている場合は該当のプロパティを出力しません。</p>
+        
+        <div class="code-example">
+            <strong>修正後のエクスポートロジック:</strong><br>
+            <pre>
+// Drive strength for outputs (if available and not default)
+const driveStrength = pin.attributes?.['Drive_Strength'];
+if ((pin.direction === 'Output' || pin.direction === 'InOut') && 
+    driveStrength && driveStrength !== '------') {
+  lines.push(`set_property DRIVE ${driveStrength} [get_ports ${pin.signalName}]`);
+}
+
+// Slew rate (if specified and not default)
+const slewRate = pin.attributes?.['Slew_Rate'];
+if (slewRate && slewRate !== '------') {
+  lines.push(`set_property SLEW ${slewRate} [get_ports ${pin.signalName}]`);
+}
+            </pre>
+        </div>
+    </div>
+
+    <div class="test-case">
+        <h2>🎯 期待される動作</h2>
+        <ol>
+            <li><strong>GUI表示:</strong> ドロップダウンで「未設定(デフォルト)」が選択可能</li>
+            <li><strong>新規ピン:</strong> デフォルトで「------」が設定される</li>
+            <li><strong>エクスポート:</strong> 「------」の場合はXDCに出力されない</li>
+            <li><strong>Vivado動作:</strong> ツールのデフォルト設定が使用される</li>
+        </ol>
+    </div>
+
+    <div class="test-case">
+        <h2>✅ テスト手順</h2>
+        <ol>
+            <li>FPGA Pin Plannerを起動</li>
+            <li>任意のピンを選択</li>
+            <li>I/O設定パネルを開く</li>
+            <li>Drive StrengthとSlew Rateで「未設定(デフォルト)」を選択</li>
+            <li>XDCファイルをエクスポート</li>
+            <li>該当ピンでDRIVEとSLEWプロパティが出力されていないことを確認</li>
+        </ol>
+    </div>
+
+    <div class="test-case">
+        <h2>🎉 修正完了</h2>
+        <p><span class="new-feature">Issue #38の要求事項を満たしました！</span></p>
+        <p>これにより、ユーザーは明示的にDrive電流やSlewRateを指定しない場合に、Vivadoのデフォルト設定を使用することができます。</p>
+    </div>
+</body>
+</html>
