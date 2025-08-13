@@ -164,7 +164,7 @@
     "lint": "eslint src --ext ts",
     "test": "node ./out/test/runTest.js",
     "clean": "rimraf out webview-dist",
-    "copy-webview": "rimraf webview-dist && mkdir webview-dist && xcopy ..\\dist\\* webview-dist\\ /E /I /Y",
+    "copy-webview": "rimraf webview-dist && mkdir webview-dist && node -e \"require('fs').cpSync('../dist', 'webview-dist', {recursive: true})\"",
     "build": "npm run clean && npm run copy-webview && npm run compile",
     "package": "npm run build && vsce package",
     "publish": "vsce publish"
