@@ -35,17 +35,24 @@ export class ExportService {
         lines.push(`set_property IOSTANDARD ${iostandard} [get_ports ${pin.signalName}]`);
       }
       
-      // Drive strength for outputs (if available and not default)
+      // Drive strength for outputs only (not for inputs)
       const driveStrength = pin.attributes?.['Drive_Strength'];
-      if ((pin.direction === 'Output' || pin.direction === 'InOut') && 
-          driveStrength && driveStrength !== '---DriveStrength---') {
-        lines.push(`set_property DRIVE ${driveStrength} [get_ports ${pin.signalName}]`);
+      if (driveStrength && driveStrength !== '---DriveStrength---') {
+        // Only apply DRIVE property to Output and InOut pins, never to Input pins
+        if (pin.direction === 'Output' || pin.direction === 'InOut') {
+          lines.push(`set_property DRIVE ${driveStrength} [get_ports ${pin.signalName}]`);
+        }
+        // Note: Input pins don't need DRIVE property as they don't drive signals
       }
       
-      // Slew rate (if specified and not default)
+      // Slew rate for outputs only (if specified and not default)
       const slewRate = pin.attributes?.['Slew_Rate'];
       if (slewRate && slewRate !== '---SlewRate---') {
-        lines.push(`set_property SLEW ${slewRate} [get_ports ${pin.signalName}]`);
+        // Only apply SLEW property to Output and InOut pins, never to Input pins
+        if (pin.direction === 'Output' || pin.direction === 'InOut') {
+          lines.push(`set_property SLEW ${slewRate} [get_ports ${pin.signalName}]`);
+        }
+        // Note: Input pins don't need SLEW property as they don't drive signals
       }
       
       return lines.join('\n');
