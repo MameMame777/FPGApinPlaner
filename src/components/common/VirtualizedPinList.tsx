@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Pin, ColumnConfig } from '../../types';
 import { getBankBackgroundColor } from '../../utils/ui-utils';
+import { debugIf, DebugCategory } from '../../utils/debug';
 
 interface VirtualizedPinListProps {
   pins: Pin[];
@@ -61,7 +62,7 @@ export const VirtualizedPinList: React.FC<VirtualizedPinListProps> = ({
     // Check if Shift key was held during the click
     const wasShiftPressed = (event.nativeEvent as MouseEvent)?.shiftKey;
     
-    console.log('☑️ handleCheckboxClick:', { 
+    debugIf('CHECKBOX', DebugCategory.CHECKBOX, 'Checkbox clicked', { 
       pinId: pin.id, 
       index, 
       isChecked,
@@ -74,12 +75,12 @@ export const VirtualizedPinList: React.FC<VirtualizedPinListProps> = ({
       // Range selection with Shift+checkbox click
       const fromIndex = Math.min(lastClickedIndex, index);
       const toIndex = Math.max(lastClickedIndex, index);
-      console.log('🎯 Checkbox range selection:', { fromIndex, toIndex, lastClickedIndex, currentIndex: index });
+      debugIf('RANGE', DebugCategory.RANGE, 'Checkbox range selection', { fromIndex, toIndex, lastClickedIndex, currentIndex: index });
       onRangeSelect(fromIndex, toIndex);
       setLastClickedIndex(index);
     } else {
       // Individual checkbox toggle
-      console.log('☑️ Individual checkbox toggle:', pin.id, isChecked);
+      debugIf('CHECKBOX', DebugCategory.CHECKBOX, 'Individual checkbox toggle', { pinId: pin.id, isChecked });
       onRowSelection(pin.id, isChecked);
       setLastClickedIndex(index);
     }
@@ -87,7 +88,7 @@ export const VirtualizedPinList: React.FC<VirtualizedPinListProps> = ({
 
   // Handle row click for 3D view pin selection
   const handleRowClick = useCallback((pin: Pin) => {
-    console.log('👆 Row click - 3D view selection:', pin.id);
+    debugIf('SELECTION', DebugCategory.SELECTION, 'Row click - 3D view selection', { pinId: pin.id });
     onPinSelect?.(pin.id);
   }, [onPinSelect]);
 

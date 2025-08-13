@@ -12,6 +12,7 @@ import {
   getDefaultIOStandard 
 } from '../../constants/pin-constants';
 import { Pin, ColumnConfig } from '../../types';
+import { debug, DebugCategory } from '../../utils/debug';
 
 interface PinListTabsProps {
   onPinSelect?: (_pinId: string) => void;
@@ -267,7 +268,7 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect: _onPinSel
         });
       });
       setBulkSignal('');
-      console.log(`🔧 Applied signal "${bulkSignal.trim()}" to ${selectedPins.length} pins`);
+      debug.log(DebugCategory.BULK_EDIT, `Applied signal "${bulkSignal.trim()}" to ${selectedPins.length} pins`);
     }
   };
 
@@ -279,7 +280,7 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect: _onPinSel
           signalName: ''
         });
       });
-      console.log(`🧹 Cleared signals from ${selectedPins.length} pins`);
+      debug.log(DebugCategory.BULK_EDIT, `Cleared signals from ${selectedPins.length} pins`);
     }
   };
 

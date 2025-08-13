@@ -4,6 +4,7 @@ import { enableMapSet } from 'immer';
 import { Pin, Package, ViewConfig, FilterState, FPGAProject, SortField, SortOrder, ListViewState, ViewMode, PinColorMode } from '@/types';
 import { UndoRedoService, Action } from '@/services/undo-redo-service';
 import { compareRows } from '@/utils/grid-utils';
+import { debug, DebugCategory } from '@/utils/debug';
 
 // Enable Immer MapSet plugin
 enableMapSet();
@@ -221,7 +222,7 @@ export const useAppStore = create<AppState & AppActions>()(
           allBanks.add(bank);
         });
         state.visibleBanks = allBanks;
-        console.log('🏪 ストア: newProject - 初期化された visibleBanks:', Array.from(allBanks));
+        debug.log(DebugCategory.STORE, 'newProject - initialized visibleBanks:', Array.from(allBanks));
         
         // Apply initial filters and sorting
         get().applyFilters();
@@ -240,7 +241,7 @@ export const useAppStore = create<AppState & AppActions>()(
     // Package and pin management
     loadPackage: (packageData) =>
       set((state) => {
-        console.log('🏪 ストア: loadPackage開始', packageData);
+        debug.log(DebugCategory.STORE, 'loadPackage started', packageData);
         state.package = packageData;
         state.pins = packageData.pins;
         state.filteredPins = packageData.pins;
@@ -253,7 +254,7 @@ export const useAppStore = create<AppState & AppActions>()(
           allBanks.add(bank);
         });
         state.visibleBanks = allBanks;
-        console.log('🏪 ストア: 初期化された visibleBanks:', Array.from(allBanks));
+        debug.log(DebugCategory.STORE, 'initialized visibleBanks:', Array.from(allBanks));
         
         console.log('🏪 ストア更新完了:', {
           packageName: state.package?.name,
