@@ -1,5 +1,6 @@
 // Export service for generating various output formats
 import { Pin, Package } from '@/types';
+import { getDefaultIOStandard } from '@/constants/pin-constants';
 
 export class ExportService {
   /**
@@ -25,11 +26,12 @@ export class ExportService {
       // Pin location constraint
       lines.push(`set_property PACKAGE_PIN ${pin.pinNumber} [get_ports ${pin.signalName}]`);
       
-      // I/O standard constraint (if available)
-      if (pin.voltage) {
-        const iostandard = pin.voltage === '3.3V' ? 'LVCMOS33' : 
-                          pin.voltage === '1.8V' ? 'LVCMOS18' :
-                          pin.voltage === '2.5V' ? 'LVCMOS25' : 'LVCMOS33';
+      // I/O standard constraint (check user-selected first, then fall back to voltage-based default)
+      const userIOStandard = pin.attributes?.['IO_Standard'] || pin.ioType;
+      if (userIOStandard && userIOStandard !== 'AUTO') {
+        lines.push(`set_property IOSTANDARD ${userIOStandard} [get_ports ${pin.signalName}]`);
+      } else if (pin.voltage) {
+        const iostandard = getDefaultIOStandard(pin.voltage);
         lines.push(`set_property IOSTANDARD ${iostandard} [get_ports ${pin.signalName}]`);
       }
       
