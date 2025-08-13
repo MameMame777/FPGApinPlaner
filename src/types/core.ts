@@ -303,6 +303,7 @@ export interface ListViewState {
   viewMode: ViewMode;
   searchQuery: string;
   selectedRows: Set<string>;
+  lastSelectedPinId: string | null; // For range selection anchor
   sortColumn?: string;
   sortDirection: 'asc' | 'desc';
   commentFilter: 'all' | 'with-comments' | 'without-comments';

@@ -215,21 +215,34 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect: _onPinSel
     const newSelection = new Set(listView.selectedRows);
     if (selected) {
       newSelection.add(pinId);
+      debug.log(DebugCategory.SELECTION, `Pin selected: ${pinId}`, {
+        totalSelected: newSelection.size,
+        action: 'add'
+      });
     } else {
       newSelection.delete(pinId);
+      debug.log(DebugCategory.SELECTION, `Pin deselected: ${pinId}`, {
+        totalSelected: newSelection.size,
+        action: 'remove'
+      });
     }
     updateListViewState({ selectedRows: newSelection });
   };
 
   const handleRangeSelection = (fromIndex: number, toIndex: number) => {
-    console.log('📋 handleRangeSelection called:', { fromIndex, toIndex, filteredPinsLength: filteredPins.length });
+    debug.log(DebugCategory.SELECTION, 'Range selection started', { 
+      fromIndex, 
+      toIndex, 
+      filteredPinsLength: filteredPins.length,
+      currentSelectionSize: listView.selectedRows.size
+    });
     
     // For range selection, we should extend the current selection, not replace it
     const newSelection = new Set(listView.selectedRows);
     const start = Math.min(fromIndex, toIndex);
     const end = Math.max(fromIndex, toIndex);
     
-    console.log('📋 Range calculation:', { start, end, currentSelection: newSelection.size });
+    debug.log(DebugCategory.SELECTION, 'Range calculation', { start, end, currentSelection: newSelection.size });
     
     // Add all pins in the range to selection
     const selectedPinIds: string[] = [];
@@ -237,10 +250,15 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect: _onPinSel
       const pinId = filteredPins[i].id;
       newSelection.add(pinId);
       selectedPinIds.push(pinId);
-      console.log(`📋 Adding pin ${i}: ${pinId}`);
+      debug.log(DebugCategory.SELECTION, `Adding pin ${i}: ${pinId}`);
     }
     
-    console.log('📋 Final selection size:', newSelection.size, 'Selected pins:', selectedPinIds);
+    debug.log(DebugCategory.SELECTION, 'Range selection completed', {
+      finalSelectionSize: newSelection.size,
+      newlySelectedPins: selectedPinIds,
+      rangeSize: selectedPinIds.length
+    });
+    
     updateListViewState({ selectedRows: newSelection });
   };
 
@@ -262,24 +280,42 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect: _onPinSel
   const handleBulkSignalApply = () => {
     if (bulkSignal.trim() && listView.selectedRows.size > 0) {
       const selectedPins = Array.from(listView.selectedRows);
+      debug.log(DebugCategory.BULK_EDIT, `Starting bulk signal assignment`, {
+        signal: bulkSignal.trim(),
+        selectedCount: selectedPins.length,
+        selectedPins: selectedPins
+      });
+      
       selectedPins.forEach(pinId => {
         updatePin(pinId, { 
-          signalName: bulkSignal.trim()
+          signalName: bulkSignal.trim(),
+          isAssigned: true
         });
       });
+      
       setBulkSignal('');
       debug.log(DebugCategory.BULK_EDIT, `Applied signal "${bulkSignal.trim()}" to ${selectedPins.length} pins`);
+      
+      // Optional: Clear selection after bulk operation
+      // updateListViewState({ selectedRows: new Set() });
     }
   };
 
   const handleBulkSignalClear = () => {
     if (listView.selectedRows.size > 0) {
       const selectedPins = Array.from(listView.selectedRows);
+      debug.log(DebugCategory.BULK_EDIT, `Starting bulk signal clearing`, {
+        selectedCount: selectedPins.length,
+        selectedPins: selectedPins
+      });
+      
       selectedPins.forEach(pinId => {
         updatePin(pinId, { 
-          signalName: ''
+          signalName: '',
+          isAssigned: false
         });
       });
+      
       debug.log(DebugCategory.BULK_EDIT, `Cleared signals from ${selectedPins.length} pins`);
     }
   };
@@ -557,7 +593,14 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect: _onPinSel
                 placeholder="Enter comment for selected pins..."
                 value={bulkComment}
                 onChange={(e) => setBulkComment(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleBulkCommentApply()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleBulkCommentApply();
+                  } else if (e.key === 'Escape') {
+                    setBulkComment('');
+                    setShowBulkEditor(false);
+                  }
+                }}
                 style={{
                   flex: 1,
                   padding: '8px 12px',
@@ -597,7 +640,14 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect: _onPinSel
                 placeholder="Enter signal name for selected pins..."
                 value={bulkSignal}
                 onChange={(e) => setBulkSignal(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleBulkSignalApply()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleBulkSignalApply();
+                  } else if (e.key === 'Escape') {
+                    setBulkSignal('');
+                    setShowBulkEditor(false);
+                  }
+                }}
                 style={{
                   flex: 1,
                   padding: '8px 12px',
@@ -804,6 +854,7 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect: _onPinSel
                 pins={filteredPins}
                 columns={activeTabConfig.columns}
                 selectedRows={listView.selectedRows}
+                lastSelectedPinId={listView.lastSelectedPinId}
                 hoveredRowId={hoveredRowId}
                 sortColumn={listView.sortColumn}
                 sortDirection={listView.sortDirection}
@@ -812,6 +863,7 @@ export const PinListTabs: React.FC<PinListTabsProps> = ({ onPinSelect: _onPinSel
                 onRangeSelect={handleRangeSelection}
                 onHover={setHoveredRowId}
                 onColumnSort={handleColumnSort}
+                onLastSelectedPinIdChange={(pinId) => updateListViewState({ lastSelectedPinId: pinId })}
                 renderCellContent={renderCellContent}
               />
             </>

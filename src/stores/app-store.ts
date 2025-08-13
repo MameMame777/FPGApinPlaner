@@ -145,6 +145,7 @@ const initialListView: ListViewState = {
   viewMode: 'grid',
   searchQuery: '',
   selectedRows: new Set(),
+  lastSelectedPinId: null,
   sortColumn: undefined,
   sortDirection: 'asc',
   commentFilter: 'all',

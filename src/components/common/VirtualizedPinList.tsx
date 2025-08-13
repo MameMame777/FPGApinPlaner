@@ -7,6 +7,7 @@ interface VirtualizedPinListProps {
   pins: Pin[];
   columns: ColumnConfig[];
   selectedRows: Set<string>;
+  lastSelectedPinId: string | null;
   hoveredRowId: string | null;
   sortColumn?: string;
   sortDirection: 'asc' | 'desc';
@@ -15,6 +16,7 @@ interface VirtualizedPinListProps {
   onRangeSelect?: (_fromIndex: number, _toIndex: number) => void;
   onHover: (_pinId: string | null) => void;
   onColumnSort?: (_column: string) => void;
+  onLastSelectedPinIdChange?: (_pinId: string | null) => void;
   renderCellContent: (_pin: Pin, _column: ColumnConfig) => React.ReactNode;
 }
 
@@ -25,6 +27,7 @@ export const VirtualizedPinList: React.FC<VirtualizedPinListProps> = ({
   pins,
   columns,
   selectedRows,
+  lastSelectedPinId,
   hoveredRowId,
   sortColumn,
   sortDirection,
@@ -33,11 +36,11 @@ export const VirtualizedPinList: React.FC<VirtualizedPinListProps> = ({
   onRangeSelect,
   onHover,
   onColumnSort,
+  onLastSelectedPinIdChange,
   renderCellContent,
 }) => {
   const [scrollTop, setScrollTop] = useState(0);
   const [containerHeight, setContainerHeight] = useState(400);
-  const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollElementRef = useRef<HTMLDivElement>(null);
 
@@ -62,29 +65,33 @@ export const VirtualizedPinList: React.FC<VirtualizedPinListProps> = ({
     // Check if Shift key was held during the click
     const wasShiftPressed = (event.nativeEvent as MouseEvent)?.shiftKey;
     
+    // Find the index of the last selected pin
+    const lastSelectedIndex = lastSelectedPinId ? pins.findIndex(p => p.id === lastSelectedPinId) : null;
+    
     debugIf('CHECKBOX', DebugCategory.CHECKBOX, 'Checkbox clicked', { 
       pinId: pin.id, 
       index, 
       isChecked,
       shiftKey: wasShiftPressed,
-      lastClickedIndex,
+      lastSelectedPinId,
+      lastSelectedIndex,
       onRangeSelect: !!onRangeSelect
     });
 
-    if (wasShiftPressed && lastClickedIndex !== null && onRangeSelect) {
+    if (wasShiftPressed && lastSelectedIndex !== null && onRangeSelect) {
       // Range selection with Shift+checkbox click
-      const fromIndex = Math.min(lastClickedIndex, index);
-      const toIndex = Math.max(lastClickedIndex, index);
-      debugIf('RANGE', DebugCategory.RANGE, 'Checkbox range selection', { fromIndex, toIndex, lastClickedIndex, currentIndex: index });
+      const fromIndex = Math.min(lastSelectedIndex, index);
+      const toIndex = Math.max(lastSelectedIndex, index);
+      debugIf('RANGE', DebugCategory.RANGE, 'Checkbox range selection', { fromIndex, toIndex, lastSelectedIndex, currentIndex: index });
       onRangeSelect(fromIndex, toIndex);
-      setLastClickedIndex(index);
+      onLastSelectedPinIdChange?.(pin.id);
     } else {
       // Individual checkbox toggle
       debugIf('CHECKBOX', DebugCategory.CHECKBOX, 'Individual checkbox toggle', { pinId: pin.id, isChecked });
       onRowSelection(pin.id, isChecked);
-      setLastClickedIndex(index);
+      onLastSelectedPinIdChange?.(pin.id);
     }
-  }, [lastClickedIndex, onRangeSelect, onRowSelection, setLastClickedIndex]);
+  }, [pins, lastSelectedPinId, onRangeSelect, onRowSelection, onLastSelectedPinIdChange]);
 
   // Handle row click for 3D view pin selection
   const handleRowClick = useCallback((pin: Pin) => {
