@@ -65,6 +65,7 @@ interface AppActions {
   selectPins: (_pinIds: string[]) => void;
   clearSelection: () => void;
   togglePinSelection: (_pinId: string) => void;
+  selectPinRange: (_startPinId: string, _endPinId: string, _filteredPins: Pin[]) => void;
   
   // View management
   setRotation: (_rotation: number) => void;
@@ -368,6 +369,23 @@ export const useAppStore = create<AppState & AppActions>()(
           state.selectedPins.delete(pinId);
         } else {
           state.selectedPins.add(pinId);
+        }
+      }),
+
+    // Range selection for list view (Shift+click functionality)
+    selectPinRange: (startPinId: string, endPinId: string, filteredPins: Pin[]) =>
+      set((state) => {
+        const startIndex = filteredPins.findIndex((pin: Pin) => pin.id === startPinId);
+        const endIndex = filteredPins.findIndex((pin: Pin) => pin.id === endPinId);
+        
+        if (startIndex !== -1 && endIndex !== -1) {
+          const start = Math.min(startIndex, endIndex);
+          const end = Math.max(startIndex, endIndex);
+          
+          // Add all pins in the range to selection
+          for (let i = start; i <= end; i++) {
+            state.selectedPins.add(filteredPins[i].id);
+          }
         }
       }),
 
