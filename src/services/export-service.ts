@@ -35,9 +35,17 @@ export class ExportService {
         lines.push(`set_property IOSTANDARD ${iostandard} [get_ports ${pin.signalName}]`);
       }
       
-      // Drive strength for outputs (if direction is available)
-      if (pin.direction === 'Output' || pin.direction === 'InOut') {
-        lines.push(`set_property DRIVE 12 [get_ports ${pin.signalName}]`);
+      // Drive strength for outputs (if available and not default)
+      const driveStrength = pin.attributes?.['Drive_Strength'];
+      if ((pin.direction === 'Output' || pin.direction === 'InOut') && 
+          driveStrength && driveStrength !== '---DriveStrength---') {
+        lines.push(`set_property DRIVE ${driveStrength} [get_ports ${pin.signalName}]`);
+      }
+      
+      // Slew rate (if specified and not default)
+      const slewRate = pin.attributes?.['Slew_Rate'];
+      if (slewRate && slewRate !== '---SlewRate---') {
+        lines.push(`set_property SLEW ${slewRate} [get_ports ${pin.signalName}]`);
       }
       
       return lines.join('\n');

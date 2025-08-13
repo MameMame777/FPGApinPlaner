@@ -417,7 +417,7 @@ export const PinItem: React.FC<PinItemProps> = ({
                     Drive Strength
                   </label>
                   <select
-                    value={pin.attributes?.['Drive_Strength'] || '12'}
+                    value={pin.attributes?.['Drive_Strength'] || '---DriveStrength---'}
                     onChange={(e) => {
                       e.stopPropagation();
                       handleIOConfigChange('driveStrength', e.target.value);
@@ -434,7 +434,9 @@ export const PinItem: React.FC<PinItemProps> = ({
                     }}
                   >
                     {DRIVE_STRENGTHS.map(strength => (
-                      <option key={strength} value={strength}>{strength}mA</option>
+                      <option key={strength} value={strength}>
+                        {strength === '---DriveStrength---' ? strength : `${strength}mA`}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -446,7 +448,7 @@ export const PinItem: React.FC<PinItemProps> = ({
                   Slew Rate
                 </label>
                 <select
-                  value={pin.attributes?.['Slew_Rate'] || 'FAST'}
+                  value={pin.attributes?.['Slew_Rate'] || '---SlewRate---'}
                   onChange={(e) => {
                     e.stopPropagation();
                     handleIOConfigChange('slewRate', e.target.value);
@@ -463,7 +465,9 @@ export const PinItem: React.FC<PinItemProps> = ({
                   }}
                 >
                   {SLEW_RATES.map(rate => (
-                    <option key={rate} value={rate}>{rate}</option>
+                    <option key={rate} value={rate}>
+                      {rate}
+                    </option>
                   ))}
                 </select>
               </div>

@@ -60,8 +60,8 @@ export interface DifferentialConstraints {
   impedance?: number; // 単端インピーダンス (Ohm)
   diffImpedance?: number; // 差動インピーダンス (Ohm)
   ioStandard?: string; // LVDS, TMDS_33, など
-  driveStrength?: string;
-  slewRate?: 'SLOW' | 'FAST';
+  driveStrength?: string; // Drive strength or '---DriveStrength---' for default
+  slewRate?: 'SLOW' | 'FAST' | '---SlewRate---'; // Slew rate or '---SlewRate---' for default
   terminationResistor?: number; // 終端抵抗値 (Ohm)
   couplingCoefficient?: number; // 結合係数 (0-1)
   routingRules?: {

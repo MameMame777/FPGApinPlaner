@@ -47,8 +47,8 @@ export const BatchOperationPanel: React.FC<BatchOperationPanelProps> = ({ isVisi
     voltage: '3.3V',
     ioStandard: 'AUTO',
     autoDetectIO: true,
-    driveStrength: 12,
-    slewRate: 'FAST'
+    driveStrength: '---DriveStrength---',
+    slewRate: '---SlewRate---'
   });
 
   // Direction configuration
@@ -479,10 +479,11 @@ export const BatchOperationPanel: React.FC<BatchOperationPanelProps> = ({ isVisi
                 </label>
                 <select
                   value={voltageIOConfig.driveStrength || ''}
-                  onChange={(e) => setVoltageIOConfig(prev => ({ ...prev, driveStrength: parseInt(e.target.value) }))}
+                  onChange={(e) => setVoltageIOConfig(prev => ({ ...prev, driveStrength: e.target.value }))}
                   className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
                 >
                   <option value="">Keep current</option>
+                  <option value="---DriveStrength---">---DriveStrength---</option>
                   <option value="2">2 mA</option>
                   <option value="4">4 mA</option>
                   <option value="6">6 mA</option>
@@ -500,10 +501,11 @@ export const BatchOperationPanel: React.FC<BatchOperationPanelProps> = ({ isVisi
                 </label>
                 <select
                   value={voltageIOConfig.slewRate || ''}
-                  onChange={(e) => setVoltageIOConfig(prev => ({ ...prev, slewRate: e.target.value as 'SLOW' | 'FAST' }))}
+                  onChange={(e) => setVoltageIOConfig(prev => ({ ...prev, slewRate: e.target.value as 'SLOW' | 'FAST' | '---SlewRate---' }))}
                   className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
                 >
                   <option value="">Keep current</option>
+                  <option value="---SlewRate---">---SlewRate---</option>
                   <option value="SLOW">SLOW</option>
                   <option value="FAST">FAST</option>
                 </select>

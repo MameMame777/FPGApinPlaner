@@ -90,11 +90,13 @@ export const COMPATIBLE_IO_STANDARDS: Record<string, string[]> = {
 
 // Drive strength options (in mA)
 export const DRIVE_STRENGTHS = [
-  2, 4, 6, 8, 12, 16, 20, 24
+  '---DriveStrength---', // 未設定(デフォルト)
+  '2', '4', '6', '8', '12', '16', '20', '24'
 ] as const;
 
 // Slew rate options
 export const SLEW_RATES = [
+  '---SlewRate---', // 未設定(デフォルト)
   'SLOW',
   'FAST'
 ] as const;
